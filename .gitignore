@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-web
+.vite
+*.local
+.DS_Store
+.env
+.env.*
+# NOTE: src/ui/type.css IS committed. It carries both typefaces base64-inlined,
+# which is what lets the app render identically from a folder with no network.
+# src/ui/fonts/*.woff2 are the sources it was generated from and are committed
+# too, so the file can be rebuilt rather than trusted.
+_zips
+_to_delete
+tsconfig.tsbuildinfo
+*.csv

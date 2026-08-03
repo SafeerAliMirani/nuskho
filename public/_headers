@@ -1,0 +1,22 @@
+# Cloudflare Pages headers.
+#
+# The app has no backend, no cookies and no third-party anything, so the policy
+# can be as tight as a policy gets. connect-src 'none' is the important line: it
+# means a browser will refuse to let this app talk to any server at all, which
+# turns the promise "nothing leaves this computer" from an intention into
+# something the browser enforces.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/sw.js
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

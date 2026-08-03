@@ -1,0 +1,33 @@
+# Netlify, standing in for Cloudflare until nuskho.pk is registered.
+#
+# The headers below are the same ones in public/_headers, repeated here because
+# Netlify reads this file first. The line that matters is connect-src 'none':
+# it tells the browser to refuse any network request this app makes, to
+# anywhere, which turns "nothing about a patient leaves this computer" from a
+# promise into something the browser enforces against our own future mistakes.
+[build]
+  publish = "dist-web"
+  command = "npm run build:web"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), interest-cohort=()"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

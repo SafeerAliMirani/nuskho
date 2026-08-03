@@ -1,0 +1,1566 @@
+/* =============================================================================
+   NUSKHO — the interface
+   =============================================================================
+
+   Written as three layers, in this order, and it matters:
+
+     1. TOKENS      one place where a colour, a size or a duration is decided
+     2. COMPONENTS  every control, built out of tokens and nothing else
+     3. ADAPTATION  what changes on a phone, and what happens when it moves
+
+   THE RULE THIS FILE OBEYS
+
+   Nothing may stand between the doctor and the printed paper. So the prescribing
+   flow — chips, dose buttons, the print bar — keeps the exact geometry it always
+   had. It has been changed here only in colour, weight and shadow. Nothing moved,
+   nothing shrank, nothing waits for a transition before it responds. A doctor who
+   knows where a button is at 9pm on a Tuesday still finds it in the same place.
+
+   Everywhere else is free.
+
+   TOUCH FIRST. 48px is the smallest thing a thumb hits reliably, and this is used
+   on a tablet on a desk in a room with a queue outside. Mouse users lose nothing
+   by having large targets; tablet users lose a patient's dose by having small ones.
+   ============================================================================= */
+
+/* ---------------------------------------------------------------- 1. tokens */
+
+:root{
+  /* Green because it is what a clinic in Sindh already looks like, and because
+     it survives being printed grey. One hue, six steps, no second accent. */
+  --g:#0f5c4a;            /* the brand. Buttons, headings, anything decisive */
+  --g-700:#0b4335;
+  --g-600:#146850;
+  --g-500:#2b8f74;
+  --g-100:#e6f0ec;        /* selected chips, quiet fills */
+  --g-50:#f2f8f6;
+
+  /* Gold. One warm accent against all that green, used almost nowhere: the
+     mark, a hover edge, the hairline under the header. A single restrained
+     second colour is the difference between a palette and a paint job. */
+  --gold:#c9a227;
+  --gold-100:#f7efd6;
+
+  --ink:#0c1412;          /* real text. Not black: pure black on white glares */
+  --ink-2:#3b4c47;        /* secondary text that must still be read */
+  --mut:#687671;          /* labels, units, things you read once */
+  --faint:#9aa8a3;
+
+  --line:#e3eae7;
+  --line-2:#f0f4f2;
+  --bg:#eef2f0;
+  --card:#ffffff;
+
+  /* Two families doing two jobs. See ui/type.css. */
+  --display:'NKDisplay','NKText',-apple-system,'Segoe UI',system-ui,Arial,sans-serif;
+  --text:'NKText',-apple-system,'Segoe UI',system-ui,Arial,sans-serif;
+
+  /* the three things that are never green */
+  --warn:#8a5b00;  --warn-bg:#fdf7ea;  --warn-line:#ecd8a8;
+  --bad:#a3301a;   --bad-bg:#fdf4f1;   --bad-line:#e8c6bb;
+  --adm:#4b3b73;   --adm-bg:#f1ecf9;   --adm-line:#d8cbec;
+
+  /* one ramp, so a card never invents its own shadow */
+  /* Elevation as light, not as grey. Each step is a tight contact shadow plus a
+     wide soft one, tinted with the brand hue instead of black, which is what
+     keeps a stack of white cards from looking like photocopies. */
+  --sh-1:0 1px 1.5px rgba(9,38,31,.05), 0 1px 3px rgba(9,38,31,.04);
+  --sh-2:0 1px 2px rgba(9,38,31,.05), 0 6px 14px -4px rgba(9,38,31,.10);
+  --sh-3:0 2px 4px rgba(9,38,31,.05), 0 16px 34px -8px rgba(9,38,31,.16);
+  --sh-4:0 4px 10px rgba(9,38,31,.10), 0 34px 70px -14px rgba(9,38,31,.42);
+  --ring:0 0 0 1px rgba(9,38,31,.06);
+
+  /* 4px grid. Every margin in this file is one of these. */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px; --s10:40px;
+  --r1:8px; --r2:12px; --r3:16px; --r4:22px; --rp:999px;
+
+  /* A wider scale than before, on purpose.
+     The old one topped out at 34px and stepped by about 1.22, so every heading
+     was nearly the size of the paragraph under it and the whole app read flat,
+     like a form. Contrast is what makes a screen look composed rather than
+     filled in: small text smaller, display text much larger, and nothing in the
+     middle pretending to be both. */
+  --t-xs:11px; --t-sm:12.5px; --t-md:13.5px; --t-base:15px;
+  --t-lg:18px; --t-xl:23px; --t-2xl:31px; --t-3xl:42px; --t-4xl:56px;
+
+  /* Tracking. Display type wants to be tighter than the browser sets it; small
+     uppercase labels want to be looser or they read as one word. */
+  --tr-tight:-.022em; --tr-snug:-.012em; --tr-wide:.09em;
+
+  /* Motion. Everything animated in this app is one of these three, and the
+     longest is 240ms because anything slower feels like waiting. */
+  --fast:120ms; --mid:180ms; --slow:240ms;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --spring:cubic-bezier(.34,1.4,.5,1);
+
+  --header:56px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--text);
+  background:var(--bg);color:var(--ink);font-size:var(--t-base);line-height:1.55;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  font-feature-settings:'cv05' 1,'cv08' 1,'ss03' 1;   /* single-storey l, better a */
+}
+h1,h2,h3,.who,.tile b,.qrow .tk,.intro h1,.signin h1,.tilebig,.whobtn .n{
+  font-family:var(--display);letter-spacing:var(--tr-tight)
+}
+/* Money and counts must line up in a column, always. */
+.tile b,.daybar b,.bn,.qrow .tk,.stp .v,.feerow input,.tk-no b{font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer;color:inherit}
+input,select,textarea{font-family:inherit;color:inherit}
+input,button,textarea{font-size:inherit}
+svg{flex:none}
+
+/* Focus you can see. A clinic laptop with a broken trackpad still has Tab. */
+:focus-visible{outline:2.5px solid var(--g-500);outline-offset:2px;border-radius:6px}
+:focus:not(:focus-visible){outline:none}
+
+/* Motion is a courtesy, never a dependency. Everything below still works with
+   this on, because nothing is only visible at the end of a transition. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+
+@keyframes nk-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes nk-fade{from{opacity:0}to{opacity:1}}
+@keyframes nk-pop{0%{transform:scale(.94);opacity:0}60%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
+@keyframes nk-slide{from{opacity:0;transform:translateY(-6px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes nk-pulse{0%{box-shadow:0 0 0 0 rgba(43,143,116,.42)}100%{box-shadow:0 0 0 14px rgba(43,143,116,0)}}
+@keyframes nk-bar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* ------------------------------------------------------------ 2. the shell */
+
+.app{max-width:1180px;margin:0 auto;min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;background:var(--bg)}
+
+.top{
+  position:sticky;top:0;z-index:30;min-height:var(--header);
+  background:linear-gradient(112deg,#0a3a2e 0%,var(--g) 46%,#17705a 100%);
+  color:#fff;padding:var(--s3) var(--s5);
+  display:flex;gap:var(--s3);justify-content:space-between;align-items:center;flex-wrap:wrap;
+  box-shadow:0 1px 0 rgba(255,255,255,.13) inset, var(--sh-3);
+}
+/* the one gold line in the app, one pixel of it, holding the header down */
+.top::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1.5px;
+  background:linear-gradient(90deg,transparent,var(--gold) 22%,var(--gold) 78%,transparent);
+  opacity:.55}
+.top{position:sticky;overflow:hidden}
+.top .brandwrap{display:flex;align-items:center;gap:var(--s3);min-width:0;flex:1 1 auto}
+.top .brandwrap .mk{opacity:.92;flex:none}
+.top .who2{min-width:0}
+.top b{display:block;font-family:var(--display);font-size:16.5px;font-weight:700;
+  letter-spacing:var(--tr-snug);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top span{font-size:var(--t-sm);opacity:.72;letter-spacing:.01em}
+.top .who2 span{display:block;margin:0;white-space:nowrap}
+
+.counts{display:flex;align-items:center;gap:var(--s1);flex-wrap:wrap;justify-content:flex-end}
+.counts>span{font-size:var(--t-sm);opacity:.9;padding:var(--s1) var(--s2);white-space:nowrap}
+.counts .pr{background:rgba(255,255,255,.14);border-radius:var(--rp);
+  padding:5px var(--s3);opacity:1;font-weight:600;
+  box-shadow:0 0 0 1px rgba(255,255,255,.14) inset}
+
+.top .lnk{color:#fff;opacity:.92;padding:var(--s1) var(--s2);text-decoration:none;
+  border-radius:var(--rp);transition:background var(--fast) var(--ease)}
+.top .lnk:hover{opacity:1;background:rgba(255,255,255,.14)}
+
+.pane{flex:1;padding:var(--s5) var(--s4) var(--s10);animation:nk-rise var(--slow) var(--ease)}
+/* Section heads were 11px uppercase grey, which is a label, not a heading. A
+   screen made entirely of labels has no hierarchy and reads as a settings page.
+   These are now real headings with a rule beside them. */
+h2{font-size:var(--t-md);margin:0 0 var(--s3);color:var(--ink);font-weight:700;
+  letter-spacing:var(--tr-snug);text-transform:none;
+  display:flex;align-items:center;gap:var(--s3)}
+h2::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* ------------------------------------------------------- 2. form controls */
+
+.fld{display:flex;flex-direction:column;gap:var(--s1);margin-bottom:var(--s3)}
+.fld label{font-size:var(--t-xs);letter-spacing:.8px;text-transform:uppercase;
+  color:var(--mut);font-weight:700}
+.fld input,.fld select{
+  border:1.5px solid var(--line);border-radius:var(--r2);padding:13px var(--s3);
+  font-size:17px;background:var(--card);color:var(--ink);
+  transition:border-color var(--fast) var(--ease),box-shadow var(--fast) var(--ease);
+}
+.fld input::placeholder{color:var(--faint)}
+.fld input:hover{border-color:#c9d6d2}
+.fld input:focus{border-color:var(--g-500);box-shadow:0 0 0 4px rgba(43,143,116,.13);outline:none}
+.row{display:flex;gap:var(--s3);flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+.unit{display:block;font-size:var(--t-xs);color:var(--mut);margin-top:var(--s1)}
+
+.btn{
+  border:0;border-radius:var(--r2);padding:14px var(--s5);
+  font-size:16px;font-weight:700;letter-spacing:-.1px;
+  background:var(--g);color:#fff;box-shadow:var(--sh-1);
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);
+  transition:background var(--fast) var(--ease),transform var(--fast) var(--ease),
+             box-shadow var(--fast) var(--ease);
+}
+.btn:hover:not(:disabled){background:var(--g-600);box-shadow:var(--sh-2)}
+/* The press is instant and it is the only motion in the prescribing path.
+   It is feedback, not decoration: a tap that shows nothing gets tapped twice. */
+.btn:active:not(:disabled){transform:translateY(1px) scale(.988);box-shadow:none}
+.btn.ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--line);box-shadow:none}
+.btn.ghost:hover:not(:disabled){background:var(--g-50);border-color:#c2d5cf}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.warn{background:var(--bad);color:#fff}
+.btn.warn:hover:not(:disabled){background:#8d2815}
+.btn.warn:disabled{background:#d8b3aa}
+
+/* These are not decoration. "close without a prescription", "print the token
+   again" and "cancel that" are the counter's real actions and they were about
+   20px tall against this file's own 48px floor. The hit area is now 44px; the
+   ink is unchanged, so nothing on screen looks bigger. */
+.lnk{border:0;background:none;color:var(--g);font-weight:700;font-size:var(--t-sm);
+  text-decoration:underline;text-underline-offset:2px;padding:12px var(--s2);
+  margin:-12px 0;border-radius:8px;min-height:44px;
+  display:inline-flex;align-items:center;
+  transition:color var(--fast) var(--ease),background var(--fast) var(--ease)}
+.lnk:hover{background:var(--g-50)}
+.top .lnk,.whoback .lnk,.gpick .lnk{min-height:0;padding:6px var(--s2);margin:0}
+.top .lnk:hover{background:rgba(255,255,255,.14)}
+.lnk:hover{color:var(--g-700)}
+.lnk.mid{display:block;margin:var(--s3) auto 0}
+
+.chips{display:flex;gap:var(--s2);flex-wrap:wrap;margin-bottom:var(--s3)}
+.chip{
+  border:1.5px solid var(--line);background:var(--card);border-radius:var(--rp);
+  padding:11px var(--s4);font-size:14px;font-weight:600;color:var(--ink);
+  box-shadow:var(--sh-1);
+  transition:background var(--fast) var(--ease),border-color var(--fast) var(--ease),
+             color var(--fast) var(--ease),transform var(--fast) var(--ease);
+}
+.chip:hover{border-color:#c2d5cf;background:var(--g-50)}
+.chip:active{transform:scale(.97)}
+.chip.on{background:var(--g);border-color:var(--g);color:#fff;box-shadow:var(--sh-2)}
+.chip.have{background:var(--g-100);border-color:#bcd6cd;color:var(--g-700)}
+.chip.mine{border-color:var(--g);color:var(--g);font-weight:700}
+.chip small{display:block;font-weight:400;font-size:var(--t-xs);opacity:.66;margin-top:1px}
+
+.check{display:flex;gap:var(--s3);align-items:flex-start;margin-top:var(--s4);
+  font-size:var(--t-md);line-height:1.55}
+.check input[type=checkbox]{width:19px;height:19px;margin-top:2px;accent-color:var(--g);flex:none}
+.check small{display:block;color:var(--mut);margin-top:2px;font-size:var(--t-sm)}
+
+.hint{font-size:var(--t-sm);color:var(--mut);line-height:1.6;margin-top:var(--s3)}
+.usable{margin:var(--s3) 0 0;font-size:var(--t-sm);color:var(--ink-2)}
+.usable.bad{color:var(--bad);font-weight:600}
+
+/* --------------------------------------------------------- 2. the queue */
+
+.qrow{
+  display:flex;align-items:center;gap:var(--s3);width:100%;text-align:left;
+  background:var(--card);border:1.5px solid var(--line);border-radius:var(--r3);
+  padding:var(--s3) var(--s4);margin-bottom:var(--s2);font-size:16px;
+  box-shadow:var(--sh-1);
+  transition:border-color var(--fast) var(--ease),box-shadow var(--fast) var(--ease),
+             transform var(--fast) var(--ease);
+  animation:nk-rise var(--mid) var(--ease) backwards;
+}
+.qrow:hover{border-color:#c2d5cf;box-shadow:var(--sh-2);transform:translateY(-1px)}
+.qrow:active{transform:translateY(0) scale(.995)}
+/* the list arrives in order rather than all at once. 30ms apart is felt, not seen */
+.qwrap:nth-child(1) .qrow{animation-delay:0ms}
+.qwrap:nth-child(2) .qrow{animation-delay:30ms}
+.qwrap:nth-child(3) .qrow{animation-delay:60ms}
+.qwrap:nth-child(4) .qrow{animation-delay:90ms}
+.qwrap:nth-child(5) .qrow{animation-delay:120ms}
+.qwrap:nth-child(n+6) .qrow{animation-delay:150ms}
+
+.qrow .tk{width:46px;height:46px;flex:none;border-radius:var(--r2);
+  background:var(--g-100);color:var(--g);display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:19px;letter-spacing:-.5px}
+.qrow.done{opacity:.6}
+.qrow.done .tk{background:var(--line-2);color:var(--mut)}
+.qrow .nm{flex:1;min-width:0}
+.qrow .nm small{display:block;font-size:var(--t-sm);color:var(--mut);margin-top:2px}
+.qrow .st{font-size:var(--t-sm);color:var(--mut);white-space:nowrap;font-weight:600}
+.st.s-left,.st.s-cancelled{color:var(--bad)}
+.st.s-referred{color:var(--warn)}
+.st.s-seen{color:var(--g)}
+
+.qwrap{margin-bottom:var(--s2)}
+.qwrap.shut .qrow{opacity:.62}
+.qclose{display:block;margin:var(--s1) 0 0 var(--s2);font-size:var(--t-sm)}
+.closebox{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center;margin:var(--s2) 0 0 var(--s2);
+  padding:var(--s3);border:1.5px solid var(--line);border-radius:var(--r2);background:var(--g-50);
+  animation:nk-slide var(--mid) var(--ease)}
+.closebox .chip .sd{font-family:'NK',serif;font-size:14px;margin-left:5px;opacity:.75}
+
+/* empty state: a picture and a sentence, never a blank rectangle */
+.blank{text-align:center;padding:var(--s8) var(--s4);color:var(--mut);
+  animation:nk-fade var(--slow) var(--ease)}
+.blank svg{width:190px;max-width:60%;height:auto;color:var(--g);margin-bottom:var(--s3)}
+.blank b{display:block;font-size:var(--t-lg);color:var(--ink);margin-bottom:var(--s1);font-weight:700}
+.blank p{font-size:var(--t-md);max-width:340px;margin:0 auto;line-height:1.6}
+
+/* ------------------------------------------------------ 2. prescribing
+   GEOMETRY FROZEN. Colour and shadow only below this line. */
+
+.line{background:var(--card);border:1.5px solid var(--line);border-radius:var(--r3);
+  padding:var(--s3);margin-bottom:var(--s2);box-shadow:var(--sh-1);
+  transition:border-color var(--fast) var(--ease),box-shadow var(--fast) var(--ease);
+  animation:nk-pop var(--mid) var(--spring)}
+.line:hover{box-shadow:var(--sh-2)}
+.line .hd{display:flex;justify-content:space-between;gap:var(--s3);align-items:flex-start}
+.line b{font-size:16px;letter-spacing:-.1px}
+.line small{display:block;font-size:var(--t-sm);color:var(--mut);margin-top:1px}
+.line .x{border:0;background:none;color:var(--faint);font-size:24px;line-height:1;
+  padding:0 var(--s1);border-radius:6px;transition:color var(--fast) var(--ease)}
+.line .x:hover{color:var(--bad)}
+.line.flash{border-color:var(--g);box-shadow:0 0 0 3px rgba(15,92,74,.16)}
+.line.bad{border-color:var(--bad);background:var(--bad-bg)}
+.badmsg{margin-top:var(--s2);font-size:var(--t-md);color:var(--bad);font-weight:700}
+.badmsg.ok{color:var(--g)}
+
+.dosegrid{display:flex;gap:var(--s2);margin-top:var(--s3);flex-wrap:wrap;align-items:center}
+.dbtn{border:1.5px solid var(--line);background:var(--card);border-radius:var(--r2);
+  min-width:60px;height:48px;font-size:15px;font-weight:700;color:var(--mut);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  transition:background var(--fast) var(--ease),border-color var(--fast) var(--ease),
+             color var(--fast) var(--ease)}
+.dbtn:hover{border-color:#c2d5cf;background:var(--g-50)}
+.dbtn small{font-size:9px;font-weight:700;letter-spacing:.4px}
+.dbtn.on{background:var(--g);border-color:var(--g);color:#fff}
+.stp{display:flex;border:1.5px solid var(--line);border-radius:var(--r2);overflow:hidden;background:var(--card)}
+.stp button{width:44px;height:48px;border:0;background:var(--card);font-size:21px;color:var(--g);
+  transition:background var(--fast) var(--ease)}
+.stp button:hover{background:var(--g-50)}
+.stp .v{min-width:64px;height:48px;line-height:48px;text-align:center;font-weight:700;font-size:15px;
+  border-left:1.5px solid var(--line);border-right:1.5px solid var(--line)}
+
+.sticky{position:sticky;bottom:0;z-index:10;
+  background:linear-gradient(180deg,rgba(244,247,246,0),var(--bg) 26%);
+  padding:var(--s4) 0 var(--s2);display:flex;gap:var(--s3)}
+.prev{background:var(--card);border-left:4px solid var(--g);border-radius:0 var(--r2) var(--r2) 0;
+  padding:var(--s3) var(--s4);margin-bottom:var(--s4);font-size:15px;line-height:1.55;
+  box-shadow:var(--sh-1)}
+.prev .lnk{display:inline-block;margin-left:var(--s2)}
+.who{font-size:var(--t-xl);font-weight:800;margin-bottom:var(--s3);line-height:1.2;letter-spacing:-.4px}
+.who span{display:block;font-size:var(--t-md);font-weight:400;color:var(--mut);margin-top:3px;letter-spacing:0}
+.lockbar{background:var(--warn-bg);border:1.5px solid var(--warn-line);border-radius:var(--r2);
+  padding:var(--s3) var(--s4);margin-bottom:var(--s4);font-size:var(--t-md);line-height:1.55;color:#6b5520}
+.nearmiss{margin:var(--s3) 0;padding:var(--s3) var(--s4);border:1.5px solid var(--warn-line);
+  background:var(--warn-bg);border-radius:var(--r2);animation:nk-slide var(--mid) var(--ease)}
+.nearmiss>b{display:block;font-size:var(--t-md);margin-bottom:var(--s2)}
+.nearmiss .chips{margin-bottom:var(--s1)}
+.saveset{display:flex;gap:var(--s2);align-items:center;margin:var(--s3) 0 var(--s1)}
+.saveset input{flex:1}
+.setrow{display:inline-block;margin-right:var(--s4)}
+
+/* ------------------------------------------------------------- 2. money */
+
+.feebar{margin:var(--s3) 0;padding:var(--s3) var(--s4);border:1.5px solid var(--line);
+  border-radius:var(--r2);background:var(--card);box-shadow:var(--sh-1)}
+.feebar>label{display:block;font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.9px;
+  color:var(--mut);margin-bottom:var(--s2);font-weight:700}
+.feebar .row{align-items:center;gap:var(--s2)}
+.feebar.done{display:flex;align-items:center;justify-content:space-between;
+  background:var(--g-50);border-color:#bcd8cd}
+.feebar.done b{font-size:15px;color:var(--g-700)}
+.feebar.plain{color:var(--mut);font-size:var(--t-md)}
+.feebar.back{background:var(--bad-bg);border-color:var(--bad-line)}
+.feebar.back b{color:var(--bad)}
+.feerow{margin-top:var(--s4);padding:var(--s3) var(--s4);border:1.5px solid var(--line);
+  border-radius:var(--r2);background:var(--card)}
+.feerow>label{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.9px;color:var(--mut);font-weight:700}
+.feerow .row{align-items:center;gap:var(--s2);margin-top:var(--s2)}
+.feerow input{max-width:130px;font-size:21px;font-weight:700}
+
+.daybar{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);align-items:baseline;
+  margin:0 0 var(--s3);padding:var(--s3) var(--s4);border-radius:var(--r2);
+  background:var(--card);border:1.5px solid var(--line);font-size:var(--t-sm);color:var(--ink-2)}
+.daybar b{color:var(--ink);font-size:15px;font-weight:800}
+.daybar .money b{color:var(--g)}
+.daybar .due b,.daybar .back b{color:var(--bad)}
+.daybar .soft{color:var(--faint)}
+.refund{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin:var(--s2) 0 0 var(--s2);
+  padding:var(--s3) var(--s4);border:2px solid var(--bad);border-radius:var(--r2);
+  background:var(--bad-bg);animation:nk-pop var(--mid) var(--spring)}
+.refund>b{font-size:16px;color:var(--bad)}
+.refund>span{font-size:var(--t-sm);color:#7b4a37;flex:1}
+
+/* ---------------------------------------------------------- 2. the door */
+
+.signin{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;
+  background:
+    radial-gradient(1100px 620px at 78% -12%, rgba(43,143,116,.55), transparent 62%),
+    radial-gradient(760px 520px at 8% 108%, rgba(11,67,53,.85), transparent 60%),
+    linear-gradient(160deg,var(--g) 0%,var(--g-700) 100%);
+  padding:var(--s6)}
+.signin .card2{width:100%;max-width:390px;background:var(--card);border-radius:var(--r4);
+  padding:var(--s8) var(--s6) var(--s6);box-shadow:var(--sh-4);text-align:center;
+  animation:nk-pop 420ms var(--spring)}
+.signin .mark{display:flex;flex-direction:column;align-items:center;gap:var(--s2);
+  font-size:var(--t-sm);letter-spacing:1px;color:var(--g);margin-bottom:var(--s5);
+  text-transform:uppercase;font-weight:700}
+.signin .mark svg{color:var(--g)}
+.signin .mark .sd{font-family:'NK',serif;font-size:17px;letter-spacing:0;text-transform:none}
+.signin h1{font-size:var(--t-2xl);margin:0 0 var(--s1);line-height:1.2;letter-spacing:-.7px}
+.signin .deg{font-size:var(--t-md);color:var(--mut);margin:0}
+.signin .nm{font-family:'NK',serif;font-size:20px;margin:var(--s2) 0 0;direction:rtl}
+.signin .day{font-size:var(--t-sm);color:var(--faint);margin:var(--s4) 0 var(--s6);
+  padding-top:var(--s4);border-top:1px solid var(--line-2)}
+.signin .fld{text-align:left}
+.signin .fld input{font-size:26px;letter-spacing:10px;text-align:center;font-weight:800}
+.signin .hint{margin-top:var(--s4);font-size:var(--t-sm);line-height:1.6}
+.lock{max-width:340px;margin:60px auto}
+.lock .mark{font-size:var(--t-md);color:var(--g);margin-bottom:var(--s3)}
+.lock .mark .sd{font-family:'NK',serif}
+
+/* --------------------------------------------------------- 2. first run */
+
+.wiz{max-width:760px;margin:0 auto;width:100%}
+.intro{padding:var(--s2) 0 var(--s6);animation:nk-rise 380ms var(--ease)}
+.introtop{display:flex;gap:var(--s8);align-items:center;margin-bottom:var(--s5);flex-wrap:wrap}
+.introtop>div{flex:1;min-width:250px}
+.introart{flex:none;width:min(300px,86vw);color:var(--g)}
+.introart svg{width:100%;height:auto;filter:drop-shadow(0 14px 34px rgba(15,92,74,.16))}
+.intro .mark{display:flex;align-items:center;gap:var(--s2);font-size:var(--t-sm);
+  letter-spacing:1.2px;color:var(--g);margin-bottom:var(--s4);text-transform:uppercase;font-weight:700}
+.intro .mark .sd{font-family:'NK',serif;font-size:17px;letter-spacing:0;text-transform:none}
+.intro h1{font-size:var(--t-3xl);line-height:1.14;margin:0 0 var(--s3);letter-spacing:-1px}
+.intro .lead{font-size:var(--t-lg);line-height:1.6;color:var(--ink-2);margin:0 0 var(--s5)}
+.intro .pts{list-style:none;padding:0;margin:0 0 var(--s5);display:grid;gap:var(--s2)}
+.intro .pts li{padding:var(--s3) var(--s4);border-left:3px solid var(--g);border-radius:0 var(--r2) var(--r2) 0;
+  font-size:var(--t-md);line-height:1.6;background:var(--card);box-shadow:var(--sh-1);
+  animation:nk-rise var(--slow) var(--ease) backwards}
+.intro .pts li:nth-child(2){animation-delay:60ms}
+.intro .pts li:nth-child(3){animation-delay:120ms}
+.intro .fine{font-size:var(--t-sm);color:var(--mut);line-height:1.6;margin:0 0 var(--s6)}
+
+.wizbar{display:flex;gap:var(--s1);flex-wrap:wrap;margin:var(--s2) 0 var(--s5)}
+.wstep{font-size:var(--t-xs);letter-spacing:.8px;text-transform:uppercase;color:var(--mut);
+  padding:5px var(--s3);border-radius:var(--rp);background:var(--line-2);font-weight:700;
+  transition:background var(--mid) var(--ease),color var(--mid) var(--ease)}
+.wstep.on{background:var(--g);color:#fff;box-shadow:var(--sh-1)}
+.wstep.done{color:var(--g);background:var(--g-100)}
+.wiznav{display:flex;gap:var(--s3);align-items:center;margin-top:var(--s6)}
+.wiznav .btn.wide{flex:1}
+
+.sumbox{border:1.5px solid var(--line);border-radius:var(--r2);overflow:hidden;
+  margin:var(--s4) 0;background:var(--card);box-shadow:var(--sh-1)}
+.sumbox>div{display:flex;justify-content:space-between;gap:var(--s3);padding:11px var(--s4);
+  border-bottom:1px solid var(--line-2);font-size:var(--t-md)}
+.sumbox>div:last-child{border-bottom:0}
+.sumbox span{color:var(--mut)}
+.sumbox b{font-weight:700}
+
+.lhbox{margin:var(--s5) 0;padding:var(--s4);border:1.5px solid var(--line);border-radius:var(--r2);
+  background:var(--card);box-shadow:var(--sh-1)}
+.lhbox h3{margin:0 0 var(--s2);font-size:15px}
+.lhbox p{font-size:var(--t-sm);line-height:1.6;margin:0 0 var(--s3);color:var(--ink-2)}
+.logobox{display:flex;gap:var(--s5);align-items:flex-start;margin:var(--s3) 0;padding:var(--s3);
+  border:1.5px solid var(--line);border-radius:var(--r2);background:var(--card)}
+.logobox img{max-width:200px;object-fit:contain}
+.logoacts{flex:1}
+.logoacts input[type=range]{width:100%;margin:var(--s2) 0;accent-color:var(--g)}
+
+/* --------------------------------------------------------------- 2. setup */
+
+.setup h2{margin:var(--s5) 0 var(--s2)}
+.setup h3{margin:0 0 var(--s2);font-size:15px}
+.setup .save{margin-top:var(--s6)}
+.counts .paper{margin-left:var(--s2)}
+
+.tabs{display:flex;gap:var(--s1);margin:var(--s4) 0 var(--s5);flex-wrap:wrap;align-items:center}
+.tab{border:0;background:var(--card);padding:9px var(--s4);border-radius:var(--rp);
+  font-size:var(--t-md);font-weight:600;box-shadow:var(--sh-1);
+  transition:background var(--fast) var(--ease),color var(--fast) var(--ease),transform var(--fast) var(--ease)}
+.tab:hover{background:var(--g-50)}
+.tab:active{transform:scale(.97)}
+.tab.on{background:var(--g);color:#fff;box-shadow:var(--sh-2)}
+.tab.adm{background:var(--adm-bg);color:var(--adm)}
+.tab.adm.on{background:var(--adm);color:#fff}
+.tabsep{width:1px;height:22px;background:var(--line);margin:0 var(--s2);flex:none}
+.gate{max-width:460px;padding:var(--s4) 0}
+.gate h3{margin:0 0 var(--s2)}
+
+.rolebar{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);align-items:baseline;
+  margin:var(--s3) 0 var(--s1);padding:var(--s3) var(--s4);border-radius:var(--r2);
+  background:var(--card);border:1.5px solid var(--line);font-size:var(--t-sm)}
+.rolebar .who{font-weight:800;font-size:var(--t-md);margin:0}
+.rolebar .can{color:var(--mut);flex:1;min-width:200px}
+.rolebar.r-admin{background:var(--adm-bg);border-color:var(--adm-line)}
+.rolebar.r-admin .who{color:var(--adm)}
+
+.sdin{font-family:'NK',serif;font-size:17px}
+.bulk{width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+  padding:var(--s3);border:1.5px solid var(--line);border-radius:var(--r2);line-height:1.6;
+  background:var(--card);resize:vertical}
+.bulk:focus{border-color:var(--g-500);box-shadow:0 0 0 4px rgba(43,143,116,.12);outline:none}
+.bulkbar{display:flex;gap:var(--s3);align-items:center;margin:var(--s3) 0 var(--s1);flex-wrap:wrap}
+.bulkbar .ok{color:var(--g);font-size:var(--t-sm);font-weight:700;animation:nk-pop var(--mid) var(--spring)}
+
+.druglist{border:1.5px solid var(--line);border-radius:var(--r2);max-height:300px;overflow:auto;
+  background:var(--card);box-shadow:var(--sh-1)}
+.druglist.tall{max-height:420px}
+.drow{display:grid;grid-template-columns:1fr 1fr auto auto;gap:var(--s3);align-items:center;
+  padding:9px var(--s3);border-bottom:1px solid var(--line-2);font-size:var(--t-md)}
+.drow:last-child{border-bottom:0}
+.drow:hover{background:var(--g-50)}
+.drow span{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drow .sd{font-family:'NK',serif;font-size:15px;color:var(--ink-2)}
+.drow.rev{grid-template-columns:1fr 1fr 1fr auto auto auto auto}
+.sd.ok{color:var(--g)}
+.sdfix{display:flex;gap:var(--s2);align-items:center}
+.sdfix .sdin{font-size:15px;padding:5px var(--s2);width:100%;min-width:90px;
+  border:1.5px solid var(--line);border-radius:var(--r1)}
+
+.gen{display:flex;align-items:center;gap:var(--s2);min-width:0}
+.gen>span,.drow .gen{overflow:visible}
+.lnk.gen.off{color:var(--warn);font-style:italic;text-align:left;font-size:var(--t-sm)}
+.aware{font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;font-weight:800;
+  padding:3px 7px;border-radius:var(--rp);white-space:nowrap}
+.aware.access{background:var(--g-100);color:var(--g-700)}
+.aware.watch{background:#fbecd2;color:#7a5410}
+.aware.reserve{background:#f7dcd8;color:#84271a}
+.gen .warnpill{font-style:normal;font-size:10px}
+
+.gpick{position:relative;display:block;min-width:0}
+.gpick>input{width:100%;font-size:var(--t-sm);padding:6px var(--s2);
+  border:1.5px solid var(--g-500);border-radius:var(--r1);background:var(--card)}
+.gopts{position:absolute;z-index:20;left:0;right:0;top:100%;margin-top:var(--s1);
+  background:var(--card);border:1.5px solid var(--line);border-radius:var(--r2);
+  box-shadow:var(--sh-3);max-height:230px;overflow:auto;animation:nk-slide var(--fast) var(--ease)}
+.gopt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+  text-align:left;padding:9px var(--s3);border:0;background:none;font-size:var(--t-md)}
+.gopt:hover{background:var(--g-50)}
+.gopt small{color:var(--mut);font-size:var(--t-xs)}
+
+.unvpill,.warnpill{font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;
+  padding:3px var(--s2);border-radius:var(--rp);background:#efe6d0;color:#6b5518;white-space:nowrap;font-weight:700}
+.warnpill{background:#f6ded9;color:#7d2f21;text-transform:none;letter-spacing:0}
+.unv{color:var(--warn);font-style:italic}
+
+.dict{border:1.5px solid var(--line);border-radius:var(--r2);overflow:hidden;
+  margin:var(--s2) 0 var(--s3);background:var(--card);box-shadow:var(--sh-2);
+  animation:nk-slide var(--fast) var(--ease)}
+.dhead{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.8px;color:var(--mut);
+  padding:8px var(--s3);background:var(--g-50);border-bottom:1px solid var(--line-2);font-weight:700}
+.drow2{display:flex;width:100%;align-items:center;gap:var(--s3);padding:12px var(--s3);border:0;
+  border-bottom:1px solid var(--line-2);background:none;text-align:left;font-family:inherit;
+  transition:background var(--fast) var(--ease)}
+.drow2:last-child{border-bottom:0}
+.drow2:hover{background:var(--g-50)}
+.drow2 .dl{flex:1;font-size:var(--t-md)}
+.drow2 .sd{font-family:'NK',serif;font-size:16px;color:var(--ink-2)}
+.drow2 .add{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.6px;color:var(--g);font-weight:800}
+.drow2.own{background:var(--bg)}
+.drow2.own .dl{color:var(--mut)}
+
+.drow.mkt{grid-template-columns:auto 1.1fr auto 1.2fr auto auto;gap:var(--s2)}
+.drow.mkt.off{opacity:.42}
+.drow.mkt .frm{color:var(--faint);font-size:var(--t-xs)}
+.drow.mkt .sdin{font-family:'NK',serif;font-size:14px;width:110px;padding:4px var(--s2);
+  border:1.5px solid var(--line);border-radius:var(--r1)}
+.drow.mkt .drops{display:flex;align-items:center;gap:var(--s1);justify-content:flex-end}
+.drow.mkt .drops small{color:var(--faint);font-size:10.5px;cursor:help;border-bottom:1px dotted var(--line)}
+
+.danger{margin-top:var(--s8);padding:var(--s4);border:1.5px solid var(--bad-line);
+  border-radius:var(--r2);background:var(--bad-bg)}
+.danger h3{margin:0 0 var(--s2);color:var(--bad)}
+.danger .drow2{justify-content:space-between;align-items:flex-start;border-top:1px solid #f0d9d3;
+  border-bottom:0;padding:var(--s3) 0;display:flex}
+.danger .drow2 b{display:block;font-size:var(--t-md);margin-bottom:3px}
+.danger .drow2 span{display:block;font-size:var(--t-sm);color:#6b5a56;line-height:1.55;max-width:520px}
+.danger .drow2 .btn{flex:none}
+.danger.done{border-color:#bcd8cd;background:var(--g-50);display:flex;gap:var(--s3);align-items:baseline}
+.confirm{margin-top:var(--s3);padding:var(--s3);border:1.5px solid #d9a99e;border-radius:var(--r1);background:var(--card)}
+.confirm code{background:var(--line-2);padding:3px var(--s2);border-radius:5px;font-weight:700}
+
+/* -------------------------------------------------------- 2. header menu */
+
+.menuwrap{position:relative;margin-left:var(--s2)}
+.rolechip{border:0;background:rgba(255,255,255,.18);color:#fff;font-size:var(--t-sm);
+  padding:6px var(--s3);border-radius:var(--rp);font-family:inherit;font-weight:700;
+  display:inline-flex;align-items:center;gap:5px;
+  transition:background var(--fast) var(--ease)}
+.rolechip:hover{background:rgba(255,255,255,.3)}
+.rolechip.admin{background:rgba(255,255,255,.28);box-shadow:0 0 0 1.5px rgba(255,255,255,.4) inset}
+.rolechip i{font-style:normal;opacity:.8}
+.scrim{position:fixed;inset:0;z-index:40;animation:nk-fade var(--fast) var(--ease)}
+.menu{position:absolute;right:0;top:calc(100% + 8px);z-index:41;min-width:268px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r2);
+  box-shadow:var(--sh-3);overflow:hidden;animation:nk-slide var(--fast) var(--ease);
+  transform-origin:top right}
+.menu button{display:block;width:100%;text-align:left;border:0;background:none;
+  padding:12px var(--s4);font-size:var(--t-md);font-family:inherit;color:var(--ink);
+  border-bottom:1px solid var(--line-2);transition:background var(--fast) var(--ease)}
+.menu button:last-child{border-bottom:0}
+.menu button:hover{background:var(--g-50)}
+.menu small{display:block;color:var(--mut);font-size:var(--t-sm);margin-top:1px}
+
+/* ------------------------------------------------------------- 2. figures */
+
+.stats h2{margin:var(--s8) 0 var(--s3)}
+.stats h3{margin:var(--s6) 0 var(--s2);font-size:15px}
+.stats h3 small{font-weight:400;color:var(--faint);margin-left:var(--s2)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--s3)}
+.tiles.money .tile b{color:var(--g)}
+.tile{padding:var(--s4) var(--s5);border:1.5px solid var(--line);border-radius:var(--r3);
+  background:var(--card);box-shadow:var(--sh-1);
+  transition:transform var(--mid) var(--ease),box-shadow var(--mid) var(--ease);
+  animation:nk-rise var(--slow) var(--ease) backwards}
+.tile:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
+.tile:nth-child(2){animation-delay:50ms} .tile:nth-child(3){animation-delay:100ms}
+.tile:nth-child(4){animation-delay:150ms} .tile:nth-child(n+5){animation-delay:200ms}
+.tile b{display:block;font-size:var(--t-3xl);line-height:1.05;letter-spacing:-1.2px;font-weight:800;
+  font-variant-numeric:tabular-nums}
+.tile span{display:block;font-size:var(--t-md);color:var(--ink-2);margin-top:var(--s1)}
+.tile span .sd{font-family:'NK',serif;font-style:normal;color:var(--mut)}
+.tile small{display:block;font-size:var(--t-sm);color:var(--mut);margin-top:var(--s1);line-height:1.5}
+.tile.hero{background:linear-gradient(150deg,var(--g) 0%,var(--g-700) 100%);border-color:var(--g-700);
+  box-shadow:var(--sh-2)}
+.tile.hero b,.tile.hero span,.tile.hero small{color:#fff}
+.tile.hero small{opacity:.8}
+.tile.warn b{color:var(--bad)}
+.note{margin:var(--s3) 0;padding:var(--s3) var(--s4);background:var(--warn-bg);
+  border-left:3px solid var(--warn-line);border-radius:0 var(--r1) var(--r1) 0;
+  font-size:var(--t-sm);color:#6b5c33;line-height:1.6}
+.note.nudge{background:var(--bad-bg);border-left-color:#c98a72;color:#7b4a37;margin-bottom:var(--s4)}
+.tilebig{font-size:var(--t-2xl);font-weight:800;margin:var(--s2) 0;letter-spacing:-.8px}
+.tilebig small{font-size:var(--t-md);font-weight:400;color:var(--mut);margin-left:var(--s2)}
+
+.bars{margin:var(--s2) 0}
+.brow{display:grid;grid-template-columns:minmax(120px,1.2fr) 3fr auto;gap:var(--s3);
+  align-items:center;padding:var(--s1) 0;font-size:var(--t-md)}
+.bt{background:var(--line-2);border-radius:var(--rp);height:16px;overflow:hidden}
+.bt i{display:block;height:100%;border-radius:var(--rp);
+  background:linear-gradient(90deg,var(--g-500),var(--g));
+  transform-origin:left;animation:nk-bar 520ms var(--ease)}
+.bn{font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bn small{font-weight:400;color:var(--faint);margin-left:5px}
+.hours{display:flex;gap:5px;align-items:flex-end;margin:var(--s3) 0;overflow-x:auto;padding-bottom:var(--s1)}
+.hbar{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:34px}
+.hbar .col{height:110px;width:26px;display:flex;align-items:flex-end}
+.hbar .fill{width:100%;background:linear-gradient(180deg,var(--g-500),var(--g));border-radius:5px 5px 0 0;
+  display:flex;flex-direction:column;justify-content:flex-end;min-height:2px;
+  transform-origin:bottom;animation:nk-bar 460ms var(--ease)}
+.hbar .lost{background:#7d2f21;width:100%}
+.hbar .n{font-size:var(--t-xs);font-weight:800}
+.hbar .hl{font-size:10.5px;color:var(--faint)}
+.swatch{display:inline-block;width:10px;height:10px;background:#7d2f21;border-radius:3px;margin-right:5px}
+.cardwrap{margin-top:var(--s3)}
+.cardpv{width:100%;max-width:390px;height:auto;display:block;border:1px solid var(--line);
+  border-radius:var(--r1);box-shadow:var(--sh-3);margin-bottom:var(--s3)}
+
+/* crash screen. A doctor must never be shown a blank page. */
+.crash{max-width:640px;margin:0 auto;padding:var(--s10) var(--s6)}
+.crash h1{font-size:var(--t-xl);margin:0 0 var(--s3)}
+.crash .lead{font-size:16px;line-height:1.6;margin:0 0 var(--s6)}
+.crash-acts{margin-bottom:var(--s5)}
+.crash-tech{margin-top:var(--s4);padding:var(--s3);background:var(--line-2);border:1px solid var(--line);
+  border-radius:var(--r1);font-size:var(--t-xs);line-height:1.5;white-space:pre-wrap;
+  color:var(--ink-2);overflow-x:auto}
+
+/* ==========================================================================
+   3. ADAPTATION
+   The same screens on a phone in a corridor, a tablet on the desk, and the
+   laptop the slip prints from. Breakpoints are where the layout actually
+   breaks, not at somebody's device widths.
+   ========================================================================== */
+
+/* --- laptop and up: more air, and the queue gets two columns --- */
+@media (min-width:1000px){
+  .pane{padding:var(--s6) var(--s6) var(--s10)}
+  .qlist{display:grid;grid-template-columns:1fr 1fr;gap:0 var(--s3)}
+}
+
+/* --- tablet portrait: the working width. Nothing changes; it was built here. */
+
+/* --- phone --- */
+@media (max-width:640px){
+  :root{--t-3xl:28px; --t-2xl:24px; --t-xl:20px}
+
+  .top{padding:var(--s2) var(--s3);gap:var(--s2);flex-wrap:nowrap}
+  .top b{font-size:var(--t-md)}
+  /* the date is on every screen behind this one; the name is not */
+  .top .who2 span{display:none}
+  .counts{flex-wrap:nowrap}
+  /* printed-today lives on the figures screen; the queue count does not */
+  .counts .pr{display:none}
+  .rolechip{white-space:nowrap;font-size:12px;padding:6px 10px}
+  .counts{gap:2px}
+  .counts>span{font-size:var(--t-xs);padding:2px var(--s1)}
+  .counts .paper{display:none}          /* Setup lives in the menu on a phone */
+  .menu{position:fixed;left:var(--s3);right:var(--s3);top:auto;bottom:var(--s3);
+    min-width:0;border-radius:var(--r3);box-shadow:var(--sh-4)}
+  .menu button{padding:15px var(--s4);font-size:16px}
+
+  .pane{padding:var(--s4) var(--s3) 96px}
+
+  /* thumbs, not cursors */
+  .fld input,.fld select{padding:14px var(--s3);font-size:16px}  /* 16px stops iOS zooming */
+  .btn{padding:16px var(--s4);width:100%}
+  .row{flex-direction:column;gap:var(--s2)}
+  .row>*{min-width:0;width:100%}
+  .wiznav{flex-direction:column-reverse;gap:var(--s2)}
+  .wiznav .btn{width:100%}
+  .chip{padding:12px var(--s4);font-size:15px}
+  .chips{gap:var(--s2)}
+
+  .qrow{padding:var(--s3);border-radius:var(--r2)}
+  .qrow .tk{width:44px;height:44px;font-size:18px}
+  .qrow .st{font-size:var(--t-xs)}
+
+  /* the prescribing card keeps its dose targets; only the frame narrows */
+  .line{padding:var(--s3);border-radius:var(--r2)}
+  .dosegrid{gap:var(--s2)}
+  .dbtn{min-width:56px;flex:1}
+  .sticky{position:fixed;left:0;right:0;bottom:0;padding:var(--s3);
+    background:var(--card);border-top:1px solid var(--line);
+    box-shadow:0 -6px 20px rgba(16,23,21,.09);flex-direction:column}
+  .sticky .btn{width:100%}
+
+  /* wide data rows become stacked cards rather than a sideways scroll */
+  .drow,.drow.rev,.drow.mkt{grid-template-columns:1fr;gap:var(--s1);
+    padding:var(--s3);align-items:start}
+  .drow span,.drow b{white-space:normal}
+  .drow.mkt .drops{justify-content:flex-start;flex-wrap:wrap}
+  .drow.mkt .sdin,.sdfix .sdin{width:100%}
+  .druglist,.druglist.tall{max-height:none}
+  .brow{grid-template-columns:1fr;gap:var(--s1)}
+  .brow .bt{height:12px}
+
+  .tabs{gap:var(--s1);overflow-x:auto;flex-wrap:nowrap;padding-bottom:var(--s2);
+    scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:none}
+
+  .tiles{grid-template-columns:1fr 1fr;gap:var(--s2)}
+  .tile{padding:var(--s3)}
+  .tile b{font-size:26px}
+  .tile.hero{grid-column:1 / -1}
+
+  .introtop{gap:var(--s4)}
+  .introart{width:100%;max-width:280px;margin:0 auto;order:-1}
+  .signin{padding:var(--s4)}
+  .signin .card2{padding:var(--s6) var(--s5) var(--s5)}
+
+  .logobox{flex-direction:column}
+  .danger .drow2{flex-direction:column;gap:var(--s2)}
+  .danger .drow2 .btn{width:100%}
+}
+
+/* very small phones, and anyone who has turned their text size up */
+@media (max-width:380px){
+  .top .who2 span{display:none}
+  .counts>span:not(.pr){display:none}
+  .tiles{grid-template-columns:1fr}
+}
+
+/* landscape phone: the header eats a third of the screen otherwise */
+@media (max-height:480px) and (orientation:landscape){
+  .top{position:static}
+  .signin{padding:var(--s3);align-items:flex-start}
+  .lock{margin:var(--s4) auto}
+}
+
+/* Printing the SCREEN is never what anyone wants. The slip has its own
+   stylesheet and its own root; everything here is hidden by print.ts. */
+@media print{ .app{box-shadow:none;background:#fff} }
+
+/* icons live inside their labels, so a menu row is a flex line not a block */
+.menu button{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap}
+.menu button svg{color:var(--g);flex:none}
+.menu small{flex-basis:100%;margin-left:28px}
+.counts>span{display:inline-flex;align-items:center;gap:5px}
+
+/* ==========================================================================
+   BACKGROUNDS
+
+   Drawn, not photographed, for the same reasons as everything in ui/art.tsx:
+   it has to work with the internet down and it must not weigh anything. Two
+   layers, both of them quiet:
+
+     - a soft wash of the brand colour in the corners, so the page has depth
+       instead of being a flat grey rectangle
+     - a faint dot lattice, the texture of squared clinic paper, at an opacity
+       where you feel it and never read it
+
+   The test every one of these had to pass: put text on it and the text must be
+   no harder to read than on plain white. Anything that failed that came out.
+   ========================================================================== */
+
+body{
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(760px 420px at 100% -6%, rgba(43,143,116,.13), transparent 62%),
+    radial-gradient(680px 460px at -8% 104%, rgba(15,92,74,.10), transparent 60%),
+    url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'>\
+<circle cx='2' cy='2' r='1' fill='%230f5c4a' fill-opacity='0.055'/></svg>");
+  background-attachment:fixed,fixed,fixed;
+  background-repeat:no-repeat,no-repeat,repeat;
+}
+.app{background:transparent}
+
+/* The pane floats on the wash rather than covering it. */
+.pane{position:relative}
+
+/* The header gets a woven texture over the gradient, so the one strong band of
+   colour on the screen is not a flat fill. */
+.top{
+  background-image:
+    linear-gradient(100deg,var(--g-700) 0%,var(--g) 58%,var(--g-600) 100%),
+    url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'>\
+<path d='M0 40L40 0M-10 10L10 -10M30 50L50 30' stroke='%23ffffff' stroke-opacity='0.05' stroke-width='1.2'/></svg>");
+  background-blend-mode:normal;
+}
+
+/* The front door carries the mark itself, very large and very faint, which is
+   the only place in the app where decoration is allowed to be the point. */
+.signin::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 48 48'>\
+<rect x='8' y='4.5' width='32' height='39' rx='4' fill='none' stroke='%23ffffff' stroke-opacity='0.055' stroke-width='2.4'/>\
+<path d='M15 15.5h13M15 22h18M15 28.5h10' stroke='%23ffffff' stroke-opacity='0.055' stroke-width='2.4' stroke-linecap='round'/>\
+</svg>");
+  background-repeat:repeat;background-size:132px 132px;
+  mask-image:radial-gradient(120% 100% at 50% 40%, #000 0%, transparent 78%);
+  -webkit-mask-image:radial-gradient(120% 100% at 50% 40%, #000 0%, transparent 78%);
+}
+.signin{position:relative;overflow:hidden}
+.signin .card2{position:relative;z-index:1}
+
+/* The wizard gets the same wash, warmer, because it is the one screen someone
+   sits in front of for ten minutes. */
+.wiz{position:relative}
+.intro::before{
+  content:'';position:absolute;right:-8%;top:-14%;width:min(560px,80%);aspect-ratio:1;
+  pointer-events:none;z-index:-1;border-radius:50%;
+  background:radial-gradient(circle, rgba(43,143,116,.16), transparent 66%);
+}
+
+/* Cards stay opaque so the lattice never shows through a data table. */
+.line,.qrow,.tile,.sumbox,.druglist,.lhbox,.feebar,.feerow,.daybar,.rolebar,
+.dict,.menu,.gopts,.prev{background-color:var(--card)}
+
+/* A phone repaints a fixed background on every scroll, which on a cheap Android
+   is the difference between smooth and not. Texture only, no fixed wash. */
+@media (max-width:640px){
+  body{background-image:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'>\
+<circle cx='2' cy='2' r='1' fill='%230f5c4a' fill-opacity='0.05'/></svg>");
+    background-attachment:scroll}
+  .signin::before{display:none}
+}
+
+/* ---- who is at the keyboard ---- */
+.pick{font-size:var(--t-md);color:var(--mut);margin:0 0 var(--s3);font-weight:600}
+.whos{display:grid;gap:var(--s2);text-align:left}
+.whobtn{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s1) var(--s3);
+  align-items:center;padding:14px var(--s4);border:1.5px solid var(--line);
+  border-radius:var(--r2);background:var(--card);box-shadow:var(--sh-1);
+  transition:border-color var(--fast) var(--ease),background var(--fast) var(--ease),
+             transform var(--fast) var(--ease)}
+.whobtn:hover{border-color:var(--g-500);background:var(--g-50)}
+.whobtn:active{transform:scale(.985)}
+.whobtn svg{color:var(--g);grid-row:span 2}
+.whobtn .n{font-size:16px;font-weight:700}
+.whobtn .n .sd{font-family:'NK',serif;font-weight:400;color:var(--mut);margin-left:6px;font-size:15px}
+.whobtn small{grid-column:2;color:var(--mut);font-size:var(--t-sm);line-height:1.4}
+.whobtn em{grid-row:span 2;font-style:normal;font-size:9.5px;letter-spacing:.6px;font-weight:800;
+  padding:3px 7px;border-radius:var(--rp);background:var(--line-2);color:var(--mut)}
+.whobtn.admin{border-style:dashed}
+.whobtn.admin svg{color:var(--adm)}
+.whoback{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
+  margin-bottom:var(--s3);text-align:left}
+.whoback b{font-size:16px}
+.whoback .sd{font-family:'NK',serif;font-weight:400;color:var(--mut);margin-left:6px}
+
+.pinrow{display:grid;grid-template-columns:1fr 150px auto;gap:var(--s3);align-items:center;
+  padding:var(--s3) 0;border-bottom:1px solid var(--line-2)}
+.pinrow:last-of-type{border-bottom:0}
+.pinrow .pw b{display:block;font-size:15px}
+.pinrow .pw .sd{font-family:'NK',serif;font-weight:400;color:var(--mut);margin-left:6px}
+.pinrow .pw small{color:var(--mut);font-size:var(--t-sm)}
+.pinrow input{border:1.5px solid var(--line);border-radius:var(--r2);padding:11px var(--s3);
+  font-size:16px;background:var(--card);width:100%}
+.pinrow .btn{padding:11px var(--s4);font-size:14px}
+
+/* a queue row the counter may read but not open */
+.qrow.flat{cursor:default}
+.qrow.flat:hover{border-color:var(--line);box-shadow:var(--sh-1);transform:none}
+.qrow:disabled{opacity:1}
+
+.rolebar .who .sd{font-family:'NK',serif;font-weight:400;color:var(--mut);margin-left:6px}
+.rolechip .sd{font-family:'NK',serif;font-weight:400;opacity:.85;margin:0 3px}
+.rolechip.doctor{background:rgba(255,255,255,.22)}
+.rolechip.admin{background:rgba(255,255,255,.3);box-shadow:0 0 0 1.5px rgba(255,255,255,.45) inset}
+
+@media (max-width:640px){
+  .pinrow{grid-template-columns:1fr;gap:var(--s2)}
+  .pinrow .btn{width:100%}
+}
+
+/* =============================================================================
+   THE FRONT DOOR
+
+   This screen does two jobs at once and used to do neither well: it was a white
+   box floating in the middle of a green rectangle, which is what every tutorial
+   login looks like. It is also the first thing a doctor sees when a colleague
+   shows him the app, so it is the one place where presentation IS the function.
+
+   Split composition. Left is the product, stated once. Right is the door. On a
+   phone the left panel collapses to a band, because a phone has no room for an
+   argument, only for a way in.
+   ============================================================================= */
+
+.door{
+  min-height:100vh;min-height:100dvh;display:grid;
+  grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
+  background:var(--card);
+}
+
+/* ---- left: the pitch ---- */
+.doorbrand{
+  position:relative;overflow:hidden;color:#fff;display:flex;align-items:center;
+  padding:var(--s10) clamp(24px,4.4vw,64px);
+  background:
+    radial-gradient(900px 620px at 84% -14%, rgba(43,143,116,.62), transparent 64%),
+    radial-gradient(680px 520px at -6% 106%, rgba(6,42,33,.9), transparent 62%),
+    linear-gradient(152deg,#0d5544 0%,#072a21 100%);
+}
+/* the mark, tiled enormous and almost invisible, fading out toward the card */
+.doorbrand::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 48 48'>\
+<rect x='8' y='4.5' width='32' height='39' rx='4' fill='none' stroke='%23ffffff' stroke-opacity='0.05' stroke-width='2'/>\
+<path d='M15 15.5h13M15 22h18M15 28.5h10' stroke='%23ffffff' stroke-opacity='0.05' stroke-width='2' stroke-linecap='round'/>\
+</svg>");
+  background-size:164px 164px;
+  mask-image:linear-gradient(100deg,#000 0%,rgba(0,0,0,.35) 62%,transparent 92%);
+  -webkit-mask-image:linear-gradient(100deg,#000 0%,rgba(0,0,0,.35) 62%,transparent 92%);
+}
+/* a gold seam where the two halves meet */
+.doorbrand::after{content:'';position:absolute;top:0;bottom:0;right:0;width:2px;
+  background:linear-gradient(180deg,transparent,var(--gold),transparent);opacity:.42}
+
+.db-in{position:relative;max-width:470px;animation:nk-rise 520ms var(--ease)}
+.db-mark{display:flex;align-items:center;gap:var(--s3);margin-bottom:var(--s8);
+  font-size:var(--t-sm);letter-spacing:var(--tr-wide);text-transform:uppercase;opacity:.95}
+.db-mark svg{color:#fff;opacity:.95}
+.db-mark .sd{font-family:'NK',serif;font-size:19px;letter-spacing:0;text-transform:none;color:var(--gold)}
+.db-mark b{font-weight:700}
+.db-line{font-family:var(--display);font-size:clamp(30px,3.5vw,var(--t-3xl));font-weight:800;
+  line-height:1.06;letter-spacing:var(--tr-tight);margin:0 0 var(--s4);color:#fff}
+.db-line::after{display:none}
+.db-sub{font-size:var(--t-lg);line-height:1.55;color:rgba(255,255,255,.74);margin:0 0 var(--s8);max-width:38ch}
+/* The illustration is a white slip. It is NOT recoloured for the dark panel:
+   a prescription is a piece of paper, and a piece of paper on a dark surface is
+   exactly what it should look like. Only the shadow changes. */
+.db-art{width:min(340px,88%);filter:drop-shadow(0 30px 56px rgba(0,0,0,.45))}
+.db-art svg{width:100%;height:auto}
+.db-foot{margin-top:var(--s8);font-size:var(--t-sm);color:rgba(255,255,255,.5);
+  padding-top:var(--s4);border-top:1px solid rgba(255,255,255,.13)}
+
+/* ---- right: the door ---- */
+.doorcard{display:flex;align-items:center;justify-content:center;
+  padding:var(--s10) clamp(20px,3.4vw,56px);background:var(--card)}
+.doorcard .card2{width:100%;max-width:392px;text-align:left;
+  animation:nk-rise 520ms var(--ease) 70ms backwards}
+.doorcard .day{font-size:var(--t-sm);color:var(--faint);letter-spacing:var(--tr-wide);
+  text-transform:uppercase;font-weight:600;margin:0 0 var(--s3);padding:0;border:0}
+.doorcard h1{font-size:var(--t-2xl);line-height:1.1;margin:0 0 var(--s1);
+  letter-spacing:var(--tr-tight);font-weight:800}
+.doorcard .deg{font-size:var(--t-md);color:var(--mut);margin:0}
+.doorcard .nm{font-family:'NK',serif;font-size:20px;margin:var(--s2) 0 0;direction:rtl;color:var(--ink-2)}
+.doorcard .pick{font-size:var(--t-sm);color:var(--mut);font-weight:600;
+  text-transform:uppercase;letter-spacing:var(--tr-wide);
+  margin:var(--s8) 0 var(--s3);padding-top:var(--s5);border-top:1px solid var(--line)}
+.doorcard .hint{margin-top:var(--s5)}
+.doorcard .fld input{font-size:26px;letter-spacing:.42em;text-align:center;font-weight:800;
+  padding:16px var(--s3)}
+
+/* ---- the three doors ---- */
+.whos{display:grid;gap:10px}
+.whobtn{
+  display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;
+  gap:2px var(--s3);align-items:center;text-align:left;
+  padding:14px var(--s4);border:1px solid var(--line);border-radius:var(--r3);
+  background:var(--card);box-shadow:var(--sh-1);
+  transition:border-color 140ms var(--ease),box-shadow 140ms var(--ease),
+             transform 140ms var(--ease),background 140ms var(--ease);
+}
+.whobtn:hover{border-color:var(--g-500);box-shadow:var(--sh-2);transform:translateY(-1px)}
+.whobtn:active{transform:translateY(0) scale(.99)}
+.whobtn .wi{grid-row:span 2;width:40px;height:40px;border-radius:var(--r2);
+  display:flex;align-items:center;justify-content:center;
+  background:var(--g-100);color:var(--g);transition:background 140ms var(--ease)}
+.whobtn:hover .wi{background:var(--g);color:#fff}
+.whobtn .n{font-size:16.5px;font-weight:700;letter-spacing:var(--tr-snug)}
+.whobtn .n .sd{font-family:'NK',serif;font-weight:400;color:var(--mut);margin-left:7px;font-size:15px}
+.whobtn small{grid-column:2;color:var(--mut);font-size:var(--t-sm);line-height:1.4}
+.whobtn .go{grid-row:span 2;font-size:11px;font-weight:800;letter-spacing:.08em;
+  color:var(--faint);min-width:26px;text-align:right;transition:color 140ms var(--ease)}
+.whobtn:hover .go{color:var(--g)}
+.whobtn.admin{border-style:dashed}
+.whobtn.admin .wi{background:var(--adm-bg);color:var(--adm)}
+.whobtn.admin:hover{border-color:var(--adm)}
+.whobtn.admin:hover .wi{background:var(--adm);color:#fff}
+
+.whoback{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
+  margin:var(--s6) 0 var(--s4);padding-top:var(--s5);border-top:1px solid var(--line)}
+.whoback b{font-size:17px;font-family:var(--display);letter-spacing:var(--tr-snug)}
+.whoback .sd{font-family:'NK',serif;font-weight:400;color:var(--mut);margin-left:7px}
+
+@media (max-width:900px){
+  .door{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .doorbrand{padding:var(--s6) var(--s5) var(--s5)}
+  .doorbrand::after{top:auto;left:0;right:0;bottom:0;width:auto;height:2px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+  .db-in{max-width:none}
+  .db-mark{margin-bottom:var(--s4)}
+  .db-line{font-size:26px;margin-bottom:var(--s2)}
+  .db-sub{font-size:var(--t-md);margin-bottom:0}
+  .db-art,.db-foot{display:none}
+  .doorcard{padding:var(--s6) var(--s4) var(--s8);align-items:flex-start}
+}
+
+/* =============================================================================
+   THE PARTS, PROPERLY MADE
+
+   What made this read as a student project was not the colours. It was that
+   every element was one flat fill with one border radius: a button, a card and
+   an input were the same object wearing different text. Real interfaces get
+   their quality from a handful of unglamorous details repeated everywhere —
+   an inner highlight on a raised surface, a border that is darker at the bottom
+   than the top, a pressed state that actually moves, numerals that line up.
+
+   Everything below is that, and nothing below changes where anything sits.
+   ============================================================================= */
+
+/* ---- buttons: a raised object, not a coloured rectangle ---- */
+.btn{
+  background:linear-gradient(180deg,var(--g-600) 0%,var(--g) 62%,#0d5241 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.20) inset,        /* the lit top edge */
+    0 -1px 0 rgba(0,0,0,.16) inset,             /* the shaded bottom edge */
+    0 1px 2px rgba(9,38,31,.22),
+    0 6px 16px -6px rgba(9,38,31,.42);
+  letter-spacing:var(--tr-snug);
+}
+.btn:hover:not(:disabled){
+  background:linear-gradient(180deg,#1a7a61 0%,var(--g-600) 62%,var(--g) 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.24) inset,0 -1px 0 rgba(0,0,0,.16) inset,
+             0 2px 4px rgba(9,38,31,.20),0 12px 26px -8px rgba(9,38,31,.46);
+}
+.btn:active:not(:disabled){
+  transform:translateY(1px);
+  box-shadow:0 1px 0 rgba(255,255,255,.12) inset,0 1px 2px rgba(9,38,31,.3);
+}
+.btn.ghost{
+  background:linear-gradient(180deg,#fff,#f7faf9);
+  border:1px solid var(--line);color:var(--ink-2);
+  box-shadow:0 1px 0 #fff inset,var(--sh-1);
+}
+.btn.ghost:hover:not(:disabled){background:linear-gradient(180deg,#fff,var(--g-50));
+  border-color:#c6dad4;color:var(--ink)}
+.btn.warn{background:linear-gradient(180deg,#b83b22,var(--bad) 62%,#8d2815)}
+
+/* ---- inputs: a recessed well, so a form reads as something to fill ---- */
+.fld input,.fld select,.bulk,.pinrow input{
+  background:linear-gradient(180deg,#fbfdfc,#fff);
+  box-shadow:0 1px 2px rgba(9,38,31,.05) inset;
+  border-color:#dbe5e1;
+}
+.fld input:focus,.bulk:focus,.pinrow input:focus{
+  background:#fff;border-color:var(--g-500);
+  box-shadow:0 0 0 3.5px rgba(43,143,116,.15),0 1px 2px rgba(9,38,31,.05) inset;
+}
+
+/* ---- chips ---- */
+.chip{background:linear-gradient(180deg,#fff,#fafcfb);letter-spacing:var(--tr-snug)}
+.chip.on{background:linear-gradient(180deg,var(--g-600),var(--g));
+  box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 4px 12px -4px rgba(9,38,31,.4)}
+
+/* ---- cards ---- */
+.line,.qrow,.tile,.sumbox,.druglist,.lhbox,.feebar,.feerow,.daybar,.rolebar,.dict{
+  box-shadow:var(--ring),var(--sh-1);border-color:var(--line);
+}
+
+/* =============================================================================
+   THE QUEUE
+
+   The one screen that is on the monitor all evening, so it gets the most care.
+   The token number is the thing anyone is looking for from two metres away, so
+   it is treated as a display number rather than as a label in a box.
+   ============================================================================= */
+.qrow{border-radius:var(--r3);padding:var(--s3) var(--s4);gap:var(--s4);position:relative;overflow:hidden}
+/* a green edge that grows on hover: motion at the boundary, not on the content */
+.qrow::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--g);transform:scaleY(0);transform-origin:center;
+  transition:transform 180ms var(--ease)}
+.qrow:hover:not(:disabled)::before{transform:scaleY(1)}
+.qrow .tk{
+  width:50px;height:50px;border-radius:14px;font-size:21px;font-weight:800;
+  letter-spacing:var(--tr-tight);
+  background:linear-gradient(160deg,var(--g-100),#dbeae4);
+  color:var(--g-700);box-shadow:0 1px 0 rgba(255,255,255,.9) inset,var(--ring);
+}
+.qrow:hover:not(:disabled) .tk{background:linear-gradient(160deg,var(--g-600),var(--g));color:#fff}
+.qrow .nm{font-weight:600;letter-spacing:var(--tr-snug)}
+.qrow .nm small{font-weight:400}
+.qrow .st{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--tr-wide);
+  font-weight:700;padding:5px 10px;border-radius:var(--rp);background:var(--line-2);color:var(--mut)}
+.st.s-done{background:var(--g-100);color:var(--g-700)}
+.st.s-left,.st.s-cancelled{background:var(--bad-bg);color:var(--bad)}
+.st.s-referred{background:var(--warn-bg);color:var(--warn)}
+.st.s-seen{background:var(--g-100);color:var(--g-700)}
+
+/* ---- figures: the tiles a doctor shows a colleague ---- */
+.tile b{letter-spacing:var(--tr-tight);font-weight:800}
+.tile.hero{
+  background:
+    radial-gradient(420px 220px at 88% -30%, rgba(43,143,116,.7), transparent 62%),
+    linear-gradient(155deg,var(--g) 0%,#083227 100%);
+  border-color:transparent;
+  box-shadow:0 1px 0 rgba(255,255,255,.14) inset,0 18px 40px -14px rgba(9,38,31,.6);
+}
+
+/* ---- the pane gets a real measure ---- */
+.pane{max-width:100%}
+@media (min-width:1000px){ .pane{padding-left:var(--s8);padding-right:var(--s8)} }
+
+/* ---- empty state ---- */
+.blank b{font-family:var(--display);letter-spacing:var(--tr-snug)}
+
+/* ---- setup tabs read as a control, not as links ---- */
+.tabs{background:var(--card);padding:5px;border-radius:var(--rp);
+  box-shadow:var(--ring),var(--sh-1);width:fit-content;max-width:100%}
+.tab{background:transparent;box-shadow:none;color:var(--mut);font-weight:600}
+.tab:hover{background:var(--g-50);color:var(--ink)}
+.tab.on{background:linear-gradient(180deg,var(--g-600),var(--g));color:#fff;
+  box-shadow:0 1px 0 rgba(255,255,255,.16) inset,0 3px 8px -3px rgba(9,38,31,.5)}
+.tab.adm{color:var(--adm)}
+.tab.adm.on{background:linear-gradient(180deg,#5b4890,var(--adm));color:#fff}
+
+/* =============================================================================
+   COLOUR, PROPERLY
+
+   The app was green, plus red when something broke. That is not a palette, it
+   is a brand colour and an exception. Six families now, each with a fill, a
+   line, a text and a solid, so a component never has to invent a shade.
+
+   The discipline that keeps this from turning into a fruit bowl: colour is
+   never the only signal. Every coloured thing in this app also carries an icon
+   and words. Around one man in twelve in Sindh cannot separate red from green,
+   and a slip printed on a black and white laser has no colour at all.
+   ============================================================================= */
+
+:root{
+  /* info — a cool blue that reads as "for your information", never as an error */
+  --i-fill:#eaf2fb; --i-line:#c3daf3; --i-text:#1c4e80; --i-solid:#2b6cb0;
+  /* good */
+  --k-fill:#e8f5ee; --k-line:#bfe0cd; --k-text:#12603f; --k-solid:#158a5a;
+  /* warn — amber, the colour of "later this becomes a problem" */
+  --w-fill:#fdf6e6; --w-line:#eddbaa; --w-text:#7a5410; --w-solid:#b1811d;
+  /* stop */
+  --e-fill:#fdf0ec; --e-line:#eec4b6; --e-text:#8e2c16; --e-solid:#b8391d;
+  /* safe — violet, kept apart from every status colour on purpose */
+  --p-fill:#f2effa; --p-line:#d6cbee; --p-text:#4b3b73; --p-solid:#6a55a3;
+  /* the two clinical greys */
+  --n-fill:#f2f5f4; --n-line:#e0e7e4; --n-text:#4a5a55;
+}
+
+/* ---- the block form ---- */
+.nt{
+  display:grid;grid-template-columns:auto 1fr auto;gap:var(--s1) var(--s3);
+  align-items:start;padding:var(--s3) var(--s4);border-radius:var(--r2);
+  border:1px solid;margin:var(--s3) 0;font-size:var(--t-md);line-height:1.55;
+  animation:nk-slide 200ms var(--ease);
+}
+.nt-i{display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:9px;flex:none;margin-top:-1px}
+/* Only the TITLE is a block. A <b> inside the body must stay inline, or a bolded
+   phrase mid-sentence throws itself onto its own line and the warning reads as
+   three fragments instead of one instruction. */
+.nt-b>b{display:block;font-family:var(--display);font-size:var(--t-base);font-weight:700;
+  letter-spacing:var(--tr-snug);margin-bottom:2px}
+.nt-b p b{font-weight:700}
+.nt-b p{margin:0}
+.nt-b p:only-child{padding-top:4px}
+.nt-a{grid-row:1 / span 2;align-self:center;display:flex;gap:var(--s2)}
+.nt-a .btn{padding:9px var(--s4);font-size:var(--t-md)}
+
+.nt-info{background:var(--i-fill);border-color:var(--i-line);color:var(--i-text)}
+.nt-info .nt-i{background:rgba(43,108,176,.13);color:var(--i-solid)}
+.nt-good{background:var(--k-fill);border-color:var(--k-line);color:var(--k-text)}
+.nt-good .nt-i{background:rgba(21,138,90,.13);color:var(--k-solid)}
+.nt-warn{background:var(--w-fill);border-color:var(--w-line);color:var(--w-text)}
+.nt-warn .nt-i{background:rgba(177,129,29,.15);color:var(--w-solid)}
+.nt-stop{background:var(--e-fill);border-color:var(--e-line);color:var(--e-text)}
+.nt-stop .nt-i{background:rgba(184,57,29,.13);color:var(--e-solid)}
+.nt-safe{background:var(--p-fill);border-color:var(--p-line);color:var(--p-text)}
+.nt-safe .nt-i{background:rgba(106,85,163,.13);color:var(--p-solid)}
+
+/* the one that must be impossible to scroll past */
+.nt-stop{box-shadow:0 0 0 3px rgba(184,57,29,.09)}
+
+/* ---- the one-line form ---- */
+.tip{display:flex;gap:var(--s2);align-items:flex-start;font-size:var(--t-sm);
+  line-height:1.55;margin:var(--s2) 0;padding-left:var(--s2);border-left:2.5px solid}
+.tip svg{flex:none;margin-top:2px}
+.tip-info{border-color:var(--i-solid);color:var(--i-text)}
+.tip-good{border-color:var(--k-solid);color:var(--k-text)}
+.tip-warn{border-color:var(--w-solid);color:var(--w-text)}
+.tip-stop{border-color:var(--e-solid);color:var(--e-text)}
+.tip-safe{border-color:var(--p-solid);color:var(--p-text)}
+
+/* ---- the old shapes, brought into line so nothing looks orphaned ---- */
+.note{background:var(--w-fill);border-left-color:var(--w-solid);color:var(--w-text)}
+.note.nudge{background:var(--e-fill);border-left-color:var(--e-solid);color:var(--e-text)}
+.lockbar{background:var(--w-fill);border-color:var(--w-line);color:var(--w-text)}
+.usable.bad{color:var(--e-text)}
+.danger{background:var(--e-fill);border-color:var(--e-line)}
+.danger h3{color:var(--e-text)}
+.nearmiss{background:var(--w-fill);border-color:var(--w-line)}
+.warnpill{background:var(--e-fill);color:var(--e-text);border:1px solid var(--e-line)}
+.unvpill{background:var(--w-fill);color:var(--w-text);border:1px solid var(--w-line)}
+.refund{border-color:var(--e-solid);background:var(--e-fill)}
+.refund>b{color:var(--e-text)}
+.aware.access{background:var(--k-fill);color:var(--k-text);border:1px solid var(--k-line)}
+.aware.watch{background:var(--w-fill);color:var(--w-text);border:1px solid var(--w-line)}
+.aware.reserve{background:var(--e-fill);color:var(--e-text);border:1px solid var(--e-line)}
+
+/* =============================================================================
+   ICONS IN THE FURNITURE
+
+   Section headings and buttons take an icon on the left. It is decoration in
+   the strict sense — the word is always there too — but it is what turns a
+   column of sentences into a screen with landmarks you can find twice.
+   ============================================================================= */
+h2 svg{color:var(--g);flex:none;opacity:.85}
+.btn svg{opacity:.9}
+.lnk svg{vertical-align:-2px;margin-right:4px}
+
+/* a small round badge, used wherever a count or a state needs a home */
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:var(--t-xs);
+  font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  padding:4px 9px;border-radius:var(--rp);border:1px solid}
+.badge.i{background:var(--i-fill);border-color:var(--i-line);color:var(--i-text)}
+.badge.k{background:var(--k-fill);border-color:var(--k-line);color:var(--k-text)}
+.badge.w{background:var(--w-fill);border-color:var(--w-line);color:var(--w-text)}
+.badge.e{background:var(--e-fill);border-color:var(--e-line);color:var(--e-text)}
+.badge.n{background:var(--n-fill);border-color:var(--n-line);color:var(--n-text)}
+
+/* =============================================================================
+   COLOUR THAT MEANS SOMETHING
+
+   The tiles on the figures screen used to be a wall of identical white boxes
+   with green numbers, which tells a reader that everything is equally
+   important, which is the same as telling them nothing is.
+   ============================================================================= */
+.tile.i b{color:var(--i-solid)} .tile.i{border-color:var(--i-line);background:linear-gradient(180deg,#fff,var(--i-fill))}
+.tile.k b{color:var(--k-solid)} .tile.k{border-color:var(--k-line);background:linear-gradient(180deg,#fff,var(--k-fill))}
+.tile.w b{color:var(--w-solid)} .tile.w{border-color:var(--w-line);background:linear-gradient(180deg,#fff,var(--w-fill))}
+.tile.e b{color:var(--e-solid)} .tile.e{border-color:var(--e-line);background:linear-gradient(180deg,#fff,var(--e-fill))}
+.tile .ti{display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s2);
+  font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--tr-wide);
+  font-weight:800;opacity:.7}
+
+/* role colours, so the header says who you are before you read it */
+.rolechip.counter{background:rgba(255,255,255,.16)}
+.rolechip.doctor{background:rgba(255,255,255,.24)}
+.rolechip.admin{background:linear-gradient(180deg,#6a55a3,#4b3b73);
+  box-shadow:0 0 0 1px rgba(255,255,255,.3) inset}
+
+/* the day bar, which is money, gets money's colours */
+.daybar{background:linear-gradient(180deg,#fff,#fafcfb)}
+.daybar .money b{color:var(--k-solid)}
+.daybar .due b,.daybar .back b{color:var(--e-solid)}
+
+/* ---- illustrations inside notes and empty states ---- */
+.blank svg{color:var(--g);opacity:.75}
+.blank.w svg{color:var(--w-solid)}
+.blank.e svg{color:var(--e-solid)}
+.artrow{display:flex;align-items:center;gap:var(--s5);margin:var(--s4) 0}
+.artrow svg{width:150px;flex:none;color:var(--g);opacity:.8}
+.artrow .t b{display:block;font-family:var(--display);font-size:var(--t-lg);
+  letter-spacing:var(--tr-snug);margin-bottom:var(--s1)}
+.artrow .t p{color:var(--mut);font-size:var(--t-md);line-height:1.6;margin:0}
+@media (max-width:640px){
+  .artrow{flex-direction:column;text-align:center;gap:var(--s3)}
+  .artrow svg{width:130px}
+  .nt{grid-template-columns:auto 1fr;gap:var(--s2) var(--s3)}
+  .nt-a{grid-column:1 / -1;grid-row:auto;margin-top:var(--s2)}
+  .nt-a .btn{width:100%}
+}
+
+/* =============================================================================
+   DEPTH
+
+   Real 3D, done with CSS transforms and a perspective camera rather than with
+   WebGL. That choice is deliberate and it is not a compromise:
+
+     - it is composited on the GPU, so it costs the main thread nothing, and the
+       main thread is where a dose tap has to be answered in a few milliseconds
+     - it adds no library to a bundle that must cross a Larkana connection
+     - it degrades to flat, not to broken, on an old clinic laptop
+     - and a WebGL canvas in the prescribing path is a second renderer that can
+       fail while a patient is standing there
+
+   So the app has genuine perspective, real Z depth and objects that turn in
+   space, and none of it can slow down a prescription.
+
+   THE RULE: nothing that moves may sit under a finger. Tilt happens on cards a
+   doctor reads, on the mark, on the sign-in panel. It never happens on a dose
+   button, a chip, or the PRINT bar.
+   ============================================================================= */
+
+@media (prefers-reduced-motion:no-preference){
+
+  /* the camera. A long lens: 1200px flattens the effect into something you feel
+     rather than notice, which is what you want on a screen used for hours. */
+  .door,.whos,.tiles,.qlist,.intro{perspective:1400px;perspective-origin:50% 40%}
+
+  /* ---- the doors on the sign-in: they lift and turn toward you ---- */
+  .whobtn{transform-style:preserve-3d;
+    transition:transform 260ms var(--ease),box-shadow 260ms var(--ease),
+               border-color 140ms var(--ease),background 140ms var(--ease)}
+  .whobtn:hover{transform:translateZ(26px) rotateX(4deg) translateY(-2px);
+    box-shadow:0 26px 44px -18px rgba(9,38,31,.34),var(--sh-2)}
+  .whobtn:active{transform:translateZ(6px) rotateX(1deg) scale(.995);transition-duration:90ms}
+  .whobtn .wi{transform:translateZ(18px);transition:transform 260ms var(--ease)}
+  .whobtn:hover .wi{transform:translateZ(34px)}
+
+  /* ---- the figures tiles: a slab that tips as if it had weight ---- */
+  .tile{transform-style:preserve-3d;
+    transition:transform 300ms var(--ease),box-shadow 300ms var(--ease)}
+  .tile:hover{transform:translateZ(22px) rotateX(5deg) rotateY(-2deg)}
+  .tile:hover b{transform:translateZ(20px)}
+  .tile b{transition:transform 300ms var(--ease);display:block}
+
+  /* ---- the queue: the token lifts out of the card it sits on ---- */
+  .qrow{transform-style:preserve-3d}
+  .qrow .tk{transition:transform 240ms var(--ease),background 240ms var(--ease),color 240ms var(--ease)}
+  .qrow:hover:not(:disabled) .tk{transform:translateZ(30px) rotateY(-10deg) scale(1.04)}
+
+  /* ---- the illustration on the sign-in floats in front of its panel ---- */
+  .db-art{transform-style:preserve-3d;
+    animation:nk-float 7s ease-in-out infinite;
+    transform:rotateY(-11deg) rotateX(5deg)}
+  @keyframes nk-float{
+    0%,100%{transform:rotateY(-11deg) rotateX(5deg) translateY(0) translateZ(0)}
+    50%    {transform:rotateY(-7deg)  rotateX(3deg) translateY(-12px) translateZ(24px)}
+  }
+
+  /* ---- the mark turns once when the app opens, like a card being dealt ---- */
+  .top .mk{animation:nk-deal 900ms var(--ease) both}
+  @keyframes nk-deal{
+    from{transform:perspective(600px) rotateY(-95deg) scale(.7);opacity:0}
+    to  {transform:perspective(600px) rotateY(0)      scale(1); opacity:.92}
+  }
+
+  /* ---- a printed slip flips face-up ---- */
+  @keyframes nk-flip{
+    from{transform:perspective(900px) rotateX(-78deg) translateY(18px);opacity:0}
+    to  {transform:perspective(900px) rotateX(0)      translateY(0);   opacity:1}
+  }
+  .line{animation:nk-flip 320ms var(--ease)}
+  .nt{animation:nk-flip 260ms var(--ease)}
+}
+
+/* =============================================================================
+   THE TOAST STACK
+   ============================================================================= */
+.toasts{position:fixed;top:calc(var(--header) + 14px);right:16px;z-index:60;
+  display:flex;flex-direction:column;gap:10px;width:min(340px,calc(100vw - 32px));
+  pointer-events:none}
+.toast{
+  pointer-events:auto;cursor:pointer;display:grid;
+  grid-template-columns:auto 1fr auto;gap:2px var(--s3);align-items:center;
+  padding:12px var(--s4);border-radius:var(--r3);border:1px solid var(--line);
+  background:rgba(255,255,255,.93);backdrop-filter:blur(14px) saturate(1.5);
+  -webkit-backdrop-filter:blur(14px) saturate(1.5);
+  box-shadow:var(--sh-3);
+  animation:nk-toast 340ms var(--spring) both;
+}
+@keyframes nk-toast{
+  from{opacity:0;transform:perspective(700px) rotateY(-22deg) translateX(46px) scale(.94)}
+  to  {opacity:1;transform:perspective(700px) rotateY(0)      translateX(0)   scale(1)}
+}
+.toast .ti{grid-row:span 2;width:34px;height:34px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center}
+.toast .tt b{display:block;font-family:var(--display);font-size:var(--t-base);
+  font-weight:700;letter-spacing:var(--tr-snug)}
+.toast .tt small{display:block;color:var(--mut);font-size:var(--t-sm);margin-top:1px}
+.toast .tbtn{grid-row:span 2;border:0;border-radius:var(--rp);padding:8px 14px;
+  font-size:var(--t-sm);font-weight:800;background:var(--g);color:#fff;font-family:inherit}
+.toast .tbtn:hover{background:var(--g-600)}
+
+.t-patient .ti{background:var(--k-fill);color:var(--k-solid)}
+.t-printed .ti,.t-seen .ti,.t-coming .ti{background:var(--n-fill);color:var(--mut)}
+.t-refund{border-color:var(--e-line)} .t-refund .ti{background:var(--e-fill);color:var(--e-solid)}
+.t-bell{border-color:var(--i-line)}   .t-bell .ti{background:var(--i-fill);color:var(--i-solid)}
+
+/* the one that must not be missed: it does not leave, and it breathes */
+.t-urgent{border:2px solid var(--e-solid);background:rgba(253,240,236,.97)}
+.t-urgent .ti{background:var(--e-solid);color:#fff}
+.t-urgent{animation:nk-toast 340ms var(--spring) both, nk-urgent 1.6s ease-in-out 340ms infinite}
+@keyframes nk-urgent{
+  0%,100%{box-shadow:var(--sh-3),0 0 0 0 rgba(184,57,29,.34)}
+  50%    {box-shadow:var(--sh-3),0 0 0 12px rgba(184,57,29,0)}
+}
+
+@media (max-width:640px){
+  .toasts{left:12px;right:12px;top:calc(var(--header) + 8px);width:auto}
+}
+
+/* =============================================================================
+   THE BELL
+   ============================================================================= */
+.bellwrap{margin:var(--s4) 0}
+.bell{display:flex;align-items:center;gap:var(--s3);width:100%;
+  padding:13px var(--s4);border-radius:var(--r3);border:1px solid var(--line);
+  background:linear-gradient(180deg,#fff,#f8fbfa);box-shadow:var(--ring),var(--sh-1);
+  text-align:left;transition:border-color 140ms var(--ease),box-shadow 140ms var(--ease),
+                             transform 140ms var(--ease)}
+.bell:hover:not(:disabled){border-color:var(--gold);box-shadow:var(--sh-2);transform:translateY(-1px)}
+.bell:disabled{opacity:1}
+.bellcup{position:relative;width:38px;height:38px;flex:none;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,var(--gold-100),#efe0b4);color:#8a6d16;
+  transform-style:preserve-3d}
+.bellcup svg{width:24px;height:24px;transform-origin:50% 12%}
+.bellcup .clap{position:absolute;bottom:7px;left:50%;width:5px;height:5px;margin-left:-2.5px;
+  border-radius:50%;background:#8a6d16;transform-origin:50% -240%}
+.belltx b{display:block;font-family:var(--display);font-size:var(--t-base);font-weight:700;
+  letter-spacing:var(--tr-snug)}
+.belltx small{display:block;font-size:var(--t-sm);color:var(--mut);font-family:'NK',serif}
+
+/* the swing. The cup rocks, the clapper lags behind it, which is what makes a
+   two-element bell read as one object with weight. */
+@keyframes nk-swing{
+  0%{transform:rotate(0)} 12%{transform:rotate(19deg)} 30%{transform:rotate(-15deg)}
+  50%{transform:rotate(10deg)} 70%{transform:rotate(-6deg)} 85%{transform:rotate(3deg)}
+  100%{transform:rotate(0)}
+}
+@keyframes nk-clap{
+  0%{transform:rotate(0)} 16%{transform:rotate(-24deg)} 34%{transform:rotate(20deg)}
+  54%{transform:rotate(-13deg)} 74%{transform:rotate(8deg)} 100%{transform:rotate(0)}
+}
+.bell.ringing .bellcup svg{animation:nk-swing 900ms ease-in-out 2}
+.bell.ringing .bellcup .clap{animation:nk-clap 900ms ease-in-out 2}
+.bell.ringing{border-color:var(--gold);box-shadow:0 0 0 4px rgba(201,162,39,.18),var(--sh-2)}
+.bell.answered{border-color:var(--k-solid);box-shadow:0 0 0 4px rgba(21,138,90,.16),var(--sh-2)}
+.bell.answered .bellcup{background:linear-gradient(160deg,var(--k-fill),#bfe0cd);color:var(--k-text)}
+
+/* a patient who cannot wait, in the queue */
+.qrow.urgent{border-color:var(--e-solid);box-shadow:0 0 0 3px rgba(184,57,29,.1),var(--sh-1)}
+.qrow.urgent .tk{background:linear-gradient(160deg,#c9452a,var(--e-solid));color:#fff}
+.qrow.urgent::before{background:var(--e-solid);transform:scaleY(1)}
+.uflag{display:inline-flex;align-items:center;gap:5px;font-size:var(--t-xs);font-weight:800;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--e-text)}
+
+/* the sound switch, wherever it lives */
+.soundrow{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
+  padding:var(--s3) 0;border-bottom:1px solid var(--line-2)}
+
+/* the "cannot wait" switch: it has to look like a decision, not a preference */
+.urgentbox{margin:var(--s3) 0;padding:var(--s3) var(--s4);border:1px solid var(--w-line);
+  background:var(--w-fill);border-radius:var(--r2);align-items:center}
+.urgentbox b{display:inline-flex;align-items:center;gap:6px;color:var(--w-text)}
+.urgentbox svg{color:var(--w-solid);vertical-align:-2px}
+.urgentbox input:checked ~ span b{color:var(--e-text)}
+.urgentbox:has(input:checked){border-color:var(--e-solid);background:var(--e-fill);
+  box-shadow:0 0 0 3px rgba(184,57,29,.09)}
+.urgentbox:has(input:checked) svg{color:var(--e-solid)}
+.urgentbox input[type=checkbox]{accent-color:var(--e-solid);width:20px;height:20px}
+
+/* =============================================================================
+   VITALS
+
+   Typed standing up, on a tablet held in one hand, by someone with a queue
+   behind them. So: large boxes, numeric keypads, no dropdowns, and the unit
+   printed inside the field so nobody has to remember it.
+   ============================================================================= */
+.vopen{display:block;width:100%;text-align:left;padding:12px var(--s4);margin:var(--s2) 0;
+  border:1.5px dashed var(--line);border-radius:var(--r2);background:transparent;
+  color:var(--mut);font-size:var(--t-md);font-weight:600;
+  transition:border-color 140ms var(--ease),color 140ms var(--ease),background 140ms var(--ease)}
+.vopen:hover{border-color:var(--g-500);color:var(--g);background:var(--g-50)}
+
+.vitals{margin:var(--s3) 0;padding:var(--s4);border:1px solid var(--line);
+  border-radius:var(--r3);background:var(--card);box-shadow:var(--ring),var(--sh-1)}
+.vhead{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
+  margin-bottom:var(--s3)}
+.vhead b{font-family:var(--display);font-size:var(--t-base);letter-spacing:var(--tr-snug)}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:var(--s3)}
+.vfld label{display:block;font-size:var(--t-xs);text-transform:uppercase;
+  letter-spacing:var(--tr-wide);color:var(--mut);font-weight:700;margin-bottom:5px}
+.vfld label .sd{font-family:'NK',serif;font-style:normal;text-transform:none;
+  letter-spacing:0;font-size:13px;color:var(--faint);margin-left:5px}
+.vone,.vpair{display:flex;align-items:center;gap:6px;
+  border:1.5px solid var(--line);border-radius:var(--r2);padding:0 var(--s3);
+  background:linear-gradient(180deg,#fbfdfc,#fff);
+  box-shadow:0 1px 2px rgba(9,38,31,.05) inset;
+  transition:border-color 140ms var(--ease),box-shadow 140ms var(--ease)}
+.vone:focus-within,.vpair:focus-within{border-color:var(--g-500);
+  box-shadow:0 0 0 3.5px rgba(43,143,116,.15)}
+.vone input,.vpair input{border:0;background:none;outline:none;padding:12px 0;
+  font-size:19px;font-weight:700;width:100%;min-width:0;font-variant-numeric:tabular-nums}
+.vpair input{text-align:center}
+.vpair span{color:var(--faint);font-size:19px;font-weight:300}
+.vone em,.vpair em{font-style:normal;font-size:var(--t-sm);color:var(--faint);white-space:nowrap}
+.vmark{display:block;font-size:var(--t-xs);font-weight:700;margin-top:4px}
+.vfld.f-high .vone,.vfld.f-high .vpair{border-color:var(--w-solid);background:var(--w-fill)}
+.vfld.f-high .vmark{color:var(--w-text)}
+.vfld.f-low .vone,.vfld.f-low .vpair{border-color:var(--i-solid);background:var(--i-fill)}
+.vfld.f-low .vmark{color:var(--i-text)}
+
+/* the compounder's pad inside a queue row is narrower and quieter */
+.qwrap .vitals{margin:var(--s2) 0 0 var(--s2);background:var(--g-50)}
+.qwrap .vopen{margin:var(--s2) 0 0 var(--s2);width:auto;padding:9px var(--s3);font-size:var(--t-sm)}
+
+/* =============================================================================
+   THE DOCTOR'S OWN DIAGNOSES
+   ============================================================================= */
+.dxlist{display:flex;flex-wrap:wrap;gap:var(--s2);margin:var(--s2) 0 var(--s4)}
+.dxchip{display:inline-flex;align-items:center;gap:7px;padding:8px var(--s2) 8px var(--s4);
+  border:1px solid var(--line);border-radius:var(--rp);background:var(--card);
+  box-shadow:var(--sh-1);font-size:var(--t-md);font-weight:600}
+.dxchip .sd{font-family:'NK',serif;font-style:normal;font-weight:400;color:var(--mut);font-size:14px}
+.dxchip button{border:0;background:var(--line-2);color:var(--mut);width:22px;height:22px;
+  border-radius:50%;font-size:15px;line-height:1;display:flex;align-items:center;
+  justify-content:center;transition:background 140ms var(--ease),color 140ms var(--ease)}
+.dxchip button:hover{background:var(--e-fill);color:var(--e-solid)}
+.chip small.sd{font-family:'NK',serif;font-size:12.5px;opacity:.7}
+
+@media (max-width:640px){
+  .vgrid{grid-template-columns:1fr 1fr}
+  .qwrap .vitals{margin-left:0}
+}
+
+/* ---- about & help ---- */
+.about{max-width:820px;margin:0 auto;width:100%}
+.abhead{display:flex;gap:var(--s5);align-items:flex-start;margin:var(--s5) 0 var(--s8)}
+.abhead svg{color:var(--g);flex:none}
+.abhead h1{font-size:var(--t-2xl);letter-spacing:var(--tr-tight);margin:0 0 var(--s2)}
+.abhead h1 .sd{font-family:'NK',serif;font-weight:400;color:var(--mut);margin-left:8px;font-size:24px}
+.abhead p{color:var(--ink-2);line-height:1.6;margin:0 0 var(--s1);max-width:52ch}
+.abhead .ver{font-size:var(--t-sm);color:var(--faint);font-variant-numeric:tabular-nums}
+.promises{list-style:none;padding:0;margin:var(--s3) 0;display:grid;gap:var(--s2)}
+.promises li{padding:var(--s3) var(--s4);border-left:3px solid var(--p-solid);
+  border-radius:0 var(--r2) var(--r2) 0;background:var(--card);box-shadow:var(--ring),var(--sh-1);
+  font-size:var(--t-md);line-height:1.6}
+.ticket{padding:var(--s4);border:1px solid var(--line);border-radius:var(--r3);
+  background:var(--card);box-shadow:var(--ring),var(--sh-1);margin:var(--s3) 0}
+.tref{display:flex;align-items:baseline;gap:var(--s3);margin-bottom:var(--s4);
+  padding-bottom:var(--s3);border-bottom:1px solid var(--line-2)}
+.tref span{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--tr-wide);
+  color:var(--mut);font-weight:700}
+.tref b{font-family:var(--display);font-size:28px;font-weight:800;letter-spacing:.14em;
+  color:var(--g);font-variant-numeric:tabular-nums}
+@media (max-width:640px){ .abhead{flex-direction:column;gap:var(--s3)} }

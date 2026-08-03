@@ -1,0 +1,338 @@
+@page{margin:0;}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+html,body{margin:0;padding:0;background:#e9e9ec;}
+body{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;color:#000;}
+.page{width:var(--pw,148mm);height:var(--ph,210mm);background:#fff;margin:0 auto 8mm;position:relative;overflow:hidden;}
+/* THE BLANK SECOND PAGE.
+   `page-break-after:always` on .page broke after EVERY sheet including the last
+   one, so a single-sheet prescription came out of the printer as two pages, the
+   second one blank. At 140 patients an evening that is 140 wasted sheets. The
+   break belongs BETWEEN sheets, so it is asked for by the sheet that follows. */
+@media print{
+  html,body{background:#fff;height:auto}
+  .page{margin:0;break-inside:avoid}
+  .page + .page{break-before:page}
+  .page:last-child{break-after:avoid}
+}
+.sd{font-family:'NK',serif;direction:rtl;unicode-bidi:isolate;}
+.pad{padding:0 7mm;}
+
+/* header */
+.hdr{padding:4.4mm 7mm 2.6mm;border-bottom:2.4pt solid #0f5c4a;}
+.hdr .row{display:flex;align-items:flex-start;justify-content:space-between;gap:4mm;}
+.docname{font-size:13.4pt;font-weight:700;line-height:1.1;}
+.docqual{font-size:7pt;color:#333;margin-top:.7mm;line-height:1.3;}
+.docsd{font-size:11.5pt;font-weight:700;text-align:right;line-height:1.45;}
+.docsd small{display:block;font-size:7.6pt;font-weight:400;color:#333;}
+.clinicline{margin-top:1.6mm;font-size:6.6pt;color:#444;display:flex;justify-content:space-between;}
+
+/* strips */
+/* THE PATIENT BAR, TIGHTENED.
+   It used to be as tall as the QR square, so every cell beside the square had a
+   band of white under its value doing nothing. On an A5 sheet that band is about
+   4mm, which is a medicine. Cells are now centred vertically instead of pinned
+   to the top, the padding is halved, and the square is 10mm rather than 13. */
+.pt{display:flex;align-items:stretch;border:.9pt solid #111;margin:2mm 0 1.2mm;font-size:7.4pt;}
+.pt>div{padding:.7mm 1.8mm;border-right:.6pt solid #999;flex:1;
+  display:flex;flex-direction:column;justify-content:center;}
+.pt>div:last-child{border-right:0;}
+.pt b{display:block;font-size:5.5pt;font-weight:400;color:#666;text-transform:uppercase;letter-spacing:.35px;line-height:1.25;}
+.pt .v{font-size:8.6pt;font-weight:700;margin-top:.15mm;line-height:1.15;}
+/* ONE LINE, ALWAYS.
+   A diagnosis and six readings is seven cells across 134mm of usable width, so
+   about 19mm each. That only works if nothing in a cell is wider than the number
+   it is labelling: the label drops to 5pt, the Sindhi sits on its own line under
+   it rather than beside it, and the unit tucks in after the value. Wrapping was
+   the honest fallback while the cells were too fat; making them fit is better,
+   because a second row costs another 6mm of a sheet that has none to spare. */
+.vt .vu{font-size:5.8pt;font-weight:400;color:#555;}
+.vt b .sd{display:block;font-size:6pt;color:#444;font-weight:400;line-height:1.15;}
+.vt>div{white-space:nowrap;}
+/* Six readings do not fit across an A5 sheet on one line, and a doctor who runs
+   a BP, a pulse, a temperature, a weight, a sugar and an HbA1c is exactly the
+   doctor this strip exists for. So it wraps to a second row rather than pushing
+   the last reading off the paper, where nobody would ever see it was missing. */
+.vt{display:flex;flex-wrap:nowrap;border:.9pt solid #111;margin-bottom:1.2mm;overflow:hidden;}
+/* NO min-width:0 here, deliberately.
+   With it, a flex item is allowed to shrink below its own content, and since
+   these cells are nowrap the text then printed straight over the cell beside it:
+   "DIAGNOSIS" and "BP" on top of each other, unreadable, and only visible on
+   paper. Leaving min-width at auto means a cell that will not fit wraps onto a
+   second row instead, which is exactly what should happen. */
+.vt>div{padding:.6mm 1.5mm;border-right:.6pt solid #999;flex:1 1 0;min-width:0;overflow:hidden;}
+.vt b{font-size:5pt;letter-spacing:.3px;line-height:1.2;}
+.vt .v{font-size:8pt;line-height:1.15;margin-top:.1mm;}
+/* the diagnosis is words, not a number, so it is the one cell allowed to be
+   wider than its neighbours and the one allowed to wrap inside itself */
+/* A blood pressure is the widest reading on the strip: two numbers, a slash and
+   mmHg. Given an equal share it clipped to "mmH", which is the kind of thing
+   only paper tells you about. */
+.vt>div.v-bp{flex:1.3 1 0;}
+.vt>div.dx{flex:2.2 1 0;white-space:normal;}
+.vt>div.dx .v{font-size:8.6pt;line-height:1.1;}
+.vt>div:last-child{border-right:0;}
+.vt b{display:block;font-size:5.5pt;color:#666;letter-spacing:.4px;text-transform:uppercase;font-weight:400}
+.vt .v{font-size:9pt;font-weight:700;margin-top:.2mm;white-space:nowrap;}
+.vt .v em{font-style:normal;font-size:5.4pt;color:#777;font-weight:400;}
+.vt .dx{flex:2.1;background:#f4f7f6;}
+.vt .dx .v{font-size:9.4pt;}
+
+/* medicine table */
+table.rx{width:100%;border-collapse:collapse;table-layout:fixed;}
+table.rx th{font-size:5.8pt;font-weight:400;color:#fff;background:#0f5c4a;padding:.8mm 0;text-align:center;letter-spacing:.3px;}
+table.rx th .sd{font-size:7.6pt;display:block;font-weight:700;}
+table.rx td{border-bottom:.7pt solid #bbb;vertical-align:middle;padding:0;}
+.c-no{width:5.6mm}.c-nm{width:44mm}.c-t{width:14.5mm}.c-ml{width:15mm}.c-dy{width:17mm}
+td.noc{background:#0f5c4a;color:#fff;font-size:11pt;font-weight:700;text-align:center;}
+.mono td.noc{background:#000;}
+.nmcell{padding:.9mm 2mm .9mm 2.4mm;}
+.brand{font-size:11pt;font-weight:700;line-height:1.03;}
+.gen{font-size:6.2pt;color:#555;margin-top:.4mm;}
+.nmsd{font-size:9pt;font-weight:700;margin-top:.6mm;}
+.tcell,.mlcell,.dycell{text-align:center;padding:1.1mm 0;}
+.tcell.off{background:repeating-linear-gradient(135deg,#fff,#fff 1.6mm,#f0f0f0 1.6mm,#f0f0f0 3.2mm);}
+.dose{font-size:7.2pt;font-weight:700;margin-top:.2mm;}
+.dose .sd{font-size:8pt;}
+.mlsd{font-size:8.2pt;font-weight:700;margin-top:.3mm;line-height:1.15;}
+.dyn{font-size:14pt;font-weight:700;line-height:1;}
+.dysd{font-size:8.2pt;font-weight:700;}
+.tick{margin-top:.7mm;display:flex;gap:.6mm;justify-content:center;}
+.tick i{width:2.2mm;height:2.2mm;border:.6pt solid #666;display:block;}
+
+/* compact mode for long prescriptions */
+table.rx.cmp td{border-bottom:.6pt solid #ccc}
+table.rx.cmp .nmcell{padding:.7mm 2mm .7mm 2.4mm}
+table.rx.cmp .brand{font-size:9.6pt}
+table.rx.cmp .gen{font-size:5.6pt;margin-top:.2mm}
+table.rx.cmp .nmsd{font-size:7.8pt;margin-top:.3mm}
+table.rx.cmp .tcell,table.rx.cmp .mlcell,table.rx.cmp .dycell{padding:.6mm 0}
+table.rx.cmp .dose{font-size:6.2pt}
+table.rx.cmp .dose .sd{font-size:7pt}
+table.rx.cmp .mlsd{font-size:7pt}
+table.rx.cmp .dyn{font-size:11.5pt}
+table.rx.cmp .dysd{font-size:7pt}
+table.rx.cmp td.noc{font-size:9.5pt}
+
+.contbar{margin-top:1.6mm;border:.9pt solid #111;background:#f4f7f6;padding:1.4mm 2mm;display:flex;justify-content:space-between;align-items:center;font-size:6.4pt;}
+.contbar .sd{font-size:8.6pt;font-weight:700;}
+.pgtag{position:absolute;top:1.6mm;left:7mm;font-size:6pt;color:#555;letter-spacing:.6px;}
+.cont2{display:flex;border:.9pt solid #111;margin:2.6mm 0 1.6mm;font-size:7.4pt;background:#f4f7f6;}
+.cont2>div{padding:1.1mm 2mm;border-right:.6pt solid #999;flex:1}
+.cont2>div:last-child{border-right:0}
+.cont2 b{display:block;font-size:5.7pt;font-weight:400;color:#666;text-transform:uppercase;letter-spacing:.4px}
+.cont2 .v{font-size:8.8pt;font-weight:700;margin-top:.3mm}
+
+/* ULTRA compact: 15 medicines on one sheet */
+.u-no{width:5mm}.u-nm{width:63mm}.u-t{width:13mm}.u-ml{width:12mm}.u-dy{width:12mm}
+table.rx.u th{font-size:5.2pt;padding:.6mm 0}
+table.rx.u th .sd{font-size:6.8pt}
+table.rx.u td{border-bottom:.5pt solid #cfd6d4;padding:0;height:7.85mm}
+table.rx.u td.noc{font-size:8pt}
+.nmu{padding:0 1.6mm 0 2mm;line-height:1.05}
+.nmu b{font-size:8.6pt;letter-spacing:.1px}
+.nmu .gu{font-size:5.4pt;color:#666;margin-left:1.4mm}
+.nmu .sdu{font-size:8pt;font-weight:700;float:right;margin-right:.5mm}
+.tu{text-align:center;font-size:5pt}
+.tu b{font-size:8pt;margin-left:.6mm;vertical-align:middle}
+.tu.off{color:#b7bfbd;background:repeating-linear-gradient(135deg,#fff,#fff 1.3mm,#f2f4f3 1.3mm,#f2f4f3 2.6mm)}
+.mlu{text-align:center}
+.mseq{display:inline-flex;align-items:center;gap:.5mm}
+.dyu{text-align:center;font-size:9.4pt;font-weight:700}
+.dyu .sd{font-size:7.4pt;margin-left:.8mm;font-weight:700}
+.vline{border:.9pt solid #111;padding:.9mm 2mm;margin-bottom:1.4mm;font-size:7pt;display:flex;gap:3mm;flex-wrap:wrap;align-items:center}
+.vline b{font-size:8.6pt}
+.vline em{font-style:normal;color:#777;font-size:6pt}
+.vline .lbl{color:#666;font-size:5.6pt;letter-spacing:.4px;text-transform:uppercase}
+.legend.thin{padding:.7mm 2mm;margin-top:1mm}
+.legend.thin .lg span{font-size:5.4pt}
+.legend.thin .lg .sd{font-size:7pt}
+
+/* mixed forms: non-grid rows + clinic band */
+table.rx.mx td{height:auto;border-bottom:.6pt solid #cfd6d4}
+.nmcell.mx{padding:.7mm 2mm .7mm 2.4mm}
+table.rx.mx .brand{font-size:9.4pt}
+table.rx.mx .gen{font-size:5.8pt}
+table.rx.mx .nmsd{font-size:8.4pt;margin-top:.4mm}
+table.rx.mx .tcell,table.rx.mx .mlcell,table.rx.mx .dycell{padding:.6mm 0}
+table.rx.mx .dose{font-size:6.4pt}
+table.rx.mx .dyn{font-size:12pt}
+table.rx.mx .dysd{font-size:7.4pt}
+.nogrid{padding:.7mm 2.5mm;background:#fbfcfc}
+.ln3{display:flex;align-items:center;gap:2.4mm}
+.sdi{font-size:8.4pt;font-weight:700;line-height:1.3;direction:rtl;font-family:'NK',serif}
+.eni{font-size:5.7pt;color:#555;margin-top:.3mm;letter-spacing:.1px}
+.warnx{margin-top:.8mm;border:.7pt solid #b3261e;color:#b3261e;border-radius:1mm;padding:.5mm 1.4mm;
+ font-size:8pt;font-weight:700;direction:rtl;font-family:'NK',serif;display:inline-block}
+.warnx span{font-family:'Liberation Sans',Arial,sans-serif;font-size:5.4pt;direction:ltr;font-weight:400}
+.band{margin-top:1.5mm;border:1.1pt solid #111;background:#f1f4f3}
+.band h5{margin:0;background:#243b35;color:#fff;font-size:5.8pt;font-weight:400;letter-spacing:.5px;
+ padding:.9mm 2mm;display:flex;justify-content:space-between;align-items:center}
+.band h5 .sd{font-size:8.4pt;font-weight:700}
+.brow{display:flex;gap:2.4mm;align-items:flex-start;padding:1mm 2.5mm;border-bottom:.6pt solid #cfd6d4}
+.brow:last-child{border-bottom:0}
+.brow .bi{flex:none;padding-top:.3mm}
+.brow .bt{flex:1}
+.brow .bt b{font-size:9pt;display:block;line-height:1.1}
+.brow .bt .g2{font-size:5.8pt;color:#555;margin-top:.3mm}
+.brow .bt .s2{font-size:8.6pt;font-weight:700;margin-top:.6mm;direction:rtl;font-family:'NK',serif}
+.brow .bq{flex:none;text-align:center;width:20mm}
+.brow .bq .n6{font-size:13pt;font-weight:700;line-height:1}
+.brow .bq .l6{font-size:5.4pt;color:#555;letter-spacing:.3px}
+.brow .bq .sd{font-size:7.6pt;font-weight:700}
+
+/* legend */
+.legend{margin-top:1.2mm;border:.8pt dashed #0f5c4a;padding:1.3mm 2mm;display:flex;justify-content:space-between;align-items:center;}
+.mono .legend{border-color:#000;}
+.lg{display:flex;align-items:center;gap:1.2mm;}
+.lg span{font-size:6pt;line-height:1.1;}
+.lg .sd{font-size:7.6pt;font-weight:700;display:block;}
+
+/* boxes row: tests + advice */
+.boxes{display:flex;gap:2.5mm;margin-top:1.2mm;align-items:stretch;}
+.bx{border:.9pt solid #111;flex:1;display:flex;flex-direction:column;}
+.bx h4{margin:0;background:#0f5c4a;color:#fff;font-size:5.8pt;font-weight:400;padding:.8mm 2mm;letter-spacing:.4px;display:flex;justify-content:space-between;align-items:center;}
+.bx h4 .sd{font-size:8.2pt;font-weight:700;}
+.mono .bx h4{background:#000;}
+.bx .in{padding:1mm 2mm;flex:1;}
+.tst{display:flex;align-items:flex-start;gap:1.6mm;margin-bottom:.7mm;}
+.tst:last-child{margin-bottom:0}
+.tst .bxk{width:2.8mm;height:2.8mm;border:.8pt solid #333;flex:none;margin-top:.5mm;}
+.tst .sd{font-size:8.4pt;font-weight:700;line-height:1.2;}
+.bx .in.two{display:grid;grid-template-columns:1fr 1fr;gap:.6mm 3mm;}
+.tst .en{font-size:5.8pt;color:#555;letter-spacing:.2px;}
+.advgrid{display:grid;grid-template-columns:1fr;gap:.9mm;}
+.adv{display:flex;align-items:center;gap:1.6mm;}
+.adv .sd{font-size:8.4pt;font-weight:700;line-height:1.2;}
+.adv .aen{font-size:5.6pt;color:#555;}
+
+/* doctor's handwriting strip */
+.note2{margin-top:1.4mm;border-top:1.6pt solid #111;padding-top:1mm}
+.note2 .nh{display:flex;justify-content:space-between;align-items:center;font-size:5.8pt;color:#444;letter-spacing:.4px}
+.note2 .nh .sd{font-size:8.4pt;font-weight:700;color:#000}
+.note2 .nh .pen{display:flex;align-items:center;gap:1.4mm}
+.note2 .lines{margin-top:.8mm}
+.note2 .lines i{display:block;border-bottom:.6pt dotted #999;height:6.4mm}
+.note2 .lines i:last-child{border-bottom-style:solid;border-bottom-color:#bbb}
+
+/* footer */
+.foot{position:absolute;left:7mm;right:7mm;bottom:calc(4mm + var(--lhb,0mm));}
+/* One rule, one line, no boxes.
+   Two bordered boxes sat here and between them ate about 20mm off the bottom of
+   every A5 sheet — which is two more medicines. Neither earned it: the keep-it
+   message is one sentence, and the signature block was a blank rectangle on a
+   slip that already carries a registration number and prints identically every
+   time. What is left is a hairline and two short lines of type. */
+.fbar{display:flex;gap:3mm;align-items:baseline;justify-content:space-between;
+  border-top:.8pt solid #111;padding-top:1.1mm;}
+.keep{display:flex;gap:2.4mm;align-items:baseline;flex:1;min-width:0;}
+.keep .sd{font-size:7.8pt;font-weight:700;line-height:1.3;}
+.keep .en{font-size:5.8pt;color:#444;}
+/* The appointments number sits at the FOOT, small, beside the keep-it line, and
+   never in the heading. In the heading it reads as the doctor's own number. */
+.keep .appt{font-size:5.8pt;color:#444;margin-left:auto;padding-left:3mm;white-space:nowrap;}
+.keep .appt .sd{font-size:7pt;color:#000;}
+.sign{flex:none;text-align:right;}
+.sign .rule{display:block;width:38mm;border-top:.6pt solid #999;margin:5.2mm 0 .5mm auto;}
+.sign .lbl{font-size:5.6pt;color:#555;}
+.sign .lbl .sd{font-size:7pt;color:#000;font-weight:700;}
+.nextv{font-size:5.8pt;color:#333;white-space:nowrap;}
+.nextv b{font-size:7pt;}
+.fine{margin-top:1.2mm;display:flex;justify-content:space-between;align-items:center;font-size:5.8pt;color:#555;}
+.fine .sd{font-size:7.6pt;color:#000;font-weight:700;}
+.brand{margin-top:1mm;border-top:.4pt dotted #c4c4c4;padding-top:.8mm;
+ display:flex;justify-content:space-between;align-items:baseline;gap:2mm;
+ font-size:5.1pt;color:#7a7a7a;letter-spacing:.15px;}
+.brand b{color:#3a3a3a;font-weight:700;}
+.brand .bn{white-space:nowrap}
+.brand .bn .sd{font-size:6.6pt;color:#3a3a3a;font-weight:700;display:inline}
+.brand .ct{white-space:nowrap;text-align:right}
+
+/* overprint variant */
+.lh{height:var(--lht,44mm);border-bottom:.6pt dashed #c00;position:relative;}
+.lh .note{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c00;font-size:6.6pt;letter-spacing:1px;text-align:center;line-height:1.6;}
+.lhfoot{position:absolute;left:0;right:0;bottom:0;height:var(--lhb,17mm);border-top:.6pt dashed #c00;}
+.lhfoot .note{height:100%;display:flex;align-items:center;justify-content:center;color:#c00;font-size:6.6pt;letter-spacing:1px;}
+.mono table.rx th{background:#000;}
+.mono .hdr{border-bottom-color:#000;}
+.tag{position:absolute;top:1.6mm;right:3mm;font-size:5.2pt;color:#aaa;letter-spacing:1.2px;}
+
+/* ---------------------------------------------------------------------------
+   A4. Not a stretched A5 — a different sheet with a different problem.
+
+   An A4 letterhead leaves roughly 210 x 225mm once the doctor's own header and
+   footer are kept clear, which is MORE room than the whole A5 slip has. So A4
+   spends the extra width on legibility: the Sindhi name moves up beside the
+   English one instead of wrapping underneath it, every column gets wider, and
+   the pictograms grow. Nothing here is decoration — the people who most need
+   this slip are the ones who cannot read either language.
+   ------------------------------------------------------------------------ */
+.page.a4 .pad{padding:0 10mm;}
+.page.a4 .foot{left:10mm;right:10mm;}
+.page.a4 .hdr{padding:5.4mm 10mm 3mm;}
+.page.a4 .docname{font-size:16pt;}
+.page.a4 .docqual{font-size:8pt;}
+.page.a4 .docsd{font-size:14pt;}
+.page.a4 .clinicline{font-size:7.6pt;}
+
+.page.a4 .pt{font-size:8.6pt;margin:3.4mm 0 2mm;}
+.page.a4 .pt b{font-size:6.4pt;}
+.page.a4 .pt .v{font-size:10.6pt;}
+.page.a4 .vt b{font-size:6.2pt;}
+.page.a4 .vt .v{font-size:10.6pt;}
+.page.a4 .vt .dx .v{font-size:11.4pt;}
+
+.page.a4 .c-no{width:8mm}
+.page.a4 .c-nm{width:83mm}
+.page.a4 .c-t{width:19mm}
+.page.a4 .c-ml{width:20mm}
+.page.a4 .c-dy{width:22mm}
+.page.a4 table.rx th{font-size:6.8pt;padding:1.1mm 0;}
+.page.a4 table.rx th .sd{font-size:9pt;}
+.page.a4 td.noc{font-size:13pt;}
+
+/* English left, Sindhi right, on one line — the whole point of the extra width */
+.page.a4 .nmcell{display:flex;align-items:center;justify-content:space-between;gap:4mm;
+  padding:1.4mm 3mm 1.4mm 3.2mm;}
+.page.a4 .nmen{min-width:0;flex:1 1 auto;}
+.page.a4 .brand{font-size:12.4pt;}
+.page.a4 .gen{font-size:7.4pt;}
+.page.a4 .nmsd{font-size:11.5pt;margin-top:0;text-align:right;white-space:nowrap;flex:0 0 auto;}
+.page.a4 table.rx.cmp .nmcell{padding:1mm 3mm;}
+.page.a4 table.rx.cmp .brand{font-size:11.4pt;}
+.page.a4 table.rx.cmp .gen{font-size:6.6pt;}
+.page.a4 table.rx.cmp .nmsd{font-size:10.2pt;}
+
+.page.a4 .dose{font-size:8.6pt;}
+.page.a4 .dose .sd{font-size:9.4pt;}
+.page.a4 .mlsd{font-size:9.6pt;}
+.page.a4 .dyn{font-size:17pt;}
+.page.a4 .dysd{font-size:9.6pt;}
+.page.a4 .tick i{width:2.8mm;height:2.8mm;}
+
+.page.a4 .lg span{font-size:7.2pt;}
+.page.a4 .bx h4{font-size:7.6pt;}
+.page.a4 .tst .en{font-size:7.4pt;}
+.page.a4 .adv .aen{font-size:7.4pt;}
+.page.a4 .keep .sd{font-size:9.4pt;}
+.page.a4 .keep .en{font-size:6.8pt;}
+.page.a4 .sign .rule{width:52mm;}
+.page.a4 .note2 .lines{min-height:20mm;}
+
+/* The dashed bands are a screen aid so the doctor can see what is being kept
+   clear. They must never reach his actual letterhead. */
+@media print{.lh,.lhfoot{border:0 !important;}.lh .note,.lhfoot .note{display:none !important;}}
+
+/* the doctor's own logo, printed when we print the heading */
+.hdr .idl{display:flex;align-items:center;gap:3mm;}
+.hdr .logo{display:block;width:auto;max-width:52mm;object-fit:contain;}
+.page.a4 .hdr .logo{max-width:70mm;}
+
+/* the patient-code square. Sits in the patient bar beside the number it holds,
+   so no one has to be told what it is. Fixed millimetres: a QR that scales with
+   the layout is a QR that becomes unreadable on one paper size and nobody
+   notices until a scanner is standing on a desk in Larkana. */
+.pt .qrcell{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.4mm 1.2mm;border-right:0;}
+.pt .qr{display:block;width:9.4mm;height:9.4mm;margin:0 auto;}
+.pt .qrcell b{display:block;text-align:center;font-size:5pt;letter-spacing:.4px;
+  color:#555;margin-top:.2mm;font-weight:400;text-transform:none;}
+.page.a4 .pt .qr{width:13mm;height:13mm;}

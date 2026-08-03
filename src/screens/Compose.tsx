@@ -1,0 +1,643 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { db, uid, nextToken, doctorDrugs, usageCounts, lastVisit, patientCode, similarDrugs, grantDiscount, listSets, saveSet, deleteSet } from '../db'
+import { formulary, labTests, adviceList } from '../data/formulary'
+import { seedDiagnoses } from '../data/specialty'
+import Vitals from '../ui/Vitals'
+import { profile } from '../profile'
+import { toSindhi, splitBrand } from '../data/translit'
+import { searchDictionary, dictLine, type DictEntry } from '../data/dictionary'
+import { printSlip } from '../print/print'
+import { IcBook, IcPill } from '../ui/art'
+import { Note } from '../ui/Note'
+import { signal } from '../ui/bus'
+import Bell from '../ui/Bell'
+import { warmPlan } from '../print/paginate'
+import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
+
+/** 0 → 1 → 2 → ½ → 0. "2 tablets" is routine for adult paracetamol; without it
+ *  the doctor reaches for his pad, and after three reaches he stops opening the app. */
+const cycle = (n: number) => (n === 0 ? 1 : n === 1 ? 2 : n === 2 ? 0.5 : 0)
+const isEmpty = (l: RxLine) => !l.dose.m && !l.dose.d && !l.dose.n
+
+export default function Compose({ visitId, onDone, onBack }: {
+  visitId: string; onDone: () => void; onBack: () => void
+}) {
+  const [visit, setVisit] = useState<Visit | null>(null)
+  const [pt, setPt] = useState<Patient | null>(null)
+  const [all, setAll] = useState<Drug[]>(formulary)
+  const [use, setUse] = useState<Record<string, number>>({})
+  const [prev, setPrev] = useState<Visit | null>(null)
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [flash, setFlash] = useState<number | null>(null)
+  const [nearMiss, setNearMiss] = useState<{ text: string; near: Drug[] } | null>(null)
+  const [repeatMsg, setRepeatMsg] = useState('')
+  const [err, setErr] = useState('')
+  const [sets, setSets] = useState<RxSet[]>([])
+  const [naming, setNaming] = useState('')
+
+  // The single source of truth between renders. Two quick taps used to read the
+  // same stale copy and the second overwrote the first — which is what put the
+  // prescription out of order. Every mutation now goes through this ref.
+  const cur = useRef<Visit | null>(null)
+  const rows = useRef<(HTMLDivElement | null)[]>([])
+
+  useEffect(() => {
+    (async () => {
+      const v = await db.visits.get(visitId); if (!v) return
+      cur.current = v; setVisit(v)
+      const p = (await db.patients.get(v.patientId)) ?? null
+      setPt(p)
+      setAll(await doctorDrugs(formulary))
+      setUse(await usageCounts())
+      setSets(await listSets())
+      if (p) setPrev((await lastVisit(p.id, v.id)) ?? null)
+    })()
+  }, [visitId])
+
+  const drugs = useMemo(() => Object.fromEntries(all.map(d => [d.id, d])), [all])
+
+  /** His list, or the starting list for his field until he has edited one. */
+  const myDx = useMemo(() => {
+    const p = profile()
+    return p.dx.length ? p.dx : seedDiagnoses(p.specialty)
+  }, [])
+
+  /**
+   * Chip positions are FIXED once the visit opens and never re-sorted while he
+   * works. If the grid moved under his finger he would add the wrong medicine
+   * and never see it.
+   *
+   * But "fixed" was implemented with a dependency array that was the literal
+   * string 'once' either way, so the memo settled on the very first render —
+   * the one where the usage counts had not arrived yet and `use` was still {}.
+   * The grid was therefore alphabetical for every patient, all evening, and
+   * nothing on screen said so. `all` and `use` are now loaded together and the
+   * freeze is done honestly, with a ref.
+   */
+  const frozen = useRef<Drug[] | null>(null)
+  const ordered = useMemo(() => {
+    if (frozen.current && frozen.current.length === all.length) return frozen.current
+    const list = [...all].sort((a, b) =>
+      (use[b.id] ?? 0) - (use[a.id] ?? 0) || a.brand.localeCompare(b.brand))
+    frozen.current = list
+    return list
+  }, [all, use])
+  const grid = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    return ordered.filter(d => !s || d.brand.toLowerCase().includes(s) || d.generic.toLowerCase().includes(s))
+  }, [ordered, q])
+
+  // Work out the sheet layout while the doctor is still choosing, not when he
+  // taps PRINT. On a twelve-medicine slip the fitting pass is close to a second,
+  // and that second must not sit between the tap and the paper.
+  // NOTE: every hook must stay ABOVE the early return below. Putting this one
+  // under it made React render a different number of hooks once a visit loaded,
+  // which blanked the whole screen.
+  useEffect(() => {
+    if (!visit || !pt || !visit.lines.length) return
+    const t = setTimeout(() => {
+      try { warmPlan(slipData()) } catch { /* the print path recomputes */ }
+    }, 350)
+    return () => clearTimeout(t)
+  }, [visit, pt, drugs])
+
+  if (!visit || !pt) return <div className="pane">…</div>
+  const locked = !!visit.printedAt
+
+  /** Re-read from the database — used after a write that did not go through apply(). */
+  async function reload() {
+    const v = await db.visits.get(visitId)
+    if (v) { cur.current = v; setVisit(v) }
+  }
+
+  /**
+   * THE ROOM AND THE COUNTER WRITE TO THE SAME ROW.
+   *
+   * This used to `put()` the whole visit, rebuilt from a copy taken when the
+   * screen opened. Every counter-side action is a partial update on that same
+   * row: a blood pressure typed at the door, a fee corrected, a refund marked
+   * handed back, a patient closed. So one dose tap in the room silently undid
+   * whatever the desk had done since — and the worst case is not theoretical:
+   * the compounder marks a refund paid, the doctor taps a dose, `refundedAt`
+   * disappears, the refund reappears at the counter, and the patient is paid
+   * twice.
+   *
+   * Compose now writes ONLY the fields it owns, as a patch, inside a
+   * transaction. Everything else on the row is left exactly as it was found.
+   */
+  const MINE = ['lines', 'diagnosis', 'vitals', 'tests', 'advice', 'printedAt', 'status', 'nextVisit'] as const
+
+  async function apply(fn: (v: Visit) => Visit) {
+    const next = fn(cur.current!)
+    cur.current = next
+    setVisit(next)
+    await db.transaction('rw', db.visits, async () => {
+      const live = await db.visits.get(next.id)
+      if (!live) return
+      const patch: Partial<Visit> = {}
+      for (const k of MINE) (patch as Record<string, unknown>)[k] = (next as unknown as Record<string, unknown>)[k]
+      await db.visits.update(next.id, patch)
+      // keep our copy honest about the fields the counter owns
+      cur.current = { ...live, ...patch }
+      setVisit(cur.current)
+    })
+  }
+
+  const setLine = (i: number, patch: Partial<RxLine>) =>
+    apply(v => ({ ...v, lines: v.lines.map((l, k) => (k === i ? { ...l, ...patch } : l)) }))
+
+  function bump(i: number) {
+    setFlash(i)
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    rows.current[i]?.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+    setTimeout(() => setFlash(null), 1800)
+  }
+
+  /** Already on the list? Show him the row he already has instead of adding a
+   *  second one. No dialog — the flashing row says more than a warning would. */
+  function addDrug(id: string, force = false) {
+    const at = cur.current!.lines.findIndex(l => l.drugId === id)
+    if (at >= 0 && !force) { bump(at); return }
+    const d = drugs[id]
+    apply(v => ({ ...v, lines: [...v.lines, { drugId: id, dose: { m: 1, d: 0, n: 1 },
+      meal: 'after', days: d?.defaultDays ?? 5 }] }))
+    setQ('')
+  }
+
+  async function addTyped(force = false) {
+    const text = q.trim(); if (!text) return
+    const norm = text.toLowerCase().replace(/\s+/g, ' ')
+    // a typo must not become a permanent chip — check what he already has first
+    const hit = all.find(d => `${d.brand} ${d.strength}`.toLowerCase().replace(/\s+/g, ' ') === norm
+                           || d.brand.toLowerCase() === norm)
+    if (hit) { addDrug(hit.id); return }
+    const { name, rest } = splitBrand(text)
+
+    // One medicine under four spellings starts here, so ask once — never block.
+    // Confirming shows him exactly what will be printed on the paper.
+    const near = similarDrugs(name.toUpperCase(), rest, all)
+    if (near.length && !force) {
+      setNearMiss({ text, near })
+      return
+    }
+    const d: Drug = {
+      id: 'own_' + uid(), brand: name.toUpperCase(), strength: rest, generic: '',
+      sd: toSindhi(name), sdReviewed: false, pending: true, form: 'tab', unitSd: 'گوري',
+      addedAt: Date.now(),
+    }
+    await db.drugs.add(d)
+    setNearMiss(null)
+    setAll(await doctorDrugs(formulary))
+    setQ('')
+    apply(v => ({ ...v, lines: [...v.lines, { drugId: d.id, dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5 }] }))
+  }
+
+  /**
+   * Copy the last prescription onto this visit, doses and days included.
+   *
+   * It appends rather than replaces, and skips anything already on the sheet,
+   * because the doctor has usually already tapped one or two things before he
+   * thinks of this. Medicines the doctor has since retired are dropped, and he
+   * is told how many, rather than silently printing something withdrawn.
+   */
+  async function repeatLast() {
+    if (!prev || locked) return
+    const have = new Set(cur.current!.lines.map(l => l.drugId))
+    const live = prev.lines.filter(l => drugs[l.drugId] && !have.has(l.drugId))
+    const gone = prev.lines.length - live.length - prev.lines.filter(l => have.has(l.drugId)).length
+    if (!live.length) { setRepeatMsg('Everything from last time is already here.'); return }
+    await apply(v => ({ ...v, lines: [...v.lines, ...live.map(l => ({ ...l, snap: undefined }))] }))
+    setRepeatMsg(gone > 0
+      ? `${live.length} brought back. ${gone} no longer on your list, so left out.`
+      : `${live.length} brought back from last time. Check every dose before printing.`)
+  }
+
+  /** His own set, applied the same way a combination is: append, never remove. */
+  function applySet(st: RxSet) {
+    apply(v => {
+      const have = new Set(v.lines.map(l => l.drugId))
+      const add = st.lines.filter(l => drugs[l.drugId] && !have.has(l.drugId))
+      return { ...v, lines: [...v.lines, ...add] }
+    })
+  }
+
+  async function keepAsSet() {
+    if (!naming.trim() || !cur.current!.lines.length) return
+    await saveSet(naming, cur.current!.lines)
+    setNaming('')
+    setSets(await listSets())
+  }
+
+  /**
+   * Take an entry out of the dictionary and make it his.
+   *
+   * A COPY, not a reference. From here it behaves like every other medicine on
+   * his list, and a later dictionary update can never quietly rewrite something
+   * he has already reviewed and prescribed.
+   */
+  async function takeFromDictionary(e: DictEntry) {
+    const key = `${e.brand} ${e.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const already = all.find(d => `${d.brand} ${d.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '') === key)
+    if (already) { setQ(''); addDrug(already.id); return }
+    const d: Drug = {
+      id: 'own_' + uid(), brand: e.brand, strength: e.strength, generic: e.generic,
+      // NOT !!e.sd. A dictionary entry is a candidate, not a verdict: the person
+      // in this clinic still has to read the word before it can print.
+      sd: e.sd, sdReviewed: false, form: e.form, addedAt: Date.now(),
+      unitSd: e.form === 'cap' ? 'ڪيپسول' : e.form === 'syr' ? 'چمچو' : 'گوري',
+    }
+    await db.drugs.add(d)
+    setAll(await doctorDrugs(formulary))
+    setQ(''); setNearMiss(null)
+    apply(v => ({ ...v, lines: [...v.lines, { drugId: d.id, dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5 }] }))
+  }
+
+  const badIdx = visit.lines.findIndex(isEmpty)
+
+  /** Build exactly what printSlip will be given, so the warm-up and the real
+   *  print agree on the layout key. */
+  function slipData() {
+    return {
+      visit: cur.current!, patientName: pt!.name, patientAge: pt!.age, patientSex: pt!.sex,
+      patientCode: patientCode(pt!.num), drugs, rxId: cur.current!.id.slice(-6),
+    }
+  }
+
+  /**
+   * Freeze what is about to be printed onto the prescription itself.
+   *
+   * From this moment the slip no longer depends on the medicine list. Correct a
+   * spelling, merge a duplicate or retire a medicine later and the paper in the
+   * patient's hand still says exactly what it said — which is the only honest
+   * answer to "what did you prescribe this patient in March".
+   */
+  async function freeze() {
+    await apply(v => ({
+      ...v,
+      lines: v.lines.map(l => {
+        const g = drugs[l.drugId]
+        return l.snap ? l : {
+          ...l,
+          snap: {
+            brand: g?.brand ?? '', strength: g?.strength ?? '', generic: g?.generic ?? '',
+            sd: g?.sd ?? '', sdReviewed: g?.sdReviewed === true, unitSd: g?.unitSd ?? '',
+            form: g?.form ?? 'tab',
+          },
+        }
+      }),
+    }))
+  }
+
+  /**
+   * THE BUTTON MUST ALWAYS COME BACK.
+   *
+   * There was no try/finally here. Anything thrown inside — a font that never
+   * loaded, a drug row the fitter could not measure, a printer the driver had
+   * given up on — left `busy` true for ever. The PRINT button then reads
+   * "Printing…", stays disabled, and that patient cannot be printed again
+   * without reloading the page, in the middle of a queue of a hundred.
+   *
+   * A failure has to end with the doctor able to press the button again, and
+   * told plainly that nothing came out.
+   */
+  async function print() {
+    if (busy) return                                   // double-tap on a slow printer
+    if (badIdx >= 0) { bump(badIdx); return }
+    setBusy(true)
+    try {
+      await freeze()
+      await printSlip(slipData())
+      await apply(v => ({ ...v, printedAt: Date.now(), status: 'done' }))
+      signal({ kind: 'printed', token: cur.current?.token ?? 0 })
+      setErr('')
+    } catch (e) {
+      console.error('[nuskho] print failed', e)
+      setErr('Check the printer is on, has paper, and is not showing an error, then press PRINT again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function reprint() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await printSlip(slipData())
+      setErr('')
+    } catch (e) {
+      console.error('[nuskho] reprint failed', e)
+      setErr('Check the printer is on and has paper, then press it again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Amending makes a NEW prescription. The paper already in the patient's hand
+   *  must never quietly stop matching what the record says. */
+  async function amend() {
+    const id = uid()
+    const v = cur.current!
+    // The fee and the token belong to the ORIGINAL visit. Copying them made the
+    // clinic show two rows with the same number, and made the evening's cash
+    // total count the same rupees twice, every time a slip was corrected.
+    const { fee: _fee, token: _tok, closedAt: _c, closeNote: _n, ...rest } = v
+    await db.visits.add({
+      ...rest, id, token: await nextToken(), printedAt: undefined,
+      status: 'waiting', createdAt: Date.now(), amendsId: v.id,
+    })
+    onDone()
+    location.hash = ''
+    setTimeout(() => window.dispatchEvent(new CustomEvent('nuskho:open', { detail: id })), 0)
+  }
+
+  return (
+    <div className="pane">
+      <button className="btn ghost" onClick={onBack} style={{ marginBottom: 12 }}>← Queue</button>
+      <div className="who">{pt.name}<span>Token {visit.token} · No. {patientCode(pt.num)}{pt.age ? ` · ${pt.age}` : ''}</span></div>
+
+      {/* The returning patient is a large share of an OPD evening, and re-entering
+          the same prescription by hand is where transcription errors breed. This
+          brings the last one back to be edited, never to be printed unread: the
+          doses and days come with it and every one is still tappable. */}
+      {prev && (
+        <div className="prev">
+          Last visit {Math.round((Date.now() - prev.createdAt) / 86400000)} days ago
+          {prev.diagnosis ? `, ${prev.diagnosis}` : ''}. {prev.lines.map(l => (l.snap?.brand ?? drugs[l.drugId]?.brand ?? '?')).join(', ')}
+          {!locked && prev.lines.length > 0 && (
+            <button className="lnk" onClick={repeatLast}>bring it back to edit</button>
+          )}
+        </div>
+      )}
+
+      {locked && (
+        <div className="lockbar">
+          Printed at {new Date(visit.printedAt!).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.
+          The patient has this paper, so it cannot be edited.
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn ghost" onClick={reprint} disabled={busy}>Reprint same slip</button>
+            <button className="btn" onClick={amend}>Amend on a new slip</button>
+          </div>
+        </div>
+      )}
+      {repeatMsg && <div className="note">{repeatMsg}</div>}
+
+      {/* The money was already taken at the door. All the doctor does here is
+          decide that this one pays less, or nothing, and send him back to the
+          counter for it. */}
+      <FeeBar visit={visit} onChange={reload} />
+
+      <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0, opacity: locked ? .55 : 1 }}>
+        {/* Vitals the compounder already took, and anything the doctor runs on a
+            strip machine while the patient is sitting there. Both print. */}
+        <Vitals which="vital" value={visit.vitals ?? {}}
+                onChange={v => apply(x => ({ ...x, vitals: v }))}
+                title="Checked before you saw them" />
+        <Vitals which="test" value={visit.vitals ?? {}}
+                onChange={v => apply(x => ({ ...x, vitals: v }))} />
+
+        <h2><IcBook size={17} /> Diagnosis</h2>
+        <div className="chips">
+          {myDx.map(d => (
+            <button key={d} className={`chip ${visit.diagnosis === d ? 'on' : ''}`}
+                    onClick={() => apply(v => ({ ...v, diagnosis: v.diagnosis === d ? undefined : d }))}>{d}</button>
+          ))}
+        </div>
+
+        {/* Only his own. Nothing we wrote fills a prescription — see formulary.ts. */}
+        {sets.length > 0 && (<>
+          <h2>Your own sets, one tap</h2>
+          <div className="chips">
+            {sets.map(st => (
+              <button key={st.id} className="chip mine" onClick={() => applySet(st)}
+                      title="A set you saved yourself">{st.name}</button>
+            ))}
+          </div>
+        </>)}
+
+        <h2><IcPill size={17} /> Medicines, printed in this order</h2>
+        {visit.lines.map((l, i) => {
+          const d = drugs[l.drugId]; if (!d) return null
+          const empty = isEmpty(l)
+          return (
+            <div className={`line ${flash === i ? 'flash' : ''} ${empty ? 'bad' : ''}`} key={i}
+                 ref={el => { rows.current[i] = el }}>
+              <div className="hd">
+                <div><b>{i + 1}. {d.brand} {d.strength}</b>
+                  <small>{d.generic || (d.pending ? 'typed in, tidy this up tonight' : '')}</small></div>
+                <button className="x" onClick={() => apply(v => ({ ...v, lines: v.lines.filter((_, k) => k !== i) }))}>×</button>
+              </div>
+              <div className="dosegrid">
+                {(['m', 'd', 'n'] as const).map(k => (
+                  <button key={k} className={`dbtn ${l.dose[k] ? 'on' : ''}`}
+                          onClick={() => setLine(i, { dose: { ...l.dose, [k]: cycle(l.dose[k]) } })}>
+                    {l.dose[k] === 0.5 ? '½' : l.dose[k] || '—'}
+                    <small>{k === 'm' ? 'MORNING' : k === 'd' ? 'MIDDAY' : 'NIGHT'}</small>
+                  </button>
+                ))}
+                <button className="dbtn on" style={{ minWidth: 96 }}
+                        onClick={() => setLine(i, { meal: l.meal === 'after' ? 'before' : l.meal === 'before' ? 'any' : 'after' })}>
+                  {l.meal === 'after' ? 'after' : l.meal === 'before' ? 'before' : '—'}<small>FOOD</small>
+                </button>
+                <div className="stp">
+                  <button onClick={() => setLine(i, { days: Math.max(1, l.days - 1) })}>−</button>
+                  <div className="v">{l.days} d</div>
+                  <button onClick={() => setLine(i, { days: Math.min(30, l.days + 1) })}>+</button>
+                </div>
+              </div>
+              {empty && <div className="badmsg">No dose set. This would print with no instruction.</div>}
+              {flash === i && <div className="badmsg ok">Already on this prescription.
+                <button className="lnk" onClick={() => addDrug(l.drugId, true)}>Add a second line anyway</button></div>}
+            </div>
+          )
+        })}
+
+        <div className="fld">
+          <input value={q} onChange={e => { setQ(e.target.value); setNearMiss(null) }}
+                 placeholder="Type two letters to find a medicine…"
+                 onKeyDown={e => { if (e.key === 'Enter' && grid.length === 0) addTyped() }} />
+        </div>
+
+        {/* Asked once, never enforced. One tap on an existing medicine is the
+            only thing that stops the same drug living under four spellings. */}
+        {nearMiss && (
+          <div className="nearmiss">
+            <b>You already have something like “{nearMiss.text}”.</b>
+            <div className="chips">
+              {nearMiss.near.map(d => (
+                <button key={d.id} className="chip on"
+                        onClick={() => { setNearMiss(null); setQ(''); addDrug(d.id) }}>
+                  Use {d.brand}{d.strength ? ' ' + d.strength : ''}
+                </button>
+              ))}
+            </div>
+            <button className="lnk" onClick={() => addTyped(true)}>
+              No, add “{nearMiss.text}” as a new medicine
+            </button>
+          </div>
+        )}
+        <div className="chips">
+          {grid.slice(0, 24).map(d => {
+            const on = visit.lines.some(l => l.drugId === d.id)
+            return <button key={d.id} className={`chip ${on ? 'have' : ''}`} onClick={() => addDrug(d.id)}>
+              {on ? '✓' : '+'} {d.brand}{d.strength ? ' ' + d.strength : ''}</button>
+          })}
+        </div>
+
+        {/* Type-to-find, and the only place the dictionary appears. Every row
+            shows brand, strength, form and generic, because that is what
+            actually separates two medicines whose names look alike. A picture
+            would raise his confidence without raising his accuracy. */}
+        {q.trim().length >= 2 && (() => {
+          const have = new Set(all.map(d => `${d.brand} ${d.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '')))
+          const found = searchDictionary(q).filter(
+            e => !have.has(`${e.brand} ${e.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '')))
+          return (
+            <div className="dict">
+              {found.length > 0 && <div className="dhead">Not on your list yet</div>}
+              {found.map(e => (
+                <button className="drow2" key={e.brand + e.strength} onClick={() => takeFromDictionary(e)}>
+                  <span className="dl">{dictLine(e)}</span>
+                  {e.sd && <span className="sd">{e.sd}</span>}
+                  <span className="add">add</span>
+                </button>
+              ))}
+              <button className="drow2 own" onClick={() => addTyped()}>
+                <span className="dl">Add “{q.trim()}” in your own words</span>
+                <span className="add">add</span>
+              </button>
+            </div>
+          )
+        })()}
+
+        {/* Saved only because he typed a name for it. Nothing here is inferred
+            from a pattern, and no set is ever offered because of a diagnosis or
+            a patient: the moment the app proposes a medicine he did not choose,
+            it stops being a typewriter. */}
+        {visit.lines.length > 1 && (
+          <div className="saveset">
+            <input value={naming} placeholder="save these as a set, e.g. my chest infection"
+                   onChange={e => setNaming(e.target.value)}
+                   onKeyDown={e => { if (e.key === 'Enter') keepAsSet() }} />
+            <button className="btn ghost" disabled={!naming.trim()} onClick={keepAsSet}>Save the set</button>
+          </div>
+        )}
+        {sets.length > 0 && (
+          <p className="hint">
+            Your sets: {sets.map(st => (
+              <span key={st.id} className="setrow">{st.name}
+                <button className="lnk" onClick={async () => { await deleteSet(st.id); setSets(await listSets()) }}>remove</button>
+              </span>
+            ))}
+          </p>
+        )}
+
+        <h2>Lab tests</h2>
+        <div className="chips">
+          {labTests.map(t => {
+            const key = `${t.en}|${t.sd}`; const on = visit.tests.includes(key)
+            return <button key={t.en} className={`chip ${on ? 'on' : ''}`}
+                     onClick={() => apply(v => ({ ...v, tests: on ? v.tests.filter(x => x !== key) : [...v.tests, key] }))}>
+              {t.en}</button>
+          })}
+        </div>
+
+        <h2>Advice</h2>
+        <div className="chips">
+          {adviceList.map(a => {
+            const key = `${a.sd}|${a.en}|${a.icon}`; const on = visit.advice.includes(key)
+            return <button key={a.en} className={`chip ${on ? 'on' : ''}`}
+                     onClick={() => apply(v => ({ ...v, advice: on ? v.advice.filter(x => x !== key) : [...v.advice, key] }))}>
+              {a.en}</button>
+          })}
+        </div>
+      </fieldset>
+
+      {!locked && (<>
+        <Bell />
+
+        <div className="sticky">
+          {err && <Note tone="stop" title="Nothing was printed">{err}</Note>}
+          <button className={`btn wide ${badIdx >= 0 ? 'warn' : ''}`} onClick={print}
+                  disabled={busy || visit.lines.length === 0}>
+            {busy ? 'Printing…'
+              : badIdx >= 0 ? `${drugs[visit.lines[badIdx].drugId]?.brand} has no dose. Tap to fix`
+              : `PRINT for ${pt.name}  (${visit.lines.length})`}
+          </button>
+        </div>
+      </>)}
+      <p className="hint">The paper pad stays on the desk. If anything fails, the doctor handwrites that one patient and we continue.</p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------- fee */
+
+/**
+ * The counter already took the money before this patient sat down. The only
+ * decision left in the room is whether some of it goes back, which happens
+ * often here, and is the one thing a doctor does not want to have to argue
+ * about at the desk afterwards.
+ */
+function FeeBar({ visit, onChange }: { visit: Visit; onChange: () => Promise<void> }) {
+  const [open, setOpen] = useState(false)
+  const [amt, setAmt] = useState('')
+  const [note, setNote] = useState('')
+  const f = visit.fee
+
+  if (!f) {
+    return <div className="feebar plain">No fee was recorded at the counter for this token.</div>
+  }
+
+  async function give(newAmount: number) {
+    await grantDiscount(visit.id, newAmount, note)
+    // The patient is about to walk the few steps back to the desk. Tell the
+    // desk now rather than letting the compounder discover it when he looks.
+    const back = (visit.fee?.amount ?? 0) - newAmount
+    if (back > 0) {
+      const pt = await db.patients.get(visit.patientId)
+      signal({ kind: 'refund', token: visit.token, name: pt?.name ?? '', amount: back })
+    }
+    setOpen(false); setNote(''); setAmt('')
+    await onChange()
+  }
+
+  if (f.refund) {
+    return (
+      <div className={'feebar ' + (f.refundedAt ? 'done' : 'back')}>
+        <b>{f.refundedAt
+          ? `Rs ${f.refund} was given back at the counter`
+          : `Send him to the counter for Rs ${f.refund}`}</b>
+        {!f.refundedAt && <button className="lnk" onClick={() => give(f.amount)}>cancel that</button>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="feebar">
+      <label>Rs {f.amount} taken at the counter{f.state === 'due' ? ', not actually paid yet' : ''}</label>
+      {!open ? (
+        <div className="row">
+          <button className="btn ghost" onClick={() => setOpen(true)} disabled={!f.amount}>
+            Charge him less
+          </button>
+          <button className="btn ghost" onClick={() => give(0)} disabled={!f.amount}>
+            Free, give it all back
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="row">
+            <div className="fld"><input value={amt} inputMode="numeric" placeholder="he should pay"
+                   onChange={e => setAmt(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))} /></div>
+            <button className="btn" disabled={amt === '' || +amt > f.amount}
+                    onClick={() => give(+amt)}>Give back Rs {Math.max(0, f.amount - (+amt || 0))}</button>
+            <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+          <div className="fld"><input value={note} placeholder="reason, for your own records only"
+                 onChange={e => setNote(e.target.value)} /></div>
+        </>
+      )}
+    </div>
+  )
+}
