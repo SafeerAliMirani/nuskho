@@ -1,0 +1,21 @@
+{
+  // Cloudflare, told explicitly rather than guessed.
+  //
+  // The first deploy failed because Cloudflare auto-detected a "Vite framework"
+  // Worker, ran `wrangler deploy`, and then refused because that automatic path
+  // wants Vite 6+. Guessing is fine until it is not; this file removes the guess.
+  //
+  // There is no worker script here on purpose. Nuskho is a static bundle with no
+  // backend and must never acquire one — the whole promise of the product is
+  // that nothing about a patient leaves the clinic's machine. An assets-only
+  // Worker is the shape that cannot quietly grow a server route later.
+  "name": "nuskho",
+  "compatibility_date": "2026-08-03",
+  "assets": {
+    "directory": "./dist-web",
+    // One page. Any path serves the app rather than a 404.
+    "not_found_handling": "single-page-application"
+  },
+  "observability": { "enabled": false },
+  "send_metrics": false
+}
