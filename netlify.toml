@@ -27,6 +27,12 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# The single-page fallback lives HERE for Netlify and in wrangler.jsonc for
+# Cloudflare. There is deliberately no public/_redirects: Cloudflare's Workers
+# assets runtime reads `/*  /index.html  200` as a redirect loop and refuses the
+# whole deployment, because not_found_handling already does that job. One
+# fallback per host, declared in that host's own file, and never a third copy
+# sitting in public/ that only one of them understands.
 [[redirects]]
   from = "/*"
   to = "/index.html"
