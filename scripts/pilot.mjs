@@ -63,6 +63,37 @@ cpSync('dist', out, { recursive: true })
 // behind a web server can. Take it out so the seal cannot be lost by accident.
 rmSync(join(out, 'sw.js'), { force: true })
 
+/**
+ * A LAUNCHER, BECAUSE DOUBLE-CLICKING index.html GIVES A BLANK PAGE.
+ *
+ * Found the hard way. Chrome refuses IndexedDB to a page opened from disk
+ * unless it is started with --allow-file-access-from-files — and the flag is
+ * only read when Chrome STARTS. If any Chrome window is already open, the flag
+ * is silently ignored, the new tab joins the running instance, and the app
+ * comes up white with no error anybody can see.
+ *
+ * On a clinic laptop with somebody's Facebook open in another window, that is
+ * every single time. It would have looked like the software was broken on the
+ * first evening of the pilot.
+ *
+ * So the release carries its own launcher with its own Chrome profile
+ * directory, which forces a separate instance and makes the flags apply
+ * whatever else is running. --kiosk-printing is in there too: without it a
+ * print dialog appears for every patient, and at 140 patients an evening that
+ * alone would end the pilot.
+ */
+writeFileSync(join(out, 'Start Nuskho.bat'),
+`@echo off
+title Nuskho
+set HERE=%~dp0
+start "" chrome.exe ^
+ --user-data-dir="%LOCALAPPDATA%\\NuskhoChrome" ^
+ --allow-file-access-from-files ^
+ --kiosk-printing ^
+ --new-window "file:///%HERE:\\=/%index.html"
+exit
+`)
+
 writeFileSync(join(out, 'WHAT-THIS-IS.txt'), `NUSKHO — sealed copy for a clinic
 
   Version   ${pkg.version}
@@ -72,9 +103,19 @@ writeFileSync(join(out, 'WHAT-THIS-IS.txt'), `NUSKHO — sealed copy for a clini
 
 HOW TO USE IT
 
-  Copy this whole folder to the clinic computer. Open index.html in Chrome.
-  For real use, start Chrome with --kiosk-printing, or a print dialog appears
-  for every patient.
+  Copy this whole folder to the clinic computer, then double-click
+
+      Start Nuskho.bat
+
+  DO NOT double-click index.html. It will open a WHITE PAGE with no error.
+  Chrome only allows a page opened from disk to keep records if it is STARTED
+  with --allow-file-access-from-files, and that flag is ignored if any Chrome
+  window is already open. The .bat file starts its own Chrome so the flags
+  always apply. It also switches on --kiosk-printing, without which a print
+  dialog appears for every patient.
+
+  Make a shortcut to the .bat on the desktop and let nobody open it any other
+  way.
 
 WHAT IT DOES NOT DO
 
