@@ -12,3 +12,4 @@ dist-web
 # too, so the file can be rebuilt rather than trusted.
 
 releases/
+tsconfig.tsbuildinfo

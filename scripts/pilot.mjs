@@ -29,7 +29,23 @@ const sh = (cmd, fallback) => {
 }
 
 const commit = sh('git rev-parse --short HEAD', 'nogit')
-const dirty = sh('git status --porcelain', '') !== ''
+
+/**
+ * DIRTY MEANS TRACKED CHANGES, NOT UNTRACKED FILES.
+ *
+ * The first version used plain `git status --porcelain`, which counts
+ * untracked files too — so a clinic's own Sindhi worksheet sitting in the
+ * folder marked every release DIRTY. A warning that fires every single time is
+ * a warning nobody reads, and this one has to still mean something in week
+ * seven when the question is which build was on the machine.
+ *
+ * Untracked files cannot change what was compiled. Modified tracked files can,
+ * so only those make a release unreproducible. Untracked ones are still worth
+ * mentioning once, quietly, in case something that should be committed is not.
+ */
+const dirty = sh('git status --porcelain --untracked-files=no', '') !== ''
+const untracked = sh('git ls-files --others --exclude-standard', '')
+  .split('\n').filter(Boolean)
 const day = new Date().toISOString().slice(0, 10)
 const name = `nuskho-${day}-${commit}${dirty ? '-DIRTY' : ''}`
 const out = join('releases', name)
@@ -77,8 +93,13 @@ IF SOMETHING IS WRONG
 `)
 
 if (dirty) {
-  console.log(`\n  ⚠ Working tree is dirty — this release is not reproducible.`)
-  console.log(`    Commit first if this is going to a real clinic.\n`)
+  console.log(`\n  ⚠ Tracked files are modified — this release cannot be rebuilt from ${commit}.`)
+  console.log(`    Commit first if this is going to a real clinic.`)
 }
-console.log(`  Sealed copy: ${out}`)
+if (untracked.length) {
+  console.log(`\n  ${untracked.length} untracked file(s), not part of the build:`)
+  for (const f of untracked.slice(0, 6)) console.log(`      ${f}`)
+  if (untracked.length > 6) console.log(`      …and ${untracked.length - 6} more`)
+}
+console.log(`\n  Sealed copy: ${out}`)
 console.log(`  Copy that folder to the clinic machine. It will never change on its own.\n`)
