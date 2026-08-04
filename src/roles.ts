@@ -26,7 +26,29 @@
  *             Owns his paper, his medicine list and his own PIN.
  *
  *   NUSKHO    us, on a visit. Identity, letterhead, the medicine review queue,
- *             the market importer, backups, and erasing the machine.
+ *             the market importer. AND NOTHING CLINICAL — see below.
+ *
+ * WHY THE NUSKHO ROLE NO LONGER READS PRESCRIPTIONS.
+ *
+ * It used to hold every permission there is, including `prescribe`, `history`,
+ * `backup` and `erase`, under a passphrase that profile.ts describes as "held
+ * by the company, not the clinic". That is a vendor key that opens every
+ * consultation on the machine and exports the lot to a file.
+ *
+ * Nothing about it was malicious and it was never used. It was simply the
+ * shape the app grew into while one person was both the builder and the only
+ * operator. But a capability, once it exists, is defended only by the courage
+ * of whoever holds it — against a court order, a police officer, a hospital
+ * owner, a buyer of the company, an employee in three years. "I cannot" ends
+ * those conversations. "I could, but I would not" ends none of them, and the
+ * promise printed on the About screen is the first thing a doctor will check.
+ *
+ * So the clinical grants moved to the people who own the data. BACKUP AND
+ * ERASE MOVED TOO, and that is deliberate rather than tidy: an export is a
+ * complete copy of every prescription in the building, so it belongs to the
+ * doctor. Restoring on a fresh install now means the doctor unlocks it while
+ * standing there — which is the correct ceremony anyway, since it is his
+ * practice being written onto the disk.
  *
  * THE RULE THAT KEEPS THIS HONEST: a role is a floor, never a ceiling on speed.
  * Nothing here may add a step between the doctor and the printed paper. Signing
@@ -84,9 +106,12 @@ export type Can =
 
 const GRANTS: Record<Role, Can[]> = {
   counter: ['queue', 'money'],
-  doctor: ['queue', 'money', 'rate', 'prescribe', 'history', 'figures', 'paper', 'medicines', 'lock'],
-  admin: ['queue', 'money', 'rate', 'prescribe', 'history', 'figures', 'paper', 'medicines', 'lock',
-          'identity', 'review', 'backup', 'erase'],
+  doctor: ['queue', 'money', 'rate', 'prescribe', 'history', 'figures', 'paper', 'medicines', 'lock',
+           'backup', 'erase'],
+  // Deliberately no 'queue', 'prescribe', 'history', 'figures', 'money',
+  // 'backup' or 'erase'. If a permission here would let us read or copy a
+  // patient's record, it is in the wrong list.
+  admin: ['paper', 'medicines', 'lock', 'identity', 'review'],
 }
 
 export const can = (what: Can, who: Role = role()): boolean => GRANTS[who].includes(what)

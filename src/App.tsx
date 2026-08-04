@@ -12,6 +12,8 @@ import { todaysVisits } from './db'
 import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo } from './ui/art'
 import Toasts from './ui/Toasts'
 import { startPresence, onSignal } from './ui/bus'
+import { isDemo } from './version'
+import { clearDemo, touchDemo } from './demo'
 import type { Visit } from './types'
 
 export default function App() {
@@ -32,6 +34,16 @@ export default function App() {
   const refresh = async () => setToday(await todaysVisits())
   // announce this window so the bell can honestly say whether anyone hears it
   useEffect(() => startPresence(), [])
+
+  // Keep the practice copy alive while somebody is actually using it, so a
+  // demonstration survives reloads and a walk to another room, and still
+  // clears itself by tomorrow. No-op in a real clinic.
+  useEffect(() => {
+    if (!isDemo) return
+    touchDemo()
+    const t = setInterval(touchDemo, 5 * 60 * 1000)
+    return () => clearInterval(t)
+  }, [])
 
   /**
    * The other window changed something, so this one reloads the day.
@@ -82,6 +94,21 @@ export default function App() {
   return (
     <div className="app">
       <Toasts />
+      {/* Never hidden, never dismissible. The failure this prevents is not
+          somebody deciding to misuse the practice copy — it is a doctor who
+          was shown it, liked it, and simply never stopped. He should not be
+          able to look at this screen and not know. */}
+      {isDemo && (
+        <div className="demobar">
+          <b>Practice copy</b>
+          <span>Everything printed says SPECIMEN. Nothing is saved to a file. It clears itself.</span>
+          <button className="lnk" onClick={async () => {
+            if (!confirm('Clear the practice patients and start again?')) return
+            await clearDemo()
+            location.reload()
+          }}>Clear and start again</button>
+        </div>
+      )}
       <header className="top">
         <div className="brandwrap">
           <Mark size={30} className="mk" />
@@ -169,7 +196,11 @@ export default function App() {
             // must refresh: a discount decided in the room has to be waiting at
             // the counter by the time the patient walks the few steps back to it
             onBack={async () => { setVisitId(null); await refresh() }} />
-        : <Intake visits={today} onOpen={setVisitId} onChange={refresh} />}
+        // The Nuskho role has no business on the day's list — it is names and
+        // who came in. It lands in Setup, which is the only reason it exists.
+        : can('queue')
+        ? <Intake visits={today} onOpen={setVisitId} onChange={refresh} />
+        : <Setup onBack={() => setSetup(false)} />}
     </div>
   )
 }

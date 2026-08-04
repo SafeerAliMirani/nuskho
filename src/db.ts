@@ -1,7 +1,8 @@
 import Dexie, { type Table } from 'dexie'
 import type { Patient, Visit, Drug, VisitStatus, Fee, RxSet, RxLine } from './types'
 import { profile } from './profile'
-import { highWater, noteIssued } from './safety'
+import { highWater, noteIssued, tokenHighWater, noteToken } from './safety'
+import { isDemo } from './version'
 
 // Everything is written the moment it changes. Load-shedding is normal here:
 // power will cut mid-session and reopening Chrome must lose nothing.
@@ -16,7 +17,13 @@ class NuskhoDB extends Dexie {
   sets!: Table<RxSet, string>
 
   constructor() {
-    super('nuskho')
+    // The practice copy gets its OWN database, and this is not tidiness.
+    // A doctor is shown the demo on his laptop, likes it, and later installs
+    // the real thing on the same machine. If they shared a store, his practice
+    // patients — typed to see what happens, half-real, wrong — would be sitting
+    // in the clinic he then starts trusting. Separate names make that
+    // impossible rather than unlikely.
+    super(isDemo ? 'nuskho-practice' : 'nuskho')
     this.version(1).stores({
       patients: 'id, name, phone, createdAt, num',
       visits: 'id, patientId, createdAt, status, token',
@@ -66,40 +73,24 @@ export async function todaysVisits(): Promise<Visit[]> {
   return v.sort((a, b) => a.token - b.token)
 }
 
-/** Token counter resets each session. */
+/**
+ * Token counter resets each day.
+ *
+ * The high-water mark is kept outside the restorable set for the same reason
+ * the patient number's is: a restore rewinds the table while the families it
+ * rewound past are still holding the receipts. Two people answering to "eight"
+ * in a full waiting room is the loudest bug this app can have.
+ */
 export async function nextToken(): Promise<number> {
   const v = await todaysVisits()
-  return v.reduce((m, x) => Math.max(m, x.token), 0) + 1
+  const fromTable = v.reduce((m, x) => Math.max(m, x.token), 0)
+  const n = Math.max(fromTable, tokenHighWater()) + 1
+  noteToken(n)
+  return n
 }
 
-/* ---------------------------------------------------------------- patient code
-   Four digits plus a Luhn check digit. The check digit is the point: a
-   mistyped number fails loudly instead of quietly opening the wrong patient's
-   history in front of a doctor who is trusting the screen. */
-
-function luhn(d: string): number {
-  let sum = 0, dbl = true
-  for (let i = d.length - 1; i >= 0; i--) {
-    let n = d.charCodeAt(i) - 48
-    if (dbl) { n *= 2; if (n > 9) n -= 9 }
-    sum += n; dbl = !dbl
-  }
-  return (10 - (sum % 10)) % 10
-}
-
-export function patientCode(num: number): string {
-  const b = String(num).padStart(4, '0')
-  return b + luhn(b)
-}
-
-/** Returns the patient number, or null if the code is malformed or mistyped. */
-export function parseCode(code: string): number | null {
-  const c = code.replace(/\D/g, '')
-  if (c.length !== 5) return null
-  const b = c.slice(0, 4)
-  if (luhn(b) !== Number(c[4])) return null
-  return Number(b)
-}
+export { patientCode, parseCode, codeLength } from './code'
+import { parseCode } from './code'
 
 /**
  * The next patient number.

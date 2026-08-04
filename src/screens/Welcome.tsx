@@ -7,6 +7,7 @@ import DrugsStep from './setup/DrugsStep'
 import { Mark, ArtSlip } from '../ui/art'
 import { readBackup, readFile, restore, type RestoreReport } from '../backup'
 import { setAdminKey } from '../profile'
+import { isDemo } from '../version'
 
 /**
  * First run.
@@ -109,9 +110,34 @@ export default function Welcome({ onDone }: { onDone: () => void }) {
             Patient records stay on this machine. Nothing is sold, and nothing is shared with
             any drug company, not now and not later.
           </p>
-          <button className="btn wide" onClick={() => setI(1)}>Set up the clinic &nbsp; شروع ڪريو</button>
+          {/* THE PRACTICE DOOR.
+              On the public copy this is the main way in, not an afterthought:
+              nobody has installed anything, nobody is committing to anything,
+              and the product is one piece of paper that has to be seen. On a
+              real clinic build the same button is what it always was — a way
+              to look around before setting up. */}
+          {isDemo ? (
+            <>
+              <button className="btn wide" onClick={onDone}>
+                Try it now &nbsp; آزمائي ڏسو
+              </button>
+              <p className="fine">
+                A practice copy. Type anything you like — <b>everything printed says
+                SPECIMEN across it</b>, nothing is saved to a file, and it clears itself.
+                No patient of yours should be entered here.
+              </p>
+              <button className="lnk mid" onClick={() => setI(1)}>
+                Set up a real clinic on this computer
+              </button>
+            </>
+          ) : (
+            <button className="btn wide" onClick={() => setI(1)}>Set up the clinic &nbsp; شروع ڪريو</button>
+          )}
+          {/* "Join a clinic that already exists" is what this actually is, and
+              saying so matters: a second machine at the same clinic is the
+              common case, and nobody reading "setup file" knows that is them. */}
           <button className="lnk mid" onClick={() => file.current?.click()}>
-            I already have a setup file from another machine
+            Join a clinic that already exists — I have its setup file
           </button>
           <input ref={file} type="file" accept="application/json,.json" hidden
                  onChange={e => { const f = e.target.files?.[0]; if (f) importSetup(f); e.target.value = '' }} />
@@ -123,9 +149,11 @@ export default function Welcome({ onDone }: { onDone: () => void }) {
               <div><span>Ready</span><b>opening…</b></div>
             </div>
           )}
-          <button className="lnk mid" onClick={onDone}>
-            {profile().ready ? 'Leave setup as it is' : 'Skip for now, I am only looking'}
-          </button>
+          {!isDemo && (
+            <button className="lnk mid" onClick={onDone}>
+              {profile().ready ? 'Leave setup as it is' : 'Skip for now, I am only looking'}
+            </button>
+          )}
         </div>
       )}
 

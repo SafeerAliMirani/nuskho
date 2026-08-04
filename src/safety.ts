@@ -70,6 +70,39 @@ export function bumpHighWaterPastRestore(seen: number): void {
   try { localStorage.setItem(HWM, String(to)) } catch { /* ignore */ }
 }
 
+/* ------------------------------------------------- 2b. the token counter
+   The same failure, one day wide, and it was left unguarded.
+
+   nextToken() was max(today's visits) + 1 read straight from the table. Restore
+   a backup taken at lunchtime and the afternoon's visits vanish — so the next
+   patient is issued token 8 while another family is sitting in the room holding
+   a thermal receipt that says 8, and the doctor calls it. Two people stand up.
+
+   Patient numbers were protected against exactly this and tokens were not,
+   because tokens reset daily and looked disposable. They are not disposable:
+   they are shouted out loud in a room full of people, which makes a collision
+   more visible and more immediate than a duplicated patient number.
+
+   Keyed by day, so it cannot leak into tomorrow, and it only ever rises. */
+
+const TOKEN_HWM = 'nuskho.tokenHighWater'
+
+export const dayKey = (t = Date.now()): string => new Date(t).toDateString()
+
+export function tokenHighWater(day = dayKey()): number {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TOKEN_HWM) ?? 'null')
+    return raw && raw.day === day ? +raw.n || 0 : 0
+  } catch { return 0 }
+}
+
+export function noteToken(n: number, day = dayKey()): void {
+  try {
+    if (n <= tokenHighWater(day)) return
+    localStorage.setItem(TOKEN_HWM, JSON.stringify({ day, n }))
+  } catch { /* private mode: fall back to the table */ }
+}
+
 /* ------------------------------------------------------ 3. nightly snapshot */
 
 const SNAP_KEY = 'nuskho.lastSnapshot'

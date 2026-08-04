@@ -174,12 +174,14 @@ export default function Intake({ visits, onOpen, onChange }: {
       <h2><IcScan size={17} /> Been here before? Number from the old slip, or scan it</h2>
       <div className="row">
         <div className="fld" style={{ flex: 2 }}>
-          <input value={code} inputMode="numeric" maxLength={13} placeholder="5 digits"
+          <input value={code} inputMode="numeric" maxLength={13} placeholder="the number on the slip"
                  style={{ fontSize: 26, letterSpacing: 6, fontWeight: 700 }}
                  onChange={e => { setCode(scanned(e.target.value)); setMsg('') }}
                  onKeyDown={e => { if (e.key === 'Enter') lookup() }} />
         </div>
-        <button className="btn" style={{ flex: 1 }} onClick={lookup} disabled={code.length !== 5}>Open</button>
+        {/* five was hard-coded here too, so patient 10000 could not be typed in
+            at all — the Open button stayed grey however correct the number was */}
+        <button className="btn" style={{ flex: 1 }} onClick={lookup} disabled={code.length < 5}>Open</button>
       </div>
       {msg && <p className="hint" style={{ color: '#8a5b00' }}>{msg}</p>}
       <Tip tone="info">

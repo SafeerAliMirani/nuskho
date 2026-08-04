@@ -2,8 +2,64 @@ import fontsCss from './fonts.css?raw'
 import slipCss from './slip.css?raw'
 import { paper, PAGE_MM } from '../paper'
 import { CALIBRATION_CSS } from './calibration'
+import { isDemo } from '../version'
 
 let injected = false
+
+/**
+ * THE PRACTICE COPY MUST NOT BE ABLE TO BECOME A CLINIC.
+ *
+ * The public copy of Nuskho rebuilds on every push. That is fine for showing
+ * people and fatal for treating patients, and the danger is not that somebody
+ * decides to misuse it — it is that a doctor is shown the app, likes it, and
+ * simply carries on using the thing already open in front of him. Nobody ever
+ * decides to start; they just do not stop.
+ *
+ * Refusing to run is not the answer either: a demo that will not do anything
+ * sells nothing, and the whole product is one piece of paper.
+ *
+ * So the paper is what is poisoned. Every printed sheet from a practice copy
+ * carries this across it, in both scripts. A clinic cannot run on prescriptions
+ * that say SPECIMEN over the medicines — a chemist will not fill one and a
+ * patient will ask — so the practice copy fails at the exact moment somebody
+ * tries to use it for real, which is the only moment that matters.
+ *
+ * It is drawn as a repeating background rather than as an element, so nothing
+ * in the layout moves: the demo prints the same rows in the same places as the
+ * real thing. What is being sold is still what is being seen.
+ */
+const TILE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='150'%3E" +
+  "%3Ctext x='150' y='80' text-anchor='middle' transform='rotate(-30 150 75)' " +
+  "font-family='Helvetica,Arial,sans-serif' font-size='26' font-weight='bold' " +
+  "letter-spacing='3' fill='%23000' fill-opacity='0.14'%3E" +
+  "SPECIMEN %D9%86%D9%85%D9%88%D9%86%D9%88%3C/text%3E%3C/svg%3E"
+
+const DEMO_PRINT_CSS = `
+@media print{
+  /* A TILE, NOT ONE BIG WORD ACROSS THE MIDDLE.
+     The first version centred a single line on the sheet — and a prescription
+     with three medicines puts them all in the top third, so the word sat in
+     the empty space underneath and crossed nothing. A slip whose medicines are
+     perfectly clean is a slip somebody will use. Tiling covers the rows
+     wherever they fall, on one medicine or on nine, on A5 or A4. */
+  .page{position:relative}
+  .page::after{
+    content:"";position:absolute;inset:0;
+    background-image:url("${TILE}");
+    background-repeat:repeat;
+    pointer-events:none;z-index:9999;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  .tok{position:relative}
+  .tok::after{
+    content:"SPECIMEN";
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:Helvetica,Arial,sans-serif;font-size:13pt;font-weight:700;letter-spacing:3px;
+    color:rgba(0,0,0,.17);transform:rotate(-26deg);
+    pointer-events:none;z-index:9999;
+  }
+}`
 
 /**
  * The print stylesheet lives outside the app's CSS and is injected once.
@@ -26,7 +82,8 @@ export function ensurePrintStyles(): void {
        body>*{display:none !important}
        #print-root{display:block !important;position:static;left:0}
        #nuskho-measure{display:none !important}
-     }`
+     }` +
+    (isDemo ? '\n' + DEMO_PRINT_CSS : '')
   document.head.appendChild(s)
   injected = true
 }

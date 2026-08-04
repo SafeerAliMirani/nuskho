@@ -37,8 +37,10 @@ export const qrPayload = (code: string) => QR_PREFIX + code.replace(/[^A-Za-z0-9
 export function readQrPayload(scanned: string): string | null {
   const s = scanned.trim()
   if (s.toUpperCase().startsWith(QR_PREFIX)) return s.slice(QR_PREFIX.length).trim()
-  // a scanner configured without a prefix, or a person typing: still accept digits
-  return /^\d{4,6}$/.test(s) ? s : null
+  // a scanner configured without a prefix, or a person typing: still accept digits.
+  // Upper bound was 6, which quietly capped the clinic at 99,999 patients; the
+  // check digit inside the code is the real guard, so length only has a floor.
+  return /^\d{5,}$/.test(s) ? s : null
 }
 
 /**

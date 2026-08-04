@@ -2,6 +2,7 @@ import { db } from './db'
 import { profile, saveProfile, adminBlob, restoreAdminBlob, type Profile } from './profile'
 import { paper, setPaper, type Paper } from './paper'
 import { bumpHighWaterPastRestore, noteExported } from './safety'
+import { isDemo } from './version'
 import type { Drug, Patient, Visit } from './types'
 
 /**
@@ -59,7 +60,33 @@ export function backupFilename(kind: 'setup' | 'full', p = profile()): string {
   return `nuskho-${kind}-${who}-${stamp}.json`
 }
 
+/**
+ * THE PRACTICE COPY CANNOT EXPORT. THIS IS THE DOOR THAT HAD TO BE SHUT.
+ *
+ * The watermark stops a demo slip being used as a prescription, and the
+ * separate database stops demo patients appearing in a real clinic by
+ * accident. This closes the third and least obvious route: somebody works in
+ * the demo for a fortnight, decides to go properly, and exports the lot into
+ * the real install. Everything about those records is untrustworthy — half
+ * typed to see what happens, Sindhi never reviewed by a person, numbers issued
+ * by a copy of the app that has since been rebuilt four times — and once they
+ * are in the clinic database nothing distinguishes them from real ones.
+ *
+ * Retyping three patients costs an afternoon. A clinic that cannot tell which
+ * of its records are real costs the practice.
+ *
+ * Moving a MEDICINE LIST out of the demo would be harmless and is worth
+ * building when somebody asks; moving patients never is.
+ */
+export class DemoRefusal extends Error {
+  constructor() {
+    super('This is a practice copy. It cannot save records to a file — set up the clinic first.')
+    this.name = 'DemoRefusal'
+  }
+}
+
 export async function downloadBackup(kind: 'setup' | 'full'): Promise<void> {
+  if (isDemo) throw new DemoRefusal()
   const data = await makeBackup(kind)
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
   const a = document.createElement('a')

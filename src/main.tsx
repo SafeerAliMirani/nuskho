@@ -5,15 +5,28 @@ import { Boundary } from './Boundary'
 import './ui/type.css'
 import './app.css'
 import { keepStorage, snapshotDaily } from './safety'
+import { freshenDemo } from './demo'
 
 // Before anything else: ask the browser not to treat a clinic's records as
 // cache, then take today's local snapshot. Both are silent and both are the
 // difference between a bad evening and a lost practice.
 keepStorage().then(() => snapshotDaily()).catch(() => { /* never block the app */ })
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode><Boundary><App /></Boundary></StrictMode>
-)
+/**
+ * The practice copy clears itself after a gap — see demo.ts.
+ *
+ * This is awaited, unlike everything else here, because rendering first would
+ * paint yesterday's practice patients for a moment before deleting them, and
+ * the one thing a demo must not do is look unreliable. In a real clinic build
+ * it returns immediately and costs nothing.
+ */
+freshenDemo()
+  .catch(() => false)
+  .then(() => {
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode><Boundary><App /></Boundary></StrictMode>
+    )
+  })
 
 /**
  * Register the offline worker ONLY when served over http(s).

@@ -10,7 +10,5 @@ dist-web
 # which is what lets the app render identically from a folder with no network.
 # src/ui/fonts/*.woff2 are the sources it was generated from and are committed
 # too, so the file can be rebuilt rather than trusted.
-_zips
-_to_delete
-tsconfig.tsbuildinfo
-*.csv
+
+releases/

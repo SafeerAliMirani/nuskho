@@ -3,10 +3,10 @@ import { db } from '../db'
 import { profile, APP } from '../profile'
 import { paper } from '../paper'
 import { role, ROLE_NAME } from '../roles'
-import { daysSinceExport } from '../safety'
+import { daysSinceExport, storageReport } from '../safety'
 import { Mark, IcShield, IcInfo, IcCheck, IcPrint } from '../ui/art'
 import { Note } from '../ui/Note'
-import { VERSION, BUILT } from '../version'
+import { VERSION, BUILT, BUILD, CHANNEL, isDemo } from '../version'
 
 /**
  * WHO MADE THIS, AND HOW TO GET HELP WHEN IT BREAKS AT EIGHT IN THE EVENING.
@@ -47,6 +47,7 @@ export default function About({ onBack }: { onBack: () => void }) {
   const [report, setReport] = useState('')
   const [copied, setCopied] = useState(false)
   const [counts, setCounts] = useState({ patients: 0, visits: 0, drugs: 0, unchecked: 0 })
+  const [store, setStore] = useState<{ persisted: boolean; usedMb: number } | null>(null)
 
   useEffect(() => {
     (async () => {
@@ -57,6 +58,13 @@ export default function About({ onBack }: { onBack: () => void }) {
         drugs: drugs.filter(d => !d.archived).length,
         unchecked: drugs.filter(d => !d.archived && d.sdReviewed !== true).length,
       })
+      // The app asks for persistent storage at startup and the browser may say
+      // no. That refusal used to be swallowed, which meant a clinic could be one
+      // low-disk evening away from losing a month of records with nothing on any
+      // screen to warn it. Losing records this way is more likely than any
+      // attacker, so it is said out loud.
+      const s = await storageReport()
+      setStore({ persisted: s.persisted, usedMb: s.usedMb })
     })()
   }, [])
 
@@ -67,7 +75,10 @@ export default function About({ onBack }: { onBack: () => void }) {
     /* eslint-disable no-irregular-whitespace */
     const lines = [
       `NUSKHO SUPPORT — ${ref}`,
-      `App        ${VERSION}  (built ${BUILT})`,
+      // The commit, not just the version: two builds numbered 1.0.0 are not the
+      // same software, and "which copy is on that machine" is the first
+      // question about every bug.
+      `App        ${VERSION}  ${BUILD}  (${CHANNEL}, built ${BUILT})`,
       `Date here  ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
       `Signed in  ${ROLE_NAME[role()]}`,
       '',
@@ -109,7 +120,10 @@ export default function About({ onBack }: { onBack: () => void }) {
           <h1>{APP.en} <span className="sd">{APP.sd}</span></h1>
           <p>The prescription, printed. English for the chemist, Sindhi for the family,
              pictures for whoever reads neither.</p>
-          <p className="ver">Version {VERSION} · built {BUILT}</p>
+          <p className="ver">
+            Version {VERSION} · {BUILD} · built {BUILT}
+            {isDemo && <> · <b>practice copy</b></>}
+          </p>
         </div>
       </div>
 
@@ -125,10 +139,23 @@ export default function About({ onBack }: { onBack: () => void }) {
         knows stays on the machine it is installed on.
       </p>
 
+      {store && !store.persisted && (
+        <Note tone="warn" title="This computer has not promised to keep your records">
+          Chrome is storing the clinic's records as if they were a web page it may throw
+          away when the disk gets tight, and "Clear browsing data" would take them
+          instantly. Nothing is lost yet ({store.usedMb} MB stored). <b>Export a backup
+          today</b>, and keep exporting weekly until this line disappears.
+        </Note>
+      )}
+
       <h2><IcShield size={17} /> What this software promises</h2>
       <ul className="promises">
         <li><b>Nothing about a patient leaves this computer.</b> There is no account, no
-          server and no upload. Not now, and there is no plan for one.</li>
+          server and no upload. <b>If that ever changes, this screen will say so first,
+          and you will have to agree before anything is sent.</b></li>
+        <li><b>Nobody at Nuskho can read your prescriptions,</b> including on this machine.
+          The setup passphrase we hold opens your letterhead and the medicine review —
+          not a consultation, not a history, and not an export.</li>
         <li><b>Prescribing is never sold.</b> What a doctor writes is not a product. No drug
           company sees it, in aggregate or otherwise.</li>
         <li><b>A Sindhi medicine name is never printed until a person has read it.</b> A
