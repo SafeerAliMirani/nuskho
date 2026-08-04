@@ -27,12 +27,46 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# The welcome and login pages must always be fresh — a returning visitor should
+# never be quoted last month's marketing by an edge cache.
+[[headers]]
+  for = "/welcome.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/login.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# ROUTING. The site's front door is the welcome page (public/welcome.html); the
+# app itself is shown at /demo. Order matters and `force` matters: "/" resolves
+# to a physical index.html (the app), so without force=true Netlify would serve
+# the file and never consult the rule.
+[[redirects]]
+  from = "/"
+  to = "/welcome.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/login"
+  to = "/login.html"
+  status = 200
+
+[[redirects]]
+  from = "/demo"
+  to = "/index.html"
+  status = 200
+
 # The single-page fallback lives HERE for Netlify and in wrangler.jsonc for
 # Cloudflare. There is deliberately no public/_redirects: Cloudflare's Workers
 # assets runtime reads `/*  /index.html  200` as a redirect loop and refuses the
 # whole deployment, because not_found_handling already does that job. One
 # fallback per host, declared in that host's own file, and never a third copy
 # sitting in public/ that only one of them understands.
+# (On Cloudflare, "/" will still serve the app until an equivalent rewrite is
+# added there — do that in the Worker when the move happens.)
 [[redirects]]
   from = "/*"
   to = "/index.html"

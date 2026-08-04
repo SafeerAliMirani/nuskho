@@ -2,7 +2,7 @@
   "name": "Nuskho — the prescription, printed",
   "short_name": "Nuskho",
   "description": "Printed bilingual prescriptions for a clinic. Works with the internet down.",
-  "start_url": ".",
+  "start_url": "./demo",
   "scope": ".",
   "display": "standalone",
   "orientation": "any",

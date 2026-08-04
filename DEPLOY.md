@@ -76,9 +76,18 @@ is worse than an old one when the thing it prints is a prescription.
 - **Register `nuskho.pk` first.** `APP.web` in `src/profile.ts` is deliberately
   blank, so no slip carries an address we do not own. Put the string back the day
   the registration is confirmed, and not a day before.
-- **Decide what the landing page says.** Right now the deployed thing is the app
-  itself. A clinic arriving cold should probably meet a page that explains it
-  before it asks them to sign in.
+- ~~**Decide what the landing page says.**~~ Done — `public/welcome.html` is the
+  front door and `public/login.html` the role sign-in. On Netlify, `/` rewrites
+  to the welcome page and the app itself is shown at `/demo` (see
+  `netlify.toml`); an installed home-screen app still opens the app, because the
+  manifest's `start_url` is `./demo`. Three rules those pages carry:
+  - **The WhatsApp number is a placeholder** (`wa.me/923000000000`, shown as
+    `+92 3XX XXXXXXX`). Search for `wa.me/` in both files and replace it with
+    the real public number before the link goes to anyone.
+  - They are plain, self-contained HTML — no JavaScript, fonts inlined — so the
+    CSP below applies to them unchanged. Keep them that way.
+  - After editing either page, **bump `CACHE` in `public/sw.js`** (v2 → v3 …),
+    or returning visitors keep the cached old copy for ever.
 - **Do not put a contact form on it.** Support is the offline ticket in
   About → Something is wrong: a reference number and a report the clinic reads
   before sending. A form on a website is a server that receives text typed by a

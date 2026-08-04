@@ -15,13 +15,17 @@
  * GET, no background sync, no push. There is no server to talk to, and there
  * must never be one that patient data could reach.
  */
-const CACHE = 'nuskho-v1'
+// BUMP THIS when welcome.html or login.html change: they are served cache-first
+// out of this cache, so an edit that does not bump the version is an edit a
+// returning visitor never sees.
+const CACHE = 'nuskho-v5'
 
 self.addEventListener('install', e => {
-  // Take the shell now so the first offline open works.
+  // Take the shell now so the first offline open works. './' is the welcome
+  // page (the host rewrites the root there); './index.html' is the app itself.
   e.waitUntil((async () => {
     const c = await caches.open(CACHE)
-    await c.addAll(['./', './index.html', './manifest.webmanifest', './icon.svg'])
+    await c.addAll(['./', './index.html', './login.html', './manifest.webmanifest', './icon.svg'])
   })())
 })
 
