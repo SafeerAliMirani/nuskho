@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Does the picture work?</title>
+<style>
+  @page { size: A4; margin: 12mm 12mm 10mm 12mm; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Liberation Sans", Arial, sans-serif;
+    color: #111;
+    font-size: 10.5pt;
+    line-height: 1.35;
+  }
+  .sd {
+    font-family: "Noto Naskh Arabic", "Noto Sans Arabic", serif;
+    direction: rtl;
+    unicode-bidi: isolate;
+  }
+
+  .sheet { page-break-after: always; }
+  .sheet:last-child { page-break-after: avoid; }
+
+  /* ---------------------------------------------------------------- header */
+  .top {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    border-bottom: 2px solid #111; padding-bottom: 4mm; margin-bottom: 5mm;
+  }
+  .top h1 { font-size: 15pt; margin: 0 0 1mm; letter-spacing: -.2px; }
+  .top .sdh { font-size: 13pt; margin: 0; }
+  .top .meta { font-size: 8.5pt; color: #555; text-align: right; line-height: 1.6; }
+  .top .meta b { display: inline-block; min-width: 26mm; border-bottom: 1px solid #999; }
+
+  /* ------------------------------------------------------------ the method */
+  h2 { font-size: 11.5pt; margin: 6mm 0 2mm; }
+  ol.method { margin: 0 0 4mm; padding-left: 6mm; }
+  ol.method li { margin-bottom: 2.2mm; }
+  .say {
+    border: 1.5px solid #111; padding: 3mm 4mm; margin: 3mm 0 4mm;
+    background: #f6f6f4;
+  }
+  .say .en { font-weight: 700; font-size: 11pt; }
+  .say .rom { font-size: 10pt; color: #333; margin-top: 1mm; }
+  .say .sd  { font-size: 14pt; margin-top: 2mm; }
+
+  .warn { border-left: 4px solid #111; padding: 2mm 0 2mm 4mm; margin: 4mm 0; }
+  .warn b { display: block; margin-bottom: 1mm; }
+
+  ul.rules { margin: 0 0 4mm; padding-left: 6mm; }
+  ul.rules li { margin-bottom: 1.8mm; }
+
+  /* --------------------------------------------------------------- patient */
+  .p {
+    border: 1px solid #111; padding: 3mm 3.5mm 3mm;
+    margin-bottom: 3.5mm; page-break-inside: avoid;
+  }
+  .phead { display: flex; align-items: baseline; gap: 4mm; margin-bottom: 2.5mm; }
+  .pno {
+    font-size: 13pt; font-weight: 700; border: 1.5px solid #111;
+    width: 9mm; height: 9mm; line-height: 8mm; text-align: center; flex: none;
+  }
+  .f { font-size: 9pt; color: #333; white-space: nowrap; }
+  .f u { text-decoration: none; border-bottom: 1px solid #666;
+         display: inline-block; min-width: 13mm; }
+  .f.grow u { min-width: 22mm; }
+
+  .reads { font-size: 8.5pt; color: #333; margin: 1.5mm 0 2.5mm; }
+  .box { display: inline-block; width: 3.2mm; height: 3.2mm;
+         border: 1px solid #111; vertical-align: -0.3mm; margin: 0 1mm 0 2.5mm; }
+
+  table.rows { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  table.rows th {
+    text-align: left; font-size: 8pt; text-transform: uppercase;
+    letter-spacing: .4px; color: #444; font-weight: 700;
+    border-bottom: 1px solid #111; padding: 0 1.5mm 1mm;
+  }
+  table.rows td { border-bottom: 1px solid #bbb; padding: 3.5mm 1.5mm 1.2mm; }
+  table.rows tr:last-child td { border-bottom: none; }
+  .c { text-align: center; width: 11mm; }
+  .said { width: auto; }
+
+  .note { font-size: 8.5pt; color: #333; margin-top: 2.5mm; }
+  .note u { text-decoration: none; border-bottom: 1px solid #999;
+            display: inline-block; min-width: 60mm; }
+
+  .foot { font-size: 8pt; color: #666; margin-top: 3mm;
+          border-top: 1px solid #ccc; padding-top: 2mm; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ page 1 -->
+<div class="sheet">
+  <div class="top">
+    <div>
+      <h1>Does the picture work?</h1>
+      <p class="sdh sd">ڇا تصوير سمجهه ۾ اچي ٿي؟</p>
+    </div>
+    <div class="meta">
+      Clinic <b></b><br>
+      Date <b></b><br>
+      Asked by <b></b>
+    </div>
+  </div>
+
+  <p><b>This is the only thing about Nuskho that nobody else has, and it has
+  never been tested on one human being.</b> Twenty patients is enough to know.</p>
+
+  <h2>How to ask</h2>
+  <ol class="method">
+    <li>Hand the patient the printed slip. <b>Say nothing about it.</b></li>
+    <li>Point at <b>one medicine row</b> — the picture, not the words.</li>
+    <li>Ask the question below, and then <b>be quiet</b>.</li>
+    <li>Write down <b>their actual words</b> before you say anything back.</li>
+    <li>Only after you have written it down, tell them the right answer.</li>
+  </ol>
+
+  <div class="say">
+    <div class="en">“How will you take this medicine?”</div>
+    <div class="rom">Hee dawa kiyan khaana aahe?</div>
+    <div class="sd">هيءَ دوا ڪيئن کائڻي آهي؟</div>
+  </div>
+
+  <div class="warn">
+    <b>A wrong answer is the most valuable thing you will collect.</b>
+    A picture meaning “three times a day” read as “three tablets at once” is the
+    one way this software can hurt somebody. Finding it now costs nothing.
+    Finding it in year two costs a patient.
+  </div>
+
+  <h2>Rules</h2>
+  <ul class="rules">
+    <li><b>Do not help.</b> No hints, no nodding, no pointing at the number.</li>
+    <li><b>Do not ask “do you understand?”</b> Everybody says yes. Make them tell
+      you what it means.</li>
+    <li><b>Do not skip the ones who cannot read.</b> They are the reason this
+      exists.</li>
+    <li>If a family member answers instead, note it — and ask the patient anyway.</li>
+    <li>Ask about <b>two or three</b> medicines per patient, not all of them.
+      People get tired and start guessing.</li>
+  </ul>
+
+  <h2>Marking</h2>
+  <p><b>✔ right</b> — they said the correct timing and the correct amount.<br>
+     <b>✘ wrong</b> — they said something else. <b>Write what they said.</b><br>
+     <b>? none</b> — they could not say, or only guessed from the number.</p>
+
+  <p class="foot">Sheets 2–6 hold four patients each. Take all five to the clinic.</p>
+</div>
+
+
+<div class="sheet">
+  <div class="top">
+    <div><h1>Does the picture work?</h1>
+      <p class="sdh sd">ڇا تصوير سمجهه ۾ اچي ٿي؟</p></div>
+    <div class="meta">Sheet 2 of 6 &nbsp;·&nbsp; patients 1–4<br>
+      Date <b></b><br>Clinic <b></b></div>
+  </div>
+  
+  <div class="p">
+    <div class="phead">
+      <div class="pno">1</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">2</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">3</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">4</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <p class="foot">Write what they said, not whether they understood. Their words are the data.</p>
+</div>
+
+<div class="sheet">
+  <div class="top">
+    <div><h1>Does the picture work?</h1>
+      <p class="sdh sd">ڇا تصوير سمجهه ۾ اچي ٿي؟</p></div>
+    <div class="meta">Sheet 3 of 6 &nbsp;·&nbsp; patients 5–8<br>
+      Date <b></b><br>Clinic <b></b></div>
+  </div>
+  
+  <div class="p">
+    <div class="phead">
+      <div class="pno">5</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">6</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">7</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">8</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <p class="foot">Write what they said, not whether they understood. Their words are the data.</p>
+</div>
+
+<div class="sheet">
+  <div class="top">
+    <div><h1>Does the picture work?</h1>
+      <p class="sdh sd">ڇا تصوير سمجهه ۾ اچي ٿي؟</p></div>
+    <div class="meta">Sheet 4 of 6 &nbsp;·&nbsp; patients 9–12<br>
+      Date <b></b><br>Clinic <b></b></div>
+  </div>
+  
+  <div class="p">
+    <div class="phead">
+      <div class="pno">9</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">10</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">11</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">12</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <p class="foot">Write what they said, not whether they understood. Their words are the data.</p>
+</div>
+
+<div class="sheet">
+  <div class="top">
+    <div><h1>Does the picture work?</h1>
+      <p class="sdh sd">ڇا تصوير سمجهه ۾ اچي ٿي؟</p></div>
+    <div class="meta">Sheet 5 of 6 &nbsp;·&nbsp; patients 13–16<br>
+      Date <b></b><br>Clinic <b></b></div>
+  </div>
+  
+  <div class="p">
+    <div class="phead">
+      <div class="pno">13</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">14</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">15</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">16</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <p class="foot">Write what they said, not whether they understood. Their words are the data.</p>
+</div>
+
+<div class="sheet">
+  <div class="top">
+    <div><h1>Does the picture work?</h1>
+      <p class="sdh sd">ڇا تصوير سمجهه ۾ اچي ٿي؟</p></div>
+    <div class="meta">Sheet 6 of 6 &nbsp;·&nbsp; patients 17–20<br>
+      Date <b></b><br>Clinic <b></b></div>
+  </div>
+  
+  <div class="p">
+    <div class="phead">
+      <div class="pno">17</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">18</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">19</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <div class="p">
+    <div class="phead">
+      <div class="pno">20</div>
+      <div class="f">Age <u></u></div>
+      <div class="f">M / F</div>
+      <div class="f grow">Village or town <u></u></div>
+    </div>
+    <div class="reads">
+      Can read:
+      <span class="box"></span>Sindhi
+      <span class="box"></span>Urdu
+      <span class="box"></span>English
+      <span class="box"></span><b>nothing</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="box"></span>a family member answered instead
+    </div>
+    <table class="rows">
+      <tr><th class="said">What the patient said, in their words</th>
+        <th class="c">✔ right</th><th class="c">✘ wrong</th><th class="c">? none</th></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+        <tr><td class="said"></td>
+          <td class="c"></td><td class="c"></td><td class="c"></td></tr>
+    </table>
+    <div class="note">Anything you noticed: <u></u></div>
+  </div>
+  <p class="foot">Write what they said, not whether they understood. Their words are the data.</p>
+</div>
+
+</body>
+</html>
