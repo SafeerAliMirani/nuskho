@@ -2,7 +2,7 @@
 
 Decided 4 August 2026, from Safeer's own answers about Larkana, with an
 independent review of the arithmetic. The clickable design is
-`superadmin-panel.html`'s sibling: **`patient-token-flows.html`** in this folder.
+`superadmin-panel.html`'s sibling. The token-flow study it grew from was deleted once the tokens became working software; it is in the git history.
 
 ---
 

@@ -138,7 +138,10 @@ apply, and switches on `--kiosk-printing` so no dialog appears per patient.
 
 ## Decisions made this session
 
-Full reasoning in `docs/decisions/nuskho-plan-v4.md`. The short version:
+The long plan document these came from was deleted once the software
+existed and started contradicting it. It is still in the git history if
+the reasoning is ever wanted: `git log --diff-filter=D --name-only`. What
+survived is below, and the standing rules above.
 
 **The product is a downloaded application that updates itself.** The public web
 link becomes a demo. This was the question that gated everything — if a server
