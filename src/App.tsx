@@ -13,8 +13,10 @@ import { role, can, signOut, currentDoctorId, ROLE_NAME, ROLE_SD } from './roles
 import { multiRoom, doctorById, visitDoctorId } from './doctors'
 import { buildingMode } from './building'
 import Mirror from './screens/Mirror'
+import Tour from './ui/Tour'
+import { tourFor, tourSeen } from './tour'
 import { todaysVisits } from './db'
-import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo } from './ui/art'
+import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo, IcBook } from './ui/art'
 import Toasts from './ui/Toasts'
 import { startPresence, onSignal } from './ui/bus'
 import { isDemo } from './version'
@@ -35,6 +37,7 @@ function Clinic() {
   const [stats, setStats] = useState(false)
   const [pharm, setPharm] = useState(false)
   const [about, setAbout] = useState(false)
+  const [tour, setTour] = useState(false)
   const [today, setToday] = useState<Visit[]>([])
   const [welcome, setWelcome] = useState(needsWelcome)
   // The lock stands between the doctor and the app only when opening it. Once
@@ -64,6 +67,9 @@ function Clinic() {
     if (!isDemo) return
     touchDemo()
     const t = setInterval(touchDemo, 5 * 60 * 1000)
+    // The practice copy opens already signed in, with nobody in the room to
+    // explain it. The tour is the person who would have been standing there.
+    if (!tourSeen(role())) setTour(true)
     return () => clearInterval(t)
   }, [])
 
@@ -115,7 +121,7 @@ function Clinic() {
   // which the counter is not allowed to do. The installer's first experience of
   // the app was that it would not print.
   if (welcome) return <Welcome onDone={() => { setWelcome(false); setLocked(true); refresh() }} />
-  if (locked) return <Lock onOpen={() => setLocked(false)} />
+  if (locked) return <Lock onOpen={() => { setLocked(false); if (!tourSeen(role())) setTour(true) }} />
 
   const printed = today.filter(v => v.printedAt).length
 
@@ -207,6 +213,15 @@ function Clinic() {
                       <IcUser size={16} /> Sign in as Nuskho <small>name, logo, medicine review, backups</small>
                     </button>
                   )}
+                  {/* Learning where things are must never mean finding a
+                      manual. It sits one tap away, for ever, in the same
+                      menu the role is chosen from. */}
+                  {tourFor(role()).length > 0 && (
+                    <button onClick={() => { setMenu(false); setTour(true) }}>
+                      <IcBook size={16} /> How this works <small>a short tour of your own screen</small>
+                    </button>
+                  )}
+
                   <button onClick={() => {
                     setMenu(false); setStats(false); setSetup(false); setVisitId(null); setAbout(true)
                   }}>
@@ -256,6 +271,10 @@ function Clinic() {
         : can('ops')
         ? <AdminDesk visits={today} />
         : <Setup onBack={() => setSetup(false)} />}
+
+      {/* Over the top of whatever is showing, and deliberately not instead
+          of it: the tour rings the real control on the real screen. */}
+      {tour && <Tour role={role()} onClose={() => setTour(false)} />}
     </div>
   )
 }

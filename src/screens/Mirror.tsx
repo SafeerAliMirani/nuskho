@@ -4,6 +4,8 @@ import {
   MIRROR_ROLES, type WireState, type WireRx, type WireVisit, type WireDoctor,
 } from '../building'
 import { ROLE_NAME, ROLE_SD, ROLE_WHAT, type Role } from '../roles'
+import Tour from '../ui/Tour'
+import { tourFor, tourSeen } from '../tour'
 import { printToken } from '../print/print'
 import { paper } from '../paper'
 import { Mark, IcRupee, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn } from '../ui/art'
@@ -47,6 +49,7 @@ export default function Mirror() {
   const [rx, setRx] = useState<WireRx>([])
   const [up, setUp] = useState(hostUp())
   const [err, setErr] = useState('')
+  const [tour, setTour] = useState(false)
 
   const out = () => {
     mirrorSignOut()
@@ -88,6 +91,8 @@ export default function Mirror() {
               <span className={'rolechip ' + role} style={{ cursor: 'default' }}>
                 {ROLE_NAME[role]} <i className="sd">{ROLE_SD[role]}</i>
               </span>
+              {tourFor(role).length > 0 &&
+                <button className="lnk paper" onClick={() => setTour(true)}>Help</button>}
               <button className="lnk paper" onClick={out}>Sign out</button>
             </>
           )}
@@ -107,6 +112,7 @@ export default function Mirror() {
       {!role
         ? <MirrorDoor up={up} onIn={r => {
             setRole(r)
+            if (!tourSeen(r)) setTour(true)
             try { sessionStorage.setItem(ROLE_KEY, r) } catch { /* ignore */ }
           }} />
         : !s
@@ -118,6 +124,8 @@ export default function Mirror() {
         : role === 'compounder' ? <MQueue s={s} />
         : role === 'pharmacy' ? <MPharm s={s} rx={rx} />
         : <MOps s={s} />}
+
+      {tour && role && <Tour role={role} onClose={() => setTour(false)} />}
     </div>
   )
 }
