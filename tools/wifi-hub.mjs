@@ -43,9 +43,17 @@ const server = createServer((req, res) => {
 
   // The one honest signal the app uses to know it is inside a building.
   // Solo folders and the public web copy get a 404 here and stay themselves.
+  //
+  // `local` says the asking browser is on THIS machine, the one running the
+  // wire. Only that browser is offered the "this computer holds the records"
+  // switch. Without it every phone in the building was offered it too, and a
+  // phone that took it would become a second record holder with an empty
+  // database — a whole evening's tokens issued into nowhere.
   if (url === '/hub.json') {
+    const ra = (req.socket.remoteAddress || '').replace(/^::ffff:/, '')
+    const local = ra === '127.0.0.1' || ra === '::1'
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
-    res.end(JSON.stringify({ hub: true, name: 'nuskho-wifi', v: 1 }))
+    res.end(JSON.stringify({ hub: true, name: 'nuskho-wifi', v: 1, local }))
     return
   }
 

@@ -7,6 +7,8 @@ import DrugsStep from './setup/DrugsStep'
 import { Mark, ArtSlip } from '../ui/art'
 import { readBackup, readFile, restore, type RestoreReport } from '../backup'
 import { setAdminKey } from '../profile'
+import { buildingMode } from '../building'
+import { Note } from '../ui/Note'
 import { isDemo } from '../version'
 
 /**
@@ -110,6 +112,25 @@ export default function Welcome({ onDone }: { onDone: () => void }) {
             Patient records stay on this machine. Nothing is sold, and nothing is shared with
             any drug company, not now and not later.
           </p>
+
+          {/* THE ADDRESS IS PART OF THE IDENTITY, AND NOBODY EXPECTS THAT.
+              A browser keeps records per address. The folder opened from disk
+              and the same folder served over the clinic's wifi are two
+              different addresses, so they are two different clinics with two
+              different databases. Discovering that halfway through an evening
+              means a queue that has vanished. Said here, once, at the only
+              moment it can still be free to fix. */}
+          {buildingMode() === 'host' && (
+            <Note tone="warn" title="This is the wifi address, and it starts empty">
+              You are opening Nuskho at the clinic's wifi address, so this is where the
+              records will live from now on. A clinic already set up by double-clicking the
+              folder is a <b>separate</b> set of records that this address cannot see. If
+              that clinic exists, stop here, open it the old way, save a full backup, and
+              restore it into this address instead of typing everything twice. If you are
+              starting fresh, carry on: set the clinic up here, and open it here every
+              evening from now on.
+            </Note>
+          )}
           {/* THE PRACTICE DOOR.
               On the public copy this is the main way in, not an afterthought:
               nobody has installed anything, nobody is committing to anything,

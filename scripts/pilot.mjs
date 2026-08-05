@@ -75,12 +75,48 @@ rmSync(join(out, 'sw.js'), { force: true })
 const WIRE = 'tools/nuskho-wifi.cjs'
 if (existsSync(WIRE)) {
   cpSync(WIRE, join(out, 'nuskho-wifi.cjs'))
-  writeFileSync(join(out, 'Start Nuskho wifi.bat'),
+
+  /**
+   * ONE LAUNCHER FOR A BUILDING, BECAUSE THE ADDRESS IS PART OF THE IDENTITY.
+   *
+   * A browser keeps records per address. The folder opened from disk and the
+   * same folder served over the clinic's wifi are two different addresses,
+   * so they are two different clinics with two different databases. Found by
+   * testing: the wire was started, the app opened at the wifi address, and it
+   * came up as a brand new clinic asking to be set up. Nothing was broken and
+   * everything was confusing, which is worse.
+   *
+   * So a building gets ONE thing to double-click. It starts the wire and
+   * opens the app AT THE WIRE'S OWN ADDRESS, with the printing flags, in its
+   * own Chrome profile. From then on the record machine and every phone are
+   * looking at the same address and therefore the same records.
+   */
+  writeFileSync(join(out, 'Start Nuskho building.bat'),
+`@echo off
+title Nuskho building
+cd /d "%~dp0"
+echo.
+echo   Starting the building's wire, then opening Nuskho on it.
+echo   LEAVE THIS WINDOW OPEN all evening. Closing it stops the phones.
+echo.
+start "Nuskho wire" /min cmd /c "node ""nuskho-wifi.cjs"" ""."" & pause"
+timeout /t 3 /nobreak >nul
+start "" chrome.exe ^
+ --user-data-dir="%LOCALAPPDATA%\\NuskhoBuilding" ^
+ --kiosk-printing ^
+ --new-window "http://localhost:8123/"
+echo   Opened. The phones use the address printed in the other window.
+timeout /t 6 /nobreak >nul
+exit
+`)
+
+  writeFileSync(join(out, 'Start Nuskho wifi only.bat'),
 `@echo off
 title Nuskho wifi
 echo.
-echo   The building's own wire. Leave this window open all evening.
-echo   Close it and the phones stop; the records are untouched either way.
+echo   The building's own wire, on its own. Leave this window open.
+echo   Use this only if the app is already open at this machine's
+echo   wifi address. Otherwise use "Start Nuskho building.bat".
 echo.
 cd /d "%~dp0"
 node "nuskho-wifi.cjs" "."
@@ -142,17 +178,37 @@ HOW TO USE IT
   Make a shortcut to the .bat on the desktop and let nobody open it any other
   way.
 
-PHONES ON THE CLINIC WIFI (only if this building uses them)
+A BUILDING WITH PHONES  —  USE THE OTHER LAUNCHER INSTEAD
 
-  On the ONE computer that holds the records, also double-click
+  If this clinic runs phones on its own wifi, do NOT use Start Nuskho.bat on
+  the record machine. Use
 
-      Start Nuskho wifi.bat
+      Start Nuskho building.bat
 
-  and leave that window open for the evening. It prints an address; phones on
-  the same wifi open it, or scan the square under Setup, Wifi. Needs Node
-  installed on that one machine, and no internet at any point. That program
-  keeps no records of its own; closing it stops the phones and touches
-  nothing else.
+  instead, and leave the small window it opens running all evening.
+
+  WHY IT MATTERS, AND IT IS NOT OBVIOUS. A browser keeps its records under the
+  ADDRESS the app was opened from. The folder opened from disk and the same
+  folder served over the wifi are two different addresses, so they are two
+  different clinics with two separate sets of records. Set the clinic up at
+  one address and open it at the other, and it will look brand new.
+
+  So pick ONE way and never mix them:
+
+     No phones     ->  Start Nuskho.bat, every evening.
+     With phones   ->  Start Nuskho building.bat, every evening, on the
+                       record machine. Phones open the address printed in
+                       the wire's window, or scan the square under
+                       Setup, Wifi.
+
+  If a clinic already set up the first way now wants phones: open it the old
+  way, Setup, Backup, save the full backup, then start the building launcher
+  and restore that file at the new address. Do it before an evening, never
+  during one.
+
+  The wire needs Node installed on that one machine, and no internet at any
+  point. It keeps no records of its own; closing its window stops the phones
+  and touches nothing else.
 
 WHAT IT DOES NOT DO
 

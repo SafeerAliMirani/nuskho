@@ -102,8 +102,14 @@ export const MIRROR_ROLES: Role[] = ['counter', 'compounder', 'pharmacy', 'clini
 const HOST_KEY = 'nuskho.hostHere'
 
 let mode: 'off' | 'host' | 'mirror' = 'off'
+let onWire_local = false
 
 export const buildingMode = () => mode
+
+/** True only on the machine actually running the wire. The offer to become
+ *  the record holder appears there and nowhere else: a phone that took it
+ *  would become a second record holder holding nothing. */
+export const hubIsLocal = () => onWire_local
 
 export function hostHere(): boolean {
   try { return localStorage.getItem(HOST_KEY) === '1' } catch { return false }
@@ -125,6 +131,7 @@ export async function initBuilding(): Promise<void> {
     const r = await fetch('/hub.json', { cache: 'no-store' })
     const j = await r.json()
     if (j?.hub !== true) return
+    onWire_local = j.local === true
   } catch { return }
   mode = hostHere() ? 'host' : 'mirror'
   connect()

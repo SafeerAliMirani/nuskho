@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  mirrorSubscribe, mirrorAuth, mirrorSignOut, intent, hostUp, setHostHere,
+  mirrorSubscribe, mirrorAuth, mirrorSignOut, intent, hostUp, setHostHere, hubIsLocal,
   MIRROR_ROLES, type WireState, type WireRx, type WireVisit, type WireDoctor,
 } from '../building'
 import { ROLE_NAME, ROLE_SD, ROLE_WHAT, type Role } from '../roles'
@@ -186,19 +186,23 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
           <p className="hint">
             The doctor and the Nuskho role sign in at the clinic machine itself, not on a phone.
           </p>
-          {/* The installer's bootstrap. A building's first machine loads as a
-              mirror, because nothing has been marked yet; this is the one way
-              to mark it. On a phone this would only produce an empty clinic,
-              which is why it asks twice in plain words. */}
-          <p className="hint" style={{ marginTop: 18, opacity: .8 }}>
-            Setting the building up, and this is the ONE computer that will hold the
-            records? <button className="lnk" onClick={() => {
-              if (confirm('Mark THIS machine as the record holder? Only the one computer that keeps the clinic’s database should be marked. A phone should never be.')) {
-                setHostHere(true)
-                location.reload()
-              }
-            }}>Mark it and reload</button>
-          </p>
+          {/* The installer's bootstrap, and it appears ONLY on the machine
+              running the wire. A building's first machine loads as a mirror
+              because nothing has been marked yet, and this is how it is
+              marked. Every phone used to see this too; a phone that took it
+              became a second record holder with an empty database, and a
+              whole evening's tokens would have gone into nowhere. */}
+          {hubIsLocal() && (
+            <p className="hint" style={{ marginTop: 18, opacity: .85 }}>
+              This computer is running the wire. If it is also the one that holds the
+              clinic's records, <button className="lnk" onClick={() => {
+                if (confirm('Mark THIS computer as the one that holds the records?\n\nEverything the clinic types will live in THIS browser, at THIS address. Set the clinic up here, and open the app here every evening.')) {
+                  setHostHere(true)
+                  location.reload()
+                }
+              }}>mark it and reload</button>.
+            </p>
+          )}
         </>
       )}
     </div>

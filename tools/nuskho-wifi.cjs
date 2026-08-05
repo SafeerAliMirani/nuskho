@@ -3728,8 +3728,10 @@ var MIME = {
 var server = (0, import_node_http.createServer)((req, res) => {
   const url = (req.url || "/").split("?")[0];
   if (url === "/hub.json") {
+    const ra = (req.socket.remoteAddress || "").replace(/^::ffff:/, "");
+    const local = ra === "127.0.0.1" || ra === "::1";
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-    res.end(JSON.stringify({ hub: true, name: "nuskho-wifi", v: 1 }));
+    res.end(JSON.stringify({ hub: true, name: "nuskho-wifi", v: 1, local }));
     return;
   }
   let p = (0, import_node_path.normalize)(url).replace(/^([/\\])+/, "").replace(/\\/g, "/");
