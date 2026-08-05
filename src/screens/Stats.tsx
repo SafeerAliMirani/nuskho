@@ -4,6 +4,8 @@ import { Note } from '../ui/Note'
 import { computeStats, MIN_CELL, MIN_TREND, type Stats, type Bar } from '../stats'
 import { cardData, drawCard, downloadCard, printCard, CARD_W, CARD_H } from '../print/card'
 import { ensurePrintStyles } from '../print/styles'
+import { role, currentDoctorId } from '../roles'
+import { multiRoom, doctorById } from '../doctors'
 
 /**
  * The doctor's own figures.
@@ -24,7 +26,10 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
   const [showDue, setShowDue] = useState(false)
   const [card, setCard] = useState(false)
 
-  useEffect(() => { computeStats().then(setS) }, [])
+  // In a building with several rooms these are HIS figures, not the machine's:
+  // the mirror scopes itself to the doctor who signed in at the door.
+  const mine = multiRoom() && role() === 'doctor' ? currentDoctorId() ?? undefined : undefined
+  useEffect(() => { computeStats(mine).then(setS) }, [mine])
   if (!s) return <div className="pane">Counting…</div>
 
   const empty = s.lifetime === 0
@@ -275,7 +280,8 @@ function Bars({ rows }: { rows: Bar[] }) {
 
 function CardView({ s, onClose }: { s: Stats; onClose: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const d = cardData(s)
+  const who = multiRoom() && role() === 'doctor' ? doctorById(currentDoctorId() ?? undefined) : undefined
+  const d = cardData(s, who)
   useEffect(() => { if (ref.current) drawCard(ref.current, d) })
   return (
     <div className="cardwrap">

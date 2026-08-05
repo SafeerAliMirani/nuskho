@@ -1,5 +1,6 @@
 import { db } from './db'
 import { profile, saveProfile, adminBlob, restoreAdminBlob, type Profile } from './profile'
+import { doctorsBlob, restoreDoctorsBlob } from './doctors'
 import { paper, setPaper, type Paper } from './paper'
 import { bumpHighWaterPastRestore, noteExported } from './safety'
 import { isDemo } from './version'
@@ -37,6 +38,9 @@ export type SetupFile = {
   visits?: Visit[]
   /** the Nuskho passphrase hash, so the lock survives the move to a new machine */
   admin?: string | null
+  /** the building's additional doctors — identity on printed slips, exactly
+   *  like the profile, so the setup file carries them the same way */
+  doctors?: string | null
 }
 
 export async function makeBackup(kind: 'setup' | 'full'): Promise<SetupFile> {
@@ -45,6 +49,7 @@ export async function makeBackup(kind: 'setup' | 'full'): Promise<SetupFile> {
     profile: profile(), paper: paper(),
     drugs: await db.drugs.toArray(),
     admin: adminBlob(),
+    doctors: doctorsBlob(),
   }
   if (kind === 'full') {
     out.patients = await db.patients.toArray()
@@ -144,6 +149,8 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
     saveProfile({ ...f.profile, ready: true })
     setPaper(f.paper)
     restoreAdminBlob(f.admin)
+    // the other rooms' doctors are identity too, and move under the same rule
+    restoreDoctorsBlob(f.doctors)
   }
 
   const have = new Set((await db.drugs.toArray())

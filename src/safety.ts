@@ -89,17 +89,21 @@ const TOKEN_HWM = 'nuskho.tokenHighWater'
 
 export const dayKey = (t = Date.now()): string => new Date(t).toDateString()
 
-export function tokenHighWater(day = dayKey()): number {
+/** Rooms count their own tokens, so each room guards its own mark. The solo
+ *  clinic passes nothing and keeps the key it has used since the pilot. */
+const tokenKey = (who?: string) => (who ? `${TOKEN_HWM}.${who}` : TOKEN_HWM)
+
+export function tokenHighWater(day = dayKey(), who?: string): number {
   try {
-    const raw = JSON.parse(localStorage.getItem(TOKEN_HWM) ?? 'null')
+    const raw = JSON.parse(localStorage.getItem(tokenKey(who)) ?? 'null')
     return raw && raw.day === day ? +raw.n || 0 : 0
   } catch { return 0 }
 }
 
-export function noteToken(n: number, day = dayKey()): void {
+export function noteToken(n: number, day = dayKey(), who?: string): void {
   try {
-    if (n <= tokenHighWater(day)) return
-    localStorage.setItem(TOKEN_HWM, JSON.stringify({ day, n }))
+    if (n <= tokenHighWater(day, who)) return
+    localStorage.setItem(tokenKey(who), JSON.stringify({ day, n }))
   } catch { /* private mode: fall back to the table */ }
 }
 

@@ -152,6 +152,12 @@ export interface Visit {
   nextVisit?: string
   /** when the pharmacy counter finished handing this prescription over */
   dispensedAt?: number
+  /**
+   * Whose room this token belongs to, in a building with several doctors.
+   * Absent means the first doctor — every visit from the solo era is his, and
+   * a solo clinic keeps writing nothing here. See doctors.ts.
+   */
+  doctorId?: string
 }
 
 /**

@@ -9,7 +9,8 @@ import About from './screens/About'
 import Welcome, { needsWelcome } from './screens/Welcome'
 import Lock from './screens/Lock'
 import { profile, adminIsSet, lockAdmin } from './profile'
-import { role, can, signOut, ROLE_NAME, ROLE_SD } from './roles'
+import { role, can, signOut, currentDoctorId, ROLE_NAME, ROLE_SD } from './roles'
+import { multiRoom, doctorById, visitDoctorId } from './doctors'
 import { todaysVisits } from './db'
 import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo } from './ui/art'
 import Toasts from './ui/Toasts'
@@ -76,12 +77,14 @@ export default function App() {
     window.addEventListener('nuskho:profile', p)
     window.addEventListener('nuskho:admin', p)
     window.addEventListener('nuskho:role', p)
+    window.addEventListener('nuskho:doctors', p)
     window.addEventListener('nuskho:wizard', w)
     return () => {
       window.removeEventListener('nuskho:open', h)
       window.removeEventListener('nuskho:profile', p)
       window.removeEventListener('nuskho:admin', p)
       window.removeEventListener('nuskho:role', p)
+      window.removeEventListener('nuskho:doctors', p)
       window.removeEventListener('nuskho:wizard', w)
     }
   }, [])
@@ -95,6 +98,22 @@ export default function App() {
   if (locked) return <Lock onOpen={() => setLocked(false)} />
 
   const printed = today.filter(v => v.printedAt).length
+
+  /**
+   * THE ROOM RULE, ENFORCED WHERE IT COUNTS. In a building with several rooms
+   * a signed-in doctor opens his own visits; another room's prescription does
+   * not render for him by any route. The compounder, who types for every room,
+   * is untouched, and a solo clinic never reaches this test.
+   */
+  const roomOk = (id: string): boolean => {
+    if (!multiRoom() || role() !== 'doctor') return true
+    const me = currentDoctorId()
+    const v = today.find(x => x.id === id)
+    return !me || !v || visitDoctorId(v.doctorId) === me
+  }
+
+  /** The signed-in doctor, for the header chip. Null in a solo clinic. */
+  const me = multiRoom() && role() === 'doctor' ? doctorById(currentDoctorId() ?? undefined) : undefined
 
   return (
     <div className="app">
@@ -129,7 +148,7 @@ export default function App() {
           {/* The role is not just a label — everything it lets you do hangs off it. */}
           <div className="menuwrap">
             <button className={'rolechip ' + role()} onClick={() => setMenu(m => !m)}>
-              {ROLE_NAME[role()]} <i className="sd">{ROLE_SD[role()]}</i> <i>▾</i>
+              {me ? <>{me.nameEn} · R{me.room}</> : <>{ROLE_NAME[role()]} <i className="sd">{ROLE_SD[role()]}</i></>} <i>▾</i>
             </button>
             {menu && (
               <>
@@ -201,7 +220,7 @@ export default function App() {
         ? <Setup onBack={() => setSetup(false)} />
         : pharm && can('dispense')
         ? <PharmWrap visits={today} onChange={refresh} onBack={() => setPharm(false)} showBack={can('queue')} />
-        : visitId && can('prescribe')
+        : visitId && can('prescribe') && roomOk(visitId)
         ? <Compose
             visitId={visitId}
             onDone={async () => { setVisitId(null); await refresh() }}

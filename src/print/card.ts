@@ -47,13 +47,14 @@ export type CardData = {
   credit: boolean
 }
 
-/** The whitelist, applied once, here. */
-export function cardData(s: Stats): CardData {
+/** The whitelist, applied once, here. `who` is the signed-in doctor in a
+ *  building with several rooms; the card is his, so his name goes on it. */
+export function cardData(s: Stats, who?: { nameEn: string; nameSd: string; degreesEn: string }): CardData {
   const p = profile()
   return {
-    doctorEn: p.doctorEn || 'Doctor',
-    doctorSd: p.doctorSd || '',
-    degreesEn: p.degreesEn || '',
+    doctorEn: who?.nameEn ?? (p.doctorEn || 'Doctor'),
+    doctorSd: who?.nameSd ?? (p.doctorSd || ''),
+    degreesEn: who?.degreesEn ?? (p.degreesEn || ''),
     clinic: p.addressEn || '',
     monthLabel: s.monthLabel,
     patientsMonth: s.month,

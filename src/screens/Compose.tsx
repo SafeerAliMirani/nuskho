@@ -7,6 +7,7 @@ import { profile } from '../profile'
 import { toSindhi, splitBrand } from '../data/translit'
 import { searchDictionary, dictLine, type DictEntry } from '../data/dictionary'
 import { printSlip } from '../print/print'
+import { doctorById, multiRoom } from '../doctors'
 import { IcBook, IcPill } from '../ui/art'
 import { Note } from '../ui/Note'
 import { signal } from '../ui/bus'
@@ -258,9 +259,16 @@ export default function Compose({ visitId, onDone, onBack }: {
   /** Build exactly what printSlip will be given, so the warm-up and the real
    *  print agree on the layout key. */
   function slipData() {
+    // In a building with several rooms the heading names the visit's own
+    // doctor. Solo visits carry no doctorId and the profile prints, as always.
+    const room = doctorById(cur.current!.doctorId)
     return {
       visit: cur.current!, patientName: pt!.name, patientAge: pt!.age, patientSex: pt!.sex,
       patientCode: patientCode(pt!.num), drugs, rxId: cur.current!.id.slice(-6),
+      doctor: room ? {
+        nameEn: room.nameEn, nameSd: room.nameSd,
+        degreesEn: room.degreesEn, degreesSd: room.degreesSd, reg: room.reg,
+      } : undefined,
     }
   }
 
@@ -343,7 +351,8 @@ export default function Compose({ visitId, onDone, onBack }: {
     // total count the same rupees twice, every time a slip was corrected.
     const { fee: _fee, token: _tok, closedAt: _c, closeNote: _n, ...rest } = v
     await db.visits.add({
-      ...rest, id, token: await nextToken(), printedAt: undefined,
+      // the room's own numbering: an amended slip in Room 2 is a Room 2 token
+      ...rest, id, token: await nextToken(v.doctorId), printedAt: undefined,
       status: 'waiting', createdAt: Date.now(), amendsId: v.id,
     })
     onDone()
@@ -354,7 +363,10 @@ export default function Compose({ visitId, onDone, onBack }: {
   return (
     <div className="pane">
       <button className="btn ghost" onClick={onBack} style={{ marginBottom: 12 }}>← Queue</button>
-      <div className="who">{pt.name}<span>Token {visit.token} · No. {patientCode(pt.num)}{pt.age ? ` · ${pt.age}` : ''}</span></div>
+      <div className="who">{pt.name}<span>Token {visit.token} · No. {patientCode(pt.num)}{pt.age ? ` · ${pt.age}` : ''}
+        {multiRoom() && doctorById(visit.doctorId) &&
+          <> · Room {doctorById(visit.doctorId)!.room} · {doctorById(visit.doctorId)!.nameEn}</>}
+      </span></div>
 
       {/* The returning patient is a large share of an OPD evening, and re-entering
           the same prescription by hand is where transcription errors breed. This

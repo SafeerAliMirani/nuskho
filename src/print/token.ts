@@ -42,6 +42,15 @@ export interface TokenSlip {
   /** free means the doctor waived it in advance; due means he is being seen first */
   feeState: 'paid' | 'waived' | 'due'
   at: number
+  /**
+   * Whose room this token is for, in a building with several doctors. The
+   * receipt is how the family finds the right door, so it carries the room
+   * and that doctor's name instead of the profile's. Absent = solo, profile.
+   */
+  doctorEn?: string
+  doctorSd?: string
+  degreesEn?: string
+  room?: string
 }
 
 /** Paper width in millimetres. 58 and 80 are the two rolls anyone sells. */
@@ -61,6 +70,9 @@ function when(at: number): string {
 
 export function renderToken(t: TokenSlip, width: TokenWidth = 58): string {
   const dr = profile()
+  const nameEn = t.doctorEn ?? (dr.doctorEn || APP.en)
+  const nameSd = t.doctorSd ?? dr.doctorSd
+  const degrees = t.degreesEn ?? dr.degreesEn
   const money =
     t.feeState === 'waived' ? 'FREE &nbsp; مفت'
     : t.feeState === 'due' ? 'TO PAY &nbsp; ادا ڪرڻي آهي'
@@ -70,10 +82,12 @@ export function renderToken(t: TokenSlip, width: TokenWidth = 58): string {
   // the standing rule is that a number we do not control never gets printed.
   return `<div class="tok w${width}">
   <div class="tk-top">
-    <b>${esc(dr.doctorEn || APP.en)}</b>
-    ${dr.degreesEn ? `<small>${esc(dr.degreesEn)}</small>` : ''}
-    ${dr.doctorSd ? `<div class="sd">${esc(dr.doctorSd)}</div>` : ''}
+    <b>${esc(nameEn)}</b>
+    ${degrees ? `<small>${esc(degrees)}</small>` : ''}
+    ${nameSd ? `<div class="sd">${esc(nameSd)}</div>` : ''}
   </div>
+
+  ${t.room ? `<div class="tk-room">ROOM ${esc(t.room)} &nbsp; <span class="sd">ڪمرو ${esc(t.room)}</span></div>` : ''}
 
   <div class="tk-no">
     <span>YOUR NUMBER &nbsp; <i class="sd">نمبر</i></span>
@@ -120,6 +134,13 @@ export const TOKEN_CSS = `
 .tok.w80 .tk-top b{font-size:12.5pt;}
 .tok .tk-top small{display:block;font-size:7pt;margin-top:.4mm;}
 .tok .tk-top .sd{font-size:10pt;margin-top:.6mm;}
+
+/* the door the family walks to. Loud, because it is the second question
+   everyone asks after their number. */
+.tok .tk-room{margin-top:1.6mm;padding:1mm 0;border:1.2pt solid #000;
+  font-size:10pt;font-weight:800;letter-spacing:.5px;}
+.tok.w80 .tk-room{font-size:11.5pt;}
+.tok .tk-room .sd{font-size:9.5pt;font-weight:700;}
 
 /* the number is the entire point of the piece of paper */
 .tok .tk-no{margin:2.4mm 0;}

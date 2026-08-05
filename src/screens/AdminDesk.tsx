@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { daySummary } from '../db'
 import { daysSinceExport, storageReport } from '../safety'
+import { activeDoctors, multiRoom, visitDoctorId, type Doctor } from '../doctors'
 import { stamp } from '../version'
 import { IcChart, IcShield, IcClock } from '../ui/art'
 import type { Visit } from '../types'
@@ -18,12 +19,24 @@ import type { Visit } from '../types'
  * every prescription in the building, so this desk watches the age and nags,
  * and never holds the copy itself.
  */
+type Sum = Awaited<ReturnType<typeof daySummary>>
+
 export default function AdminDesk({ visits }: { visits: Visit[] }) {
-  const [sum, setSum] = useState<Awaited<ReturnType<typeof daySummary>> | null>(null)
+  const [sum, setSum] = useState<Sum | null>(null)
+  const [byRoom, setByRoom] = useState<{ d: Doctor; s: Sum }[] | null>(null)
   const [store, setStore] = useState<{ persisted: boolean; usedMb: number; quotaMb: number } | null>(null)
   const [drawer, setDrawer] = useState('')
 
   useEffect(() => { daySummary(visits).then(setSum) }, [visits])
+  // Each room's slice of the same day. This is drawer arithmetic — in these
+  // buildings the desk settles with each doctor at closing, so the building
+  // must know what each room's tokens brought in and what is owed back.
+  useEffect(() => {
+    if (!multiRoom()) { setByRoom(null); return }
+    Promise.all(activeDoctors().map(async d => ({
+      d, s: await daySummary(visits.filter(v => visitDoctorId(v.doctorId) === d.id)),
+    }))).then(setByRoom)
+  }, [visits])
   useEffect(() => { storageReport().then(setStore).catch(() => null) }, [])
 
   const exportAge = daysSinceExport()
@@ -55,6 +68,29 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
       <p className="hint">
         {sum ? `${sum.total} tokens · ${sum.printed} printed · ${sum.seen} seen · ${sum.left} left · ${sum.waived} free on the doctor's word` : '…'}
       </p>
+
+      {byRoom && byRoom.length > 1 && (
+        <>
+          <h2 style={{ marginTop: 18 }}>By room, tonight</h2>
+          {byRoom.map(({ d, s }) => (
+            <div className="line" key={d.id}>
+              <div className="hd"><div>
+                <b>Room {d.room} · {d.nameEn}</b>
+                <small>
+                  {s.total} tokens · {s.printed} printed · {s.waiting} waiting
+                  &nbsp;·&nbsp; Rs {s.collected} taken
+                  {s.toRefund > 0 ? ` · Rs ${s.toRefund} to give back` : ''}
+                  {s.due > 0 ? ` · Rs ${s.due} due` : ''}
+                </small>
+              </div></div>
+            </div>
+          ))}
+          <p className="hint">
+            This is the drawer's arithmetic for settling with each doctor at closing,
+            and that is all it is. No patients per hour, no rates, nothing clinical.
+          </p>
+        </>
+      )}
 
       <h2 style={{ marginTop: 18 }}>Closing the drawer</h2>
       <div className="row">
@@ -103,8 +139,9 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
       </div>
 
       <p className="hint" style={{ marginTop: 16 }}>
-        This desk never sees a prescription, a diagnosis, a history or a medicine name,
-        and it never ranks one doctor against another. {stamp()}
+        This desk never sees a prescription, a diagnosis, a history or a medicine name.
+        Money by room is how the building settles its drawer, not a scoreboard: there are
+        no speed figures and no clinical figures here, for any doctor. {stamp()}
       </p>
     </div>
   )

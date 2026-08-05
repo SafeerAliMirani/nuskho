@@ -1,4 +1,5 @@
 import { db } from './db'
+import { FIRST_DOCTOR } from './doctors'
 import type { Visit } from './types'
 
 /**
@@ -113,10 +114,19 @@ function bars(counts: Map<string, number>, total: number, otherWord = 'Other'): 
   return kept
 }
 
-export async function computeStats(): Promise<Stats> {
-  const [visits, patients, drugs] = await Promise.all([
+/**
+ * `forDoctor` scopes the whole page to one doctor's visits, for a building
+ * with several rooms: his patients, his money, his evenings, his card.
+ * Visits from the solo era carry no doctorId and belong to the first doctor.
+ * A solo clinic passes nothing and the figures are the machine's, as always.
+ */
+export async function computeStats(forDoctor?: string): Promise<Stats> {
+  const [allVisits, patients, drugs] = await Promise.all([
     db.visits.toArray(), db.patients.toArray(), db.drugs.toArray(),
   ])
+  const visits = forDoctor
+    ? allVisits.filter(v => (v.doctorId ?? FIRST_DOCTOR) === forDoctor)
+    : allVisits
   const pById = new Map(patients.map(p => [p.id, p]))
   const dById = new Map(drugs.map(d => [d.id, d]))
 

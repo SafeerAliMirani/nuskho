@@ -11,6 +11,9 @@ import { Note } from '../ui/Note'
 import { soundOn, setSound, play } from '../ui/sound'
 import { SPECIALTIES, seedDiagnoses, diagnosisSd } from '../data/specialty'
 import { profile, saveProfile } from '../profile'
+import {
+  allDoctors, addDoctor, updateDoctor, setDoctorArchived, FIRST_DOCTOR, type Doctor,
+} from '../doctors'
 
 /**
  * Who may change what.
@@ -24,16 +27,16 @@ import { profile, saveProfile } from '../profile'
  * a medical document, they change roughly never, and we install in person. The
  * medicine list is the opposite on every count, so it stays with the doctor.
  */
-type Tab = 'Fee' | 'Paper' | 'Medicines' | 'Diagnoses' | 'Lock' | 'Backup' | 'You' | 'Heading' | 'Review' | 'Market'
+type Tab = 'Fee' | 'Paper' | 'Medicines' | 'Diagnoses' | 'Lock' | 'Backup' | 'You' | 'Doctors' | 'Heading' | 'Review' | 'Market'
 
 /** Each tab names the ONE permission that opens it. Nothing decides twice. */
 const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
   Fee: 'rate', Paper: 'paper', Medicines: 'medicines', Diagnoses: 'medicines',
   Lock: 'lock', Backup: 'backup',
-  You: 'identity', Heading: 'identity', Market: 'review', Review: 'review',
+  You: 'identity', Doctors: 'identity', Heading: 'identity', Market: 'review', Review: 'review',
 }
 const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Lock']
-const ADMIN: Tab[] = ['You', 'Heading', 'Market', 'Review', 'Backup']
+const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review', 'Backup']
 
 export default function Setup({ onBack }: { onBack: () => void }) {
   const mine = CLINIC.filter(t => can(NEEDS[t]))
@@ -106,6 +109,7 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             {tab === 'Medicines' && <DrugsStep />}
             {tab === 'Diagnoses' && <DxTab />}
             {tab === 'Backup' && <BackupTab />}
+            {tab === 'Doctors' && <DoctorsTab />}
             {tab === 'You' && <IdentityFields v={dr.v} on={on(dr.on)} />}
             {tab === 'Review' && <ReviewQueue />}
             {tab === 'Market' && <MarketPaste />}
@@ -133,7 +137,7 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             {tab === 'Lock' && <PinTab />}
 
             {tab !== 'Medicines' && tab !== 'Backup' && tab !== 'Review' && tab !== 'Market'
-              && tab !== 'Lock' && tab !== 'Diagnoses' && (
+              && tab !== 'Lock' && tab !== 'Diagnoses' && tab !== 'Doctors' && (
               <button className="btn wide save" onClick={save}>{saved ? 'Saved ✓' : 'Save'}</button>
             )}
           </>}
@@ -311,6 +315,130 @@ function DxTab() {
         These are shortcuts for writing down what the doctor has already decided. Nothing here
         reads symptoms, ranks anything, or offers an opinion about what is wrong with a patient,
         and it never will.
+      </Note>
+    </>
+  )
+}
+
+/* ---------------------------------------------------------------- doctors */
+
+/**
+ * The building's rooms.
+ *
+ * One doctor here means the shipped solo product, untouched. The moment a
+ * second is added, the whole app becomes a corridor: the desk grows the
+ * Tonight strip, tokens count per room, the front door asks which doctor,
+ * and every slip and receipt carries its own room's name.
+ *
+ * The first doctor is deliberately NOT edited here — he IS the profile from
+ * the first-run wizard, and two screens editing one name is how a
+ * prescription ends up with two spellings of it. The You tab stays his.
+ */
+const BLANK = { nameEn: '', nameSd: '', degreesEn: '', degreesSd: '', reg: '', fee: '', room: '' }
+
+function DoctorsTab() {
+  const [, redraw] = useState(0)
+  const [editing, setEditing] = useState<string | null>(null)   // doctor id, or 'new'
+  const [f, setF] = useState(BLANK)
+  const [msg, setMsg] = useState('')
+
+  const list = allDoctors()
+  const bump = () => redraw(n => n + 1)
+
+  function openNew() {
+    const rooms = list.map(d => +d.room).filter(n => !isNaN(n))
+    setF({ ...BLANK, room: String(Math.max(1, ...rooms) + 1) })
+    setEditing('new'); setMsg('')
+  }
+
+  function openEdit(d: Doctor) {
+    setF({ nameEn: d.nameEn, nameSd: d.nameSd, degreesEn: d.degreesEn,
+           degreesSd: d.degreesSd, reg: d.reg, fee: String(d.fee || ''), room: d.room })
+    setEditing(d.id); setMsg('')
+  }
+
+  function saveDoc() {
+    if (!f.nameEn.trim() || !f.room.trim()) return
+    const rec = {
+      nameEn: f.nameEn.trim(), nameSd: f.nameSd.trim(),
+      degreesEn: f.degreesEn.trim(), degreesSd: f.degreesSd.trim(),
+      reg: f.reg.trim(), fee: +f.fee || 0, room: f.room.trim(),
+    }
+    if (editing === 'new') { addDoctor(rec); setMsg(`${rec.nameEn} added. His room is live at the desk and the front door.`) }
+    else if (editing) { updateDoctor(editing, rec); setMsg('Saved.') }
+    setEditing(null); setF(BLANK); bump()
+  }
+
+  const fld = (k: keyof typeof BLANK, label: string, props: Record<string, unknown> = {}) => (
+    <div className="fld"><label>{label}</label>
+      <input value={f[k]} {...props}
+             onChange={e => setF(p => ({ ...p, [k]: (e.target as HTMLInputElement).value }))} /></div>
+  )
+
+  return (
+    <>
+      <p className="hint">
+        One doctor here is the solo clinic, exactly as shipped. Add a second and the desk
+        grows the Tonight strip, each room counts its own tokens, the front door asks which
+        doctor is signing in, and every slip and receipt prints its own room's name.
+      </p>
+
+      {list.map(d => (
+        <div className="line" key={d.id}>
+          <div className="hd">
+            <div>
+              <b>Room {d.room} · {d.nameEn} {d.nameSd && <span className="sd">{d.nameSd}</span>}
+                {d.archived ? ' · retired' : ''}</b>
+              <small>
+                {d.degreesEn || 'no degrees entered'} · Rs {d.fee || 0}
+                {d.id === FIRST_DOCTOR ? ' · from the first-run setup: name and fee are edited under You and Fee' : ''}
+              </small>
+            </div>
+            {d.id !== FIRST_DOCTOR && (
+              <span>
+                <button className="lnk" onClick={() => openEdit(d)}>edit</button>
+                &nbsp;&nbsp;
+                <button className="lnk" onClick={() => { setDoctorArchived(d.id, !d.archived); bump() }}>
+                  {d.archived ? 'bring back' : 'retire'}
+                </button>
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {editing ? (
+        <div className="lhbox">
+          <h3>{editing === 'new' ? 'Add a doctor' : 'Edit doctor'}</h3>
+          <div className="row">
+            {fld('nameEn', 'Name, English — printed on his slips')}
+            {fld('nameSd', 'Name, Sindhi — سنڌي ۾ نالو', { dir: 'rtl', lang: 'sd' })}
+          </div>
+          <div className="row">
+            {fld('degreesEn', 'Degrees, English — optional')}
+            {fld('degreesSd', 'Degrees, Sindhi — optional', { dir: 'rtl', lang: 'sd' })}
+          </div>
+          <div className="row">
+            {fld('reg', 'PMC registration — optional, prints only if entered')}
+            {fld('fee', 'His fee, Rs', { inputMode: 'numeric', maxLength: 6 })}
+            {fld('room', 'Room', { maxLength: 4 })}
+          </div>
+          <div className="row">
+            <button className="btn" disabled={!f.nameEn.trim() || !f.room.trim()} onClick={saveDoc}>
+              {editing === 'new' ? 'Add doctor' : 'Save'}
+            </button>
+            <button className="btn ghost" onClick={() => { setEditing(null); setF(BLANK) }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn wide" onClick={openNew}>Add a doctor · another room</button>
+      )}
+      {msg && <p className="usable">{msg}</p>}
+
+      <Note tone="safe" title="Retiring keeps every record">
+        A retired doctor leaves the desk, the door and the pickers. His printed
+        prescriptions and his figures stay exactly where they are, under his name,
+        because paper in a drawer somewhere still says he wrote it.
       </Note>
     </>
   )

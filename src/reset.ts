@@ -49,16 +49,25 @@ export async function factoryReset(): Promise<ResetReport> {
     await db.snapshots.clear()
     await db.sets.clear()
   })
-  for (const k of ['nuskho.profile', 'nuskho.paper', 'nuskho.pin', 'nuskho.admin',
-                   'nuskho.patientHighWater', 'nuskho.lastSnapshot',
-                   'nuskho.lastExport', 'nuskho.lastPrint', 'nuskho.sound',
-                   // the per-role PINs. Leaving these behind does not merely leak,
-                   // it LOCKS OUT: checkRolePin only opens when the key is absent,
-                   // so a second clinic inherits the first doctor's PIN with no way
-                   // to clear it, on a machine that says it has been wiped.
-                   'nuskho.pin.counter', 'nuskho.pin.doctor', 'nuskho.pin.admin']) {
-    try { localStorage.removeItem(k) } catch { /* ignore */ }
-  }
-  try { sessionStorage.removeItem('nuskho.role') } catch { /* ignore */ }
+  // Everything under the app's prefix, by SWEEP rather than by list. The list
+  // this used to be fell behind twice: the per-role PINs for compounder,
+  // pharmacy and clinic admin were never added to it — and a leftover PIN does
+  // not merely leak, it LOCKS OUT, because checkRolePin only opens when the
+  // key is absent; the second clinic inherits the first one's PIN with no way
+  // to clear it, on a machine that says it has been wiped. The building's
+  // extra doctors and the per-room token marks would have been the third
+  // omission. A sweep cannot fall behind.
+  try {
+    const doomed: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith('nuskho.')) doomed.push(k)
+    }
+    for (const k of doomed) localStorage.removeItem(k)
+  } catch { /* private mode */ }
+  try {
+    sessionStorage.removeItem('nuskho.role')
+    sessionStorage.removeItem('nuskho.doctorId')
+  } catch { /* ignore */ }
   return { patients, visits, drugs }
 }

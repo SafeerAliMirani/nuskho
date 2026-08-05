@@ -1611,3 +1611,24 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 
 .composegrid{display:grid;grid-template-columns:1.04fr .96fr;gap:0 24px;align-items:start}
 @media (max-width:1080px){.composegrid{grid-template-columns:1fr}}
+
+/* ---- the Tonight strip: the building's rooms, at the desk (multi only) ---- */
+.rooms{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.roomcard{flex:1;min-width:190px;max-width:290px;background:var(--card);border-radius:14px;
+  box-shadow:var(--ring);display:flex;flex-direction:column;overflow:hidden}
+.roomcard.on{box-shadow:0 0 0 2px var(--g),0 10px 26px -14px rgba(9,61,51,.35)}
+.roomcard.off{opacity:.62}
+.rc-main{display:block;text-align:left;background:none;border:0;padding:12px 14px 9px;cursor:pointer;
+  font:inherit;color:inherit;width:100%}
+.rc-main:disabled{cursor:default}
+.rc-room{display:inline-block;background:#093d33;color:#e9f3ef;font-size:11px;font-weight:800;
+  letter-spacing:.6px;border-radius:7px;padding:2px 8px;margin-bottom:6px}
+.roomcard.off .rc-room{background:#7c8a86}
+.rc-who{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rc-who b{font-size:14.5px;color:#0c1412}
+.rc-who .sd{font-size:13px;color:var(--mut)}
+.rc-main small{display:block;margin-top:3px;font-size:11.8px;color:var(--mut)}
+.roomcard.on .rc-main small{color:#0f5c4a;font-weight:600}
+.rc-sit{align-self:flex-start;margin:0 14px 10px;font-size:11.5px}
+
+/* the mixed queue a shared desk reads: rows already carry their room tag */

@@ -7,7 +7,10 @@ import Vitals from '../ui/Vitals'
 import { IcWarn } from '../ui/art'
 import { printToken } from '../print/print'
 import { paper } from '../paper'
-import { can } from '../roles'
+import { can, role, currentDoctorId } from '../roles'
+import {
+  activeDoctors, sittingDoctors, isSitting, setSitting, doctorById, multiRoom, visitDoctorId,
+} from '../doctors'
 import {
   db, uid, nextToken, nextPatientNum, findByCode, patientCode, parseCode, closeVisit,
   daySummary, markRefunded, owedRefund,
@@ -66,10 +69,28 @@ export default function Intake({ visits, onOpen, onChange }: {
   const [msg, setMsg] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
   const [closing, setClosing] = useState<string | null>(null)
+
+  /**
+   * The building's rooms. With one doctor none of this exists on screen and
+   * the desk is exactly the shipped solo product. With several, the desk picks
+   * the room first — that is the order the corridor already works in: "which
+   * doctor?" comes before the money — and everything below follows the pick:
+   * the fee, the token numbering, the name on the receipt.
+   */
+  const multi = multiRoom()
+  const [selDoc, setSelDoc] = useState<string>(() => (sittingDoctors()[0] ?? activeDoctors()[0])?.id ?? '')
+  const sel = !multi ? undefined : (() => {
+    const d = doctorById(selDoc)
+    return d && !d.archived && isSitting(d.id) ? d : (sittingDoctors()[0] ?? activeDoctors()[0])
+  })()
+
   // The money comes first here. The counter takes it and hands over a token;
   // the doctor decides later whether any of it goes back.
-  const rate = profile().fee
+  const rate = sel ? sel.fee : profile().fee
   const [amt, setAmt] = useState(String(rate || ''))
+  // Switching rooms re-arms the fee box with that room's rate: the desk's next
+  // motion is taking that money, not remembering to retype it.
+  useEffect(() => { setAmt(String(rate || '')) }, [sel?.id])   // eslint-disable-line react-hooks/exhaustive-deps
   const [fstate, setFstate] = useState<FeeState>('paid')
   const [urgent, setUrgent] = useState(false)
   // a second tap while the first is still writing gives two patients one token
@@ -89,13 +110,14 @@ export default function Intake({ visits, onOpen, onChange }: {
   }
 
   async function openVisitFor(patientId: string) {
-    const token = await nextToken()
+    const token = await nextToken(sel?.id)
     const id = uid()
     const n = +amt || 0
     const fee = { amount: fstate === 'waived' ? 0 : n, state: (n === 0 ? 'waived' : fstate) as FeeState, at: Date.now() }
     await db.visits.add({
       id, patientId, token, status: 'waiting', createdAt: Date.now(),
       lines: [], tests: [], advice: [], fee, urgent: urgent || undefined,
+      doctorId: sel?.id,
     })
     setAmt(String(rate || ''))
     setFstate('paid')
@@ -118,6 +140,7 @@ export default function Intake({ visits, onOpen, onChange }: {
         token, patientName: pt.name, patientCode: patientCode(pt.num),
         fee: fee.amount, feeState: fee.state === 'due' ? 'due' : fee.state === 'waived' ? 'waived' : 'paid',
         at: fee.at,
+        doctorEn: sel?.nameEn, doctorSd: sel?.nameSd, degreesEn: sel?.degreesEn, room: sel?.room,
       }).then(ok => { if (ok) setMsg(`Token ${token} printed.`) })
     }
     return id
@@ -128,11 +151,14 @@ export default function Intake({ visits, onOpen, onChange }: {
     const pt = await db.patients.get(v.patientId)
     if (!pt) return
     const f = v.fee
+    // the room the token was ISSUED for, not the one selected now
+    const d = multi ? doctorById(visitDoctorId(v.doctorId)) : undefined
     const ok = await printToken({
       token: v.token, patientName: pt.name, patientCode: patientCode(pt.num),
       fee: f?.amount ?? 0,
       feeState: f?.state === 'due' ? 'due' : f?.state === 'waived' ? 'waived' : 'paid',
       at: f?.at ?? v.createdAt,
+      doctorEn: d?.nameEn, doctorSd: d?.nameSd, degreesEn: d?.degreesEn, room: d?.room,
     })
     setMsg(ok ? `Token ${v.token} printed again.` : 'The receipt printer is switched off in Setup, Paper.')
   }
@@ -168,11 +194,70 @@ export default function Intake({ visits, onOpen, onChange }: {
     onChange()
   }
 
+  /**
+   * Who may open a row into the prescription screen. The compounder serves
+   * every room; a signed-in doctor opens his own. The router in App.tsx
+   * enforces the same rule, so this is the courtesy and that is the gate.
+   */
+  const mayOpen = (v: Visit) =>
+    can('prescribe') && (!multi || role() !== 'doctor' || !currentDoctorId()
+      || visitDoctorId(v.doctorId) === currentDoctorId())
+
+  /** "R2 · Dr S. Soomro", for the mixed list a shared desk reads. */
+  const roomTag = (v: Visit): string => {
+    if (!multi) return ''
+    const d = doctorById(visitDoctorId(v.doctorId))
+    return d ? `R${d.room} ${d.nameEn} · ` : ''
+  }
+
   return (
     <div className="pane">
       <BackupNudge />
 
-      <h2><IcScan size={17} /> Been here before? Number from the old slip, or scan it</h2>
+      {/* TONIGHT. Only a building with several rooms sees this. The default is
+          that everyone active is sitting, so the normal evening costs the desk
+          nothing; the strip earns its place on the night a doctor does not
+          come, and as the switch that decides where the next token goes. */}
+      {multi && (
+        <>
+          <h2><IcQueue size={17} /> Tonight <span className="sd">اڄ رات</span></h2>
+          <div className="rooms">
+            {activeDoctors().map(d => {
+              const mine = visits.filter(v => visitDoctorId(v.doctorId) === d.id)
+              const waiting = mine.filter(v => v.status === 'waiting').length
+              const nextTok = mine.reduce((m, v) => Math.max(m, v.token), 0) + 1
+              const sitting = isSitting(d.id)
+              const on = sel?.id === d.id
+              return (
+                <div key={d.id} className={'roomcard' + (on ? ' on' : '') + (sitting ? '' : ' off')}>
+                  <button className="rc-main" disabled={!sitting} onClick={() => setSelDoc(d.id)}>
+                    <span className="rc-room">R{d.room}</span>
+                    <span className="rc-who"><b>{d.nameEn}</b>{d.nameSd ? <i className="sd">{d.nameSd}</i> : null}</span>
+                    {sitting
+                      ? <small>Rs {d.fee} · {waiting} waiting · next token {nextTok}</small>
+                      : <small>not sitting tonight</small>}
+                  </button>
+                  <button className="lnk rc-sit" onClick={() => {
+                    setSitting(d.id, !sitting)
+                    if (sitting && sel?.id === d.id) {
+                      const next = sittingDoctors().find(x => x.id !== d.id)
+                      if (next) setSelDoc(next.id)
+                    }
+                  }}>{sitting ? 'not in tonight' : 'sitting after all'}</button>
+                </div>
+              )
+            })}
+          </div>
+          {sel && (
+            <p className="hint">
+              Tokens below are issued for <b>Room {sel.room} · {sel.nameEn}</b>, at his fee.
+              Tap another room to change.
+            </p>
+          )}
+        </>
+      )}
+
+      <h2 style={multi ? { marginTop: 22 } : undefined}><IcScan size={17} /> Been here before? Number from the old slip, or scan it</h2>
       <div className="row">
         <div className="fld" style={{ flex: 2 }}>
           <input value={code} inputMode="numeric" maxLength={13} placeholder="the number on the slip"
@@ -276,12 +361,13 @@ export default function Intake({ visits, onOpen, onChange }: {
         const shut = v.status !== 'waiting'
         return (
           <div key={v.id} className={`qwrap ${shut ? 'shut' : ''}`}>
-            <button className={`qrow ${v.status === 'done' ? 'done' : ''}${v.urgent && v.status === 'waiting' ? ' urgent' : ''}${can('prescribe') ? '' : ' flat'}`}
-                    onClick={() => can('prescribe') && onOpen(v.id)}
-                    disabled={!can('prescribe')}>
+            <button className={`qrow ${v.status === 'done' ? 'done' : ''}${v.urgent && v.status === 'waiting' ? ' urgent' : ''}${mayOpen(v) ? '' : ' flat'}`}
+                    onClick={() => mayOpen(v) && onOpen(v.id)}
+                    disabled={!mayOpen(v)}>
               <span className="tk">{v.token}</span>
               <span className="nm">{names[v.id] ?? '…'}
                 <small>
+                  {roomTag(v)}
                   {can('history')
                     ? (v.lines.length ? `${v.lines.length} medicines` : 'no prescription yet')
                     : (v.printedAt ? 'prescription printed' : 'with the doctor')}

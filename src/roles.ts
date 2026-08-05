@@ -181,7 +181,39 @@ export function signOut(): void {
   current = null
   loaded = true
   try { sessionStorage.removeItem(KEY) } catch { /* ignore */ }
+  setDoctorIdentity(null)
   window.dispatchEvent(new CustomEvent('nuskho:role'))
+}
+
+/* ----------------------------------------------------- which doctor, exactly
+ *
+ * In a building with several rooms, "Doctor" is a role and also a question.
+ * The front door asks it once, right after the role is picked, and the answer
+ * lives beside the role for the same sitting: his figures are his, his queue
+ * rows open for him, and the other rooms' prescriptions do not.
+ *
+ * A solo clinic never sets this and never sees the question.
+ */
+const DKEY = 'nuskho.doctorId'
+
+let doc: string | null = null
+let docLoaded = false
+
+export function currentDoctorId(): string | null {
+  if (!docLoaded) {
+    docLoaded = true
+    try { doc = sessionStorage.getItem(DKEY) } catch { doc = null }
+  }
+  return doc
+}
+
+export function setDoctorIdentity(id: string | null): void {
+  doc = id
+  docLoaded = true
+  try {
+    if (id) sessionStorage.setItem(DKEY, id)
+    else sessionStorage.removeItem(DKEY)
+  } catch { /* private mode: memory is enough */ }
 }
 
 /* ------------------------------------------------------------- per-role PINs */

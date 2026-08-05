@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type { Patient, Visit, Drug, VisitStatus, Fee, RxSet, RxLine } from './types'
 import { profile } from './profile'
+import { FIRST_DOCTOR } from './doctors'
 import { highWater, noteIssued, tokenHighWater, noteToken } from './safety'
 import { isDemo } from './version'
 
@@ -80,12 +81,18 @@ export async function todaysVisits(): Promise<Visit[]> {
  * the patient number's is: a restore rewinds the table while the families it
  * rewound past are still holding the receipts. Two people answering to "eight"
  * in a full waiting room is the loudest bug this app can have.
+ *
+ * In a building with several rooms each room counts from one, because that is
+ * how the corridor already works: "token 12 for Room 2". So the counter, and
+ * its high-water guard, are per doctor when a doctor is named. The solo clinic
+ * passes nothing and keeps the numbering it has always had.
  */
-export async function nextToken(): Promise<number> {
+export async function nextToken(doctorId?: string): Promise<number> {
   const v = await todaysVisits()
-  const fromTable = v.reduce((m, x) => Math.max(m, x.token), 0)
-  const n = Math.max(fromTable, tokenHighWater()) + 1
-  noteToken(n)
+  const mine = doctorId ? v.filter(x => (x.doctorId ?? FIRST_DOCTOR) === doctorId) : v
+  const fromTable = mine.reduce((m, x) => Math.max(m, x.token), 0)
+  const n = Math.max(fromTable, tokenHighWater(undefined, doctorId)) + 1
+  noteToken(n, undefined, doctorId)
   return n
 }
 

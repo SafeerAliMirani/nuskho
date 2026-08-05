@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Mark, ArtSlip, IcUser, IcRupee, IcCog, IcQueue, IcPill, IcChart } from '../ui/art'
 import { profile, APP, adminIsSet, unlockAdmin } from '../profile'
 import { primeSound } from '../ui/sound'
-import { ROLES, ROLE_NAME, ROLE_SD, ROLE_WHAT, pinSet, checkRolePin, signIn, type Role } from '../roles'
+import { ROLES, ROLE_NAME, ROLE_SD, ROLE_WHAT, pinSet, checkRolePin, signIn, setDoctorIdentity, type Role } from '../roles'
+import { multiRoom, activeDoctors, isSitting } from '../doctors'
 
 /**
  * The front door, and the only place a role is chosen.
@@ -36,6 +37,7 @@ export default function Lock({ onOpen }: { onOpen: () => void }) {
   const [pin, setPin] = useState('')
   const [bad, setBad] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [pickDoc, setPickDoc] = useState(false)
   const p = profile()
 
   /**
@@ -45,9 +47,22 @@ export default function Lock({ onOpen }: { onOpen: () => void }) {
    */
   const needsSecret = (r: Role) => (r === 'admin' ? adminIsSet() : pinSet(r))
 
+  /**
+   * The role is chosen; finish or, in a building with several rooms, ask the
+   * one question the role leaves open: which doctor. One tap, no second PIN —
+   * the doctor PIN guards the role, and inside the building the rooms are
+   * colleagues, not strangers.
+   */
+  function enter(r: Role) {
+    if (r === 'doctor' && multiRoom()) { setWant(r); setPickDoc(true); return }
+    setDoctorIdentity(null)
+    signIn(r)
+    onOpen()
+  }
+
   function choose(r: Role) {
     primeSound()   // browsers only allow audio after a real click; this is it
-    if (!needsSecret(r)) { signIn(r); onOpen(); return }
+    if (!needsSecret(r)) { enter(r); return }
     setWant(r); setPin(''); setBad(false)
   }
 
@@ -55,7 +70,7 @@ export default function Lock({ onOpen }: { onOpen: () => void }) {
     if (busy || !want || !pin) return
     setBusy(true)
     const ok = want === 'admin' ? await unlockAdmin(pin) : await checkRolePin(want, pin)
-    if (ok) { signIn(want); onOpen() } else { setBad(true); setPin('') }
+    if (ok) { enter(want) } else { setBad(true); setPin('') }
     setBusy(false)
   }
 
@@ -88,7 +103,29 @@ export default function Lock({ onOpen }: { onOpen: () => void }) {
           {p.degreesEn && <p className="deg">{p.degreesEn}</p>}
           {p.doctorSd && <p className="sd nm">{p.doctorSd}</p>}
 
-          {want ? (
+          {pickDoc ? (
+            <>
+              <div className="whoback">
+                <b>{ROLE_NAME.doctor} <span className="sd">{ROLE_SD.doctor}</span></b>
+                <button className="lnk" onClick={() => { setPickDoc(false); setWant(null) }}>not me</button>
+              </div>
+              <p className="pick">Which doctor?</p>
+              <div className="whos">
+                {activeDoctors().map(d => (
+                  <button key={d.id} className="whobtn doctor"
+                          onClick={() => { setDoctorIdentity(d.id); signIn('doctor'); onOpen() }}>
+                    <span className="wi"><IcUser size={20} /></span>
+                    <span className="n">{d.nameEn} {d.nameSd && <i className="sd">{d.nameSd}</i>}</span>
+                    <small>Room {d.room}{isSitting(d.id) ? '' : ' · marked not sitting tonight'}</small>
+                    <span className="go">{'→'}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="hint">
+                Your queue, your prescriptions and your figures follow this choice for the evening.
+              </p>
+            </>
+          ) : want ? (
             <>
               <div className="whoback">
                 <b>{ROLE_NAME[want]} <span className="sd">{ROLE_SD[want]}</span></b>

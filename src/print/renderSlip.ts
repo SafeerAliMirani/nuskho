@@ -150,6 +150,13 @@ export interface SlipData {
   patientCode: string
   drugs: Record<string, Drug>
   rxId: string
+  /**
+   * Whose name heads this prescription, in a building with several doctors.
+   * The visit knows its room, so the caller passes that room's doctor and the
+   * heading stops assuming the profile. Absent = solo, profile as always.
+   * The address, timing and logo stay the building's.
+   */
+  doctor?: { nameEn: string; nameSd: string; degreesEn: string; degreesSd: string; reg: string }
 }
 
 /** How the medicines are laid out across sheets. Produced by planSheets() in
@@ -197,6 +204,13 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
   const pp = paper()
   const lhd = pp.kind === 'letterhead'
 
+  // The visit's own doctor when the building has several rooms; the profile,
+  // exactly as always, when it does not.
+  const who = d.doctor ?? {
+    nameEn: dr.doctorEn, nameSd: dr.doctorSd,
+    degreesEn: dr.degreesEn, degreesSd: dr.degreesSd, reg: dr.reg,
+  }
+
   // On his own pad we print nothing in the two bands his design already
   // occupies. The heights come from Setup, measured on one of his real sheets.
   const hdr = lhd
@@ -206,11 +220,11 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
       <div class="idl">
         ${dr.logo ? `<img class="logo" src="${dr.logo}" alt="" style="height:${dr.logoMm}mm">` : ''}
         <div>
-          <div class="docname">${esc(dr.doctorEn)}</div>
-          <div class="docqual">${esc(dr.degreesEn)}${dr.reg ? '<br>' + esc(dr.reg) : ''}</div>
+          <div class="docname">${esc(who.nameEn)}</div>
+          <div class="docqual">${esc(who.degreesEn)}${who.reg ? '<br>' + esc(who.reg) : ''}</div>
         </div>
       </div>
-      <div class="sd docsd">${esc(dr.doctorSd)}<small>${esc(dr.degreesSd)}</small></div>
+      <div class="sd docsd">${esc(who.nameSd)}<small>${esc(who.degreesSd)}</small></div>
     </div>
     <div class="clinicline"><span>${esc(dr.addressEn)}</span><span>${sheets > 1 ? `Sheet ${sheet + 1} of ${sheets}` : esc(dr.timing)}</span></div>
   </div>`
