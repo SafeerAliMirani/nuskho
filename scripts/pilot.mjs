@@ -64,6 +64,31 @@ cpSync('dist', out, { recursive: true })
 rmSync(join(out, 'sw.js'), { force: true })
 
 /**
+ * THE BUILDING'S WIRE TRAVELS WITH THE FOLDER.
+ *
+ * A clinic that runs phones needs tools/nuskho-wifi.cjs on the machine that
+ * holds the records, and the folder a person carries is the only thing that
+ * arrives there. Leaving it behind means discovering it while standing in a
+ * clinic at seven in the evening, which is the worst possible moment to need
+ * a file that is at home. A solo clinic simply never double-clicks it.
+ */
+const WIRE = 'tools/nuskho-wifi.cjs'
+if (existsSync(WIRE)) {
+  cpSync(WIRE, join(out, 'nuskho-wifi.cjs'))
+  writeFileSync(join(out, 'Start Nuskho wifi.bat'),
+`@echo off
+title Nuskho wifi
+echo.
+echo   The building's own wire. Leave this window open all evening.
+echo   Close it and the phones stop; the records are untouched either way.
+echo.
+cd /d "%~dp0"
+node "nuskho-wifi.cjs" "."
+pause
+`)
+}
+
+/**
  * A LAUNCHER, BECAUSE DOUBLE-CLICKING index.html GIVES A BLANK PAGE.
  *
  * Found the hard way. Chrome refuses IndexedDB to a page opened from disk
@@ -116,6 +141,18 @@ HOW TO USE IT
 
   Make a shortcut to the .bat on the desktop and let nobody open it any other
   way.
+
+PHONES ON THE CLINIC WIFI (only if this building uses them)
+
+  On the ONE computer that holds the records, also double-click
+
+      Start Nuskho wifi.bat
+
+  and leave that window open for the evening. It prints an address; phones on
+  the same wifi open it, or scan the square under Setup, Wifi. Needs Node
+  installed on that one machine, and no internet at any point. That program
+  keeps no records of its own; closing it stops the phones and touches
+  nothing else.
 
 WHAT IT DOES NOT DO
 
