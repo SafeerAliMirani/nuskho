@@ -13,6 +13,7 @@ import {
   daySummary, markRefunded, owedRefund,
 } from '../db'
 import type { Visit, VisitStatus, FeeState } from '../types'
+import { isDemo } from '../version'
 import { daysSinceExport } from '../safety'
 import { profile } from '../profile'
 
@@ -354,6 +355,9 @@ export default function Intake({ visits, onOpen, onChange }: {
  */
 function BackupNudge() {
   const d = daysSinceExport()
+  // The practice copy saves nothing to a file on purpose, so nagging a visitor
+  // to back it up would contradict the banner right above that says so.
+  if (isDemo) return null
   if (d !== null && d < 7) return null
   // Never a backup at all is a different situation from an old one, and the
   // tone says which: one is a problem now, the other is drifting toward one.

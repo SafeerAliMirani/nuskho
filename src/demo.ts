@@ -1,5 +1,6 @@
 import { factoryReset } from './reset'
 import { isDemo } from './version'
+import { signedIn, signIn } from './roles'
 
 /**
  * THE PRACTICE COPY, AND WHY IT FORGETS.
@@ -65,6 +66,11 @@ export async function freshenDemo(): Promise<boolean> {
     try { await factoryReset() } catch { /* a demo that cannot clear must still open */ }
   }
   touchDemo()
+  // The practice copy opens already working: signed in as the doctor, on the
+  // queue, samples in the picker. Every screen between the tap and the product
+  // is a screen where a curious doctor gives up. Sign-out still shows the role
+  // door, which is itself worth seeing; no PIN exists here, so one tap returns.
+  if (!signedIn()) signIn('doctor')
   return stale
 }
 

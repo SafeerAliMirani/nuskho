@@ -272,5 +272,11 @@ export default function Welcome({ onDone }: { onDone: () => void }) {
 
 /** Has this machine been set up? */
 export function needsWelcome(): boolean {
+  // The public copy never opens on this wizard. Its front door is the website's
+  // welcome page, which has already made the pitch; a visitor who taps "open
+  // the demo" should land inside the working day, not on a second introduction.
+  // The wizard stays reachable from the admin menu for showing setup, and the
+  // clinic build is untouched: a real machine still walks through first run.
+  if (isDemo) return false
   return !profile().ready && !profileComplete() && paper().kind === 'plain'
 }

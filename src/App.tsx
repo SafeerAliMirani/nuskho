@@ -27,7 +27,9 @@ export default function App() {
   // he is in, nothing here can come back and interrupt a consultation.
   // The first page is a sign-in page, whether or not a PIN is set. It is what
   // everyone expects software to open with, and it gives the evening a start.
-  const [locked, setLocked] = useState(() => !needsWelcome())
+  // The public copy is the exception: demo.ts has already signed the visitor in
+  // as the doctor, so the first thing seen is the working day itself.
+  const [locked, setLocked] = useState(() => isDemo ? false : !needsWelcome())
   const [, bump] = useState(0)
   const [menu, setMenu] = useState(false)
 
