@@ -18,7 +18,7 @@
 // BUMP THIS when welcome.html or login.html change: they are served cache-first
 // out of this cache, so an edit that does not bump the version is an edit a
 // returning visitor never sees.
-const CACHE = 'nuskho-v8'
+const CACHE = 'nuskho-v9'
 
 self.addEventListener('install', e => {
   // Take the shell now so the first offline open works. './' is the welcome

@@ -396,6 +396,12 @@ export default function Compose({ visitId, onDone, onBack }: {
         <Vitals which="test" value={visit.vitals ?? {}}
                 onChange={v => apply(x => ({ ...x, vitals: v }))} />
 
+        {/* THE DESK. On a wide screen the prescription grows on the left while
+            the picking surface stays put on the right, so adding the fourth
+            medicine does not mean scrolling past the first three. On a phone
+            the two stack and the flow is what it always was. */}
+        <div className="composegrid">
+        <div className="cg-left">
         <h2><IcBook size={17} /> Diagnosis</h2>
         <div className="chips">
           {myDx.map(d => (
@@ -403,17 +409,6 @@ export default function Compose({ visitId, onDone, onBack }: {
                     onClick={() => apply(v => ({ ...v, diagnosis: v.diagnosis === d ? undefined : d }))}>{d}</button>
           ))}
         </div>
-
-        {/* Only his own. Nothing we wrote fills a prescription — see formulary.ts. */}
-        {sets.length > 0 && (<>
-          <h2>Your own sets, one tap</h2>
-          <div className="chips">
-            {sets.map(st => (
-              <button key={st.id} className="chip mine" onClick={() => applySet(st)}
-                      title="A set you saved yourself">{st.name}</button>
-            ))}
-          </div>
-        </>)}
 
         <h2><IcPill size={17} /> Medicines, printed in this order</h2>
         {visit.lines.map((l, i) => {
@@ -451,6 +446,20 @@ export default function Compose({ visitId, onDone, onBack }: {
             </div>
           )
         })}
+
+        </div>
+
+        <div className="cg-right">
+        {/* Only his own. Nothing we wrote fills a prescription — see formulary.ts. */}
+        {sets.length > 0 && (<>
+          <h2>Your own sets, one tap</h2>
+          <div className="chips">
+            {sets.map(st => (
+              <button key={st.id} className="chip mine" onClick={() => applySet(st)}
+                      title="A set you saved yourself">{st.name}</button>
+            ))}
+          </div>
+        </>)}
 
         <div className="fld">
           <input value={q} onChange={e => { setQ(e.target.value); setNearMiss(null) }}
@@ -531,6 +540,9 @@ export default function Compose({ visitId, onDone, onBack }: {
             ))}
           </p>
         )}
+
+        </div>
+        </div>
 
         <h2>Lab tests</h2>
         <div className="chips">

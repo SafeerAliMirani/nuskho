@@ -44,6 +44,9 @@ export type Stats = {
 
   /* money — private, never exported */
   received: number
+  /** rupees actually handed back at the counter this month, already
+   *  subtracted from `received` — the same arithmetic the desk uses. */
+  refunded: number
   waivedCount: number
   waivedTotal: number
   dueTotal: number
@@ -59,6 +62,10 @@ export type Stats = {
   byHour: { hour: number; arrived: number; left: number }[]
   hoursUnreliable: boolean
   busiestDay?: string
+  /** distinct days worked this month, and the plain count per day. Counts
+   *  only: no projections, no smoothing, no trend arrows. */
+  evenings: number
+  byEvening: { day: number; n: number }[]
 
   /* clinical */
   diagnoses: Bar[]
@@ -132,11 +139,12 @@ export async function computeStats(): Promise<Stats> {
   const loyalN = [...perPatient.values()].filter(a => a.length >= 3).length
 
   /* --- money. Private for ever: no rupee figure reaches any export path. --- */
-  let received = 0, waivedTotal = 0, waivedCount = 0, dueTotal = 0
+  let received = 0, refunded = 0, waivedTotal = 0, waivedCount = 0, dueTotal = 0
   const due: Stats['due'] = []
   for (const v of monthAll) {
     const f = v.fee
     if (!f) continue
+    if (f.refund && f.refundedAt) refunded += f.refund
     if (f.state === 'paid') received += f.amount
     else if (f.state === 'waived') { waivedCount++; waivedTotal += f.amount }
     else if (f.state === 'due') {
@@ -146,6 +154,9 @@ export async function computeStats(): Promise<Stats> {
     }
   }
   due.sort((a, b) => b.at - a.at)
+  // What was handed back is not money received. The desk's own summary already
+  // subtracts it; this page must not quietly disagree with the drawer.
+  received -= refunded
   const feeUnrecorded = monthAll.filter(v => !v.fee && v.status !== 'waiting').length
 
   /* --- the queue. "Left" paired with the hour it happened is a staffing
@@ -176,6 +187,14 @@ export async function computeStats(): Promise<Stats> {
   }
   const batched = [...perMinute.values()].filter(n => n >= 4).reduce((a, n) => a + n, 0)
   const hoursUnreliable = recent.length > 0 && batched / recent.length > 0.25
+
+  const evenMap = new Map<number, number>()
+  for (const v of monthSeen) {
+    const d = startOfDay(v.createdAt)
+    evenMap.set(d, (evenMap.get(d) ?? 0) + 1)
+  }
+  const byEvening = [...evenMap.entries()].map(([day, n]) => ({ day, n }))
+    .sort((a, b) => a.day - b.day)
 
   const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const dayCount = new Map<number, number>()
@@ -243,12 +262,13 @@ export async function computeStats(): Promise<Stats> {
     returningN,
     loyalN,
 
-    received, waivedCount, waivedTotal, dueTotal, due, feeUnrecorded,
+    received, refunded, waivedCount, waivedTotal, dueTotal, due, feeUnrecorded,
 
     leftN,
     leftPct: monthAll.length ? Math.round((leftN / monthAll.length) * 100) : 0,
     cancelledN, referredN, seenOnlyN,
     byHour, hoursUnreliable, busiestDay,
+    evenings: evenMap.size, byEvening,
 
     diagnoses,
     dxRecordedPct: monthSeen.length ? Math.round((dxRecorded / monthSeen.length) * 100) : 0,

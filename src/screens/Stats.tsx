@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { IcClock, IcCalendar, IcUser, IcHeart, IcRupee, ArtNoFigures } from '../ui/art'
+import { IcClock, IcCalendar, IcHeart, IcRupee, ArtNoFigures } from '../ui/art'
 import { Note } from '../ui/Note'
 import { computeStats, MIN_CELL, MIN_TREND, type Stats, type Bar } from '../stats'
 import { cardData, drawCard, downloadCard, printCard, CARD_W, CARD_H } from '../print/card'
@@ -48,14 +48,25 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
         </div>
       ) : (
         <>
-          <div className="tiles">
-            <Tile big={s.today} lab="seen today" sd="اڄ" icon={IcClock} cap="today" />
-            <Tile big={s.month} lab={`seen in ${s.monthLabel.split(' ')[0]}`} sd="هن مهيني" hero
-                  icon={IcCalendar} cap="this month" />
-            <Tile big={s.lifetime} lab="seen in all" icon={IcUser} cap="all time"
-                  sub={s.since ? `since ${new Date(s.since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}` : ''} />
-            <Tile big={`${s.returningPct}%`} lab="came back to you" tone="i" icon={IcHeart} cap="trust"
-                  sub={`${s.returningN} returning visits · ${s.loyalN} on a third visit or more`} />
+          {/* The headline pair, exactly as the Mirror design frames it: volume,
+              and the closest thing this data has to evidence of care. */}
+          <div className="mheroes">
+            <div className="mh">
+              <small>People served <i className="sd">ماڻهو</i></small>
+              <b>{s.month.toLocaleString('en-GB')}</b>
+              <span>in {s.monthLabel} · {s.today} today</span>
+            </div>
+            <div className="mh">
+              <small>People who came back</small>
+              <b>{s.returningN.toLocaleString('en-GB')}</b>
+              <span>{s.returningPct}% of the month · {s.loyalN} on a third visit or more</span>
+            </div>
+            <div className="mh alt">
+              <small>Evenings worked</small>
+              <b>{s.evenings}</b>
+              <span>{s.lifetime.toLocaleString('en-GB')} people in all{s.since
+                ? `, since ${new Date(s.since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}` : ''}</span>
+            </div>
           </div>
 
           {s.thin && (
@@ -69,7 +80,8 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
           <h2><IcRupee size={17} /> Fees this month</h2>
           <div className="tiles money">
             <Tile big={`Rs ${s.received.toLocaleString('en-GB')}`} lab="received"
-                  tone="k" icon={IcRupee} cap="in hand" />
+                  tone="k" icon={IcRupee} cap="in hand"
+                  sub={s.refunded > 0 ? `after Rs ${s.refunded.toLocaleString('en-GB')} given back on your word` : ''} />
             <Tile big={`Rs ${s.dueTotal.toLocaleString('en-GB')}`} lab="still due"
                   tone={s.dueTotal > 0 ? 'w' : undefined} icon={IcClock} cap="owed"
                   sub={s.due.length ? `${s.due.length} patients` : 'nobody owes anything'} />
@@ -99,6 +111,25 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
               {s.feeUnrecorded} visits this month have no fee recorded at all. That is not the
               same as free, and the figures above do not include them.
             </p>
+          )}
+
+          {/* ---- the rhythm: plain counts per evening, nothing cleverer ---- */}
+          {s.byEvening.length > 1 && (
+            <>
+              <h2><IcCalendar size={17} /> Patients per evening</h2>
+              <div className="evcols">
+                {(() => {
+                  const max = Math.max(...s.byEvening.map(z => z.n)) || 1
+                  return s.byEvening.map(e => (
+                    <i key={e.day} className={e.n === max ? 'mx' : ''}
+                       style={{ height: `${Math.max(8, (e.n / max) * 100)}%` }}
+                       title={`${new Date(e.day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: ${e.n}`} />
+                  ))
+                })()}
+              </div>
+              <p className="hint">This month, day by day. Counts only: no projections, no
+                smoothing, no trend arrows. The gold column is the busiest evening.</p>
+            </>
           )}
 
           {/* ---- the queue ---- */}
@@ -189,6 +220,14 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
           </p>
           <button className="btn wide" onClick={() => setCard(true)}>See the card</button>
           {card && <CardView s={s} onClose={() => setCard(false)} />}
+
+          <div className="refuse">
+            <b>What this page refuses to show, on purpose.</b>
+            <p>No patients per hour, no average consultation time, no revenue per patient,
+              no streaks, no personal bests, no projections, and no comparison with any
+              other doctor. A page that celebrates speed quietly argues for shorter
+              consultations, and this one will not.</p>
+          </div>
         </>
       )}
     </div>

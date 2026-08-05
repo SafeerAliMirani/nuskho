@@ -1585,3 +1585,29 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .demobar .lnk{color:#ffd98a;text-decoration:underline;flex:none;padding:0}
 .demobar .lnk:hover{color:#fff}
 @media print{ .demobar{display:none} }
+
+
+/* ---------------- phase two: the Mirror's face + the doctor's desk ---------------- */
+.mheroes{display:grid;grid-template-columns:1.1fr 1.1fr .9fr;gap:12px;margin:14px 0 6px}
+.mh{border-radius:16px;padding:17px 19px;background:linear-gradient(160deg,#0b463a,#093d33);
+  color:#dcebe4;box-shadow:0 2px 4px rgba(9,38,31,.08),0 16px 36px -16px rgba(9,38,31,.3)}
+.mh small{display:block;font-size:10.5px;font-weight:750;letter-spacing:.12em;text-transform:uppercase;color:#9fb8af}
+.mh small .sd{letter-spacing:0;text-transform:none;font-size:12px;color:#8aa89e}
+.mh b{display:block;font-family:var(--display);font-weight:790;font-size:38px;letter-spacing:-.03em;
+  line-height:1.1;color:#fff;margin-top:6px;font-variant-numeric:tabular-nums}
+.mh span{display:block;font-size:12.3px;color:#b9d2c9;margin-top:4px}
+.mh.alt{background:var(--card);box-shadow:var(--ring),0 8px 24px -12px rgba(9,38,31,.16)}
+.mh.alt b{color:#093d33}.mh.alt small{color:var(--faint)}.mh.alt span{color:var(--mut)}
+@media (max-width:760px){.mheroes{grid-template-columns:1fr 1fr}.mh b{font-size:30px}}
+
+.evcols{display:flex;align-items:flex-end;gap:3px;height:92px;background:var(--card);
+  border-radius:14px;box-shadow:var(--ring);padding:14px 14px 10px;margin-top:6px}
+.evcols i{flex:1;min-width:4px;background:var(--g);border-radius:3px 3px 0 0}
+.evcols i.mx{background:var(--gold)}
+
+.refuse{margin-top:22px;background:var(--card);border-radius:14px;box-shadow:var(--ring);padding:15px 17px}
+.refuse b{font-size:14px;color:#093d33}
+.refuse p{font-size:12.8px;color:var(--mut);margin-top:4px;line-height:1.55}
+
+.composegrid{display:grid;grid-template-columns:1.04fr .96fr;gap:0 24px;align-items:start}
+@media (max-width:1080px){.composegrid{grid-template-columns:1fr}}
