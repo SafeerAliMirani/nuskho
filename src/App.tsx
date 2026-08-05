@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import Intake from './screens/Intake'
+import Pharmacy from './screens/Pharmacy'
+import AdminDesk from './screens/AdminDesk'
 import Compose from './screens/Compose'
 import Setup from './screens/Setup'
 import StatsScreen from './screens/Stats'
@@ -20,6 +22,7 @@ export default function App() {
   const [visitId, setVisitId] = useState<string | null>(null)
   const [setup, setSetup] = useState(false)
   const [stats, setStats] = useState(false)
+  const [pharm, setPharm] = useState(false)
   const [about, setAbout] = useState(false)
   const [today, setToday] = useState<Visit[]>([])
   const [welcome, setWelcome] = useState(needsWelcome)
@@ -137,6 +140,11 @@ export default function App() {
                       <IcChart size={16} /> My figures <small>patients, fees, month card</small>
                     </button>
                   )}
+                  {can('dispense') && can('queue') && (
+                    <button onClick={() => { setMenu(false); setSetup(false); setStats(false); setVisitId(null); setPharm(true) }}>
+                      <IcQueue size={16} /> Pharmacy desk <small>printed slips, mark medicines given</small>
+                    </button>
+                  )}
                   {(can('paper') || can('identity')) &&
                   <button onClick={() => { setMenu(false); setStats(false); setSetup(true) }}>
                     <IcCog size={16} /> Setup <small>paper, medicines, PINs</small>
@@ -191,6 +199,8 @@ export default function App() {
         ? <StatsScreen onBack={() => setStats(false)} />
         : setup && (can('paper') || can('identity'))
         ? <Setup onBack={() => setSetup(false)} />
+        : pharm && can('dispense')
+        ? <PharmWrap visits={today} onChange={refresh} onBack={() => setPharm(false)} showBack={can('queue')} />
         : visitId && can('prescribe')
         ? <Compose
             visitId={visitId}
@@ -202,7 +212,28 @@ export default function App() {
         // who came in. It lands in Setup, which is the only reason it exists.
         : can('queue')
         ? <Intake visits={today} onOpen={setVisitId} onChange={refresh} />
+        : can('dispense')
+        ? <PharmWrap visits={today} onChange={refresh} onBack={() => {}} showBack={false} />
+        : can('ops')
+        ? <AdminDesk visits={today} />
         : <Setup onBack={() => setSetup(false)} />}
+    </div>
+  )
+}
+
+
+/** The pharmacy desk, with a way back for the roles that also hold a queue. */
+function PharmWrap({ visits, onChange, onBack, showBack }: {
+  visits: Visit[]; onChange: () => void; onBack: () => void; showBack: boolean
+}) {
+  return (
+    <div>
+      {showBack && (
+        <div className="pane" style={{ paddingBottom: 0 }}>
+          <button className="btn ghost" onClick={onBack}>← Queue</button>
+        </div>
+      )}
+      <Pharmacy visits={visits} onChange={onChange} />
     </div>
   )
 }

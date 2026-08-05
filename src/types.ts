@@ -58,6 +58,9 @@ export interface RxLine {
   note?: string          // free line for forms that do not fit the grid
   /** written at print time; from then on this, not drugId, is what was prescribed */
   snap?: RxSnap
+  /** how many units the pharmacy counter actually handed over. Absent means
+   *  not yet; smaller than the printed course means a short, on purpose. */
+  given?: number
 }
 
 export interface Patient {
@@ -147,6 +150,8 @@ export interface Visit {
   /** set when this prescription replaces an earlier printed one */
   amendsId?: string
   nextVisit?: string
+  /** when the pharmacy counter finished handing this prescription over */
+  dispensedAt?: number
 }
 
 /**

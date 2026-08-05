@@ -61,25 +61,34 @@
  * that lets you in.
  */
 
-export type Role = 'counter' | 'doctor' | 'admin'
+export type Role = 'counter' | 'compounder' | 'doctor' | 'pharmacy' | 'clinicadmin' | 'admin'
 
-export const ROLES: Role[] = ['counter', 'doctor', 'admin']
+export const ROLES: Role[] = ['doctor', 'compounder', 'counter', 'pharmacy', 'clinicadmin', 'admin']
 
 export const ROLE_NAME: Record<Role, string> = {
-  counter: 'Counter',
+  counter: 'Token counter',
+  compounder: 'Compounder',
   doctor: 'Doctor',
-  admin: 'Nuskho admin',
+  pharmacy: 'Pharmacy',
+  clinicadmin: 'Clinic admin',
+  admin: 'Nuskho',
 }
 
 export const ROLE_SD: Record<Role, string> = {
-  counter: 'ڪائونٽر',
+  counter: 'ٽوڪن ڪائونٽر',
+  compounder: 'ڪمپائونڊر',
   doctor: 'ڊاڪٽر',
+  pharmacy: 'فارميسي',
+  clinicadmin: 'اڊمن',
   admin: 'نسخو',
 }
 
 export const ROLE_WHAT: Record<Role, string> = {
   counter: 'Take the fee, give the number, hand back refunds',
+  compounder: 'Run the queue and the room screen for the doctor',
   doctor: 'See patients and print prescriptions',
+  pharmacy: 'Read printed slips, mark the medicines given',
+  clinicadmin: 'The building: money totals, the day, the machines',
   admin: 'Setup, medicine review and backups',
 }
 
@@ -103,11 +112,25 @@ export type Can =
   | 'review'       // the medicine review queue and the market importer
   | 'backup'       // export or restore the whole database
   | 'erase'        // clear records, factory reset
+  | 'dispense'     // read PRINTED slips at the counter and mark medicines given
+  | 'ops'          // the building's day: money totals, backup age, the machines
 
 const GRANTS: Record<Role, Can[]> = {
   counter: ['queue', 'money'],
+  // The compounder OPERATES the room screen — intake, queue, entry, print —
+  // which is why he holds 'prescribe': the doctor speaks, he types. What he
+  // does not hold is anything that shapes the practice itself: the fee rate,
+  // the figures, the paper, the medicine list, the locks, the backups.
+  compounder: ['queue', 'money', 'prescribe', 'history'],
   doctor: ['queue', 'money', 'rate', 'prescribe', 'history', 'figures', 'paper', 'medicines', 'lock',
-           'backup', 'erase'],
+           'backup', 'erase', 'dispense'],
+  // The pharmacy reads what was PRINTED — the lines a patient already carries
+  // on paper — and marks them given. No queue, no fees, no history, no
+  // diagnosis: there is no route from this role to any of them.
+  pharmacy: ['dispense'],
+  // Operations, never the clinical record. Money totals the desk collected,
+  // the day's shape, backup age, the machines. Not one prescription.
+  clinicadmin: ['ops'],
   // Deliberately no 'queue', 'prescribe', 'history', 'figures', 'money',
   // 'backup' or 'erase'. If a permission here would let us read or copy a
   // patient's record, it is in the wrong list.

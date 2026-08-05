@@ -181,7 +181,7 @@ function AdminGate({ onOpen }: { onOpen: () => void }) {
  * doctor is also the counter should not have to type anything.
  */
 function PinTab() {
-  const [pin, setPin] = useState<Record<Role, string>>({ counter: '', doctor: '', admin: '' })
+  const [pin, setPin] = useState<Record<Role, string>>({ counter: '', compounder: '', doctor: '', pharmacy: '', clinicadmin: '', admin: '' })
   const [msg, setMsg] = useState('')
   const [, redraw] = useState(0)
 

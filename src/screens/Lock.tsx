@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Mark, ArtSlip, IcUser, IcRupee, IcCog } from '../ui/art'
+import { Mark, ArtSlip, IcUser, IcRupee, IcCog, IcQueue, IcPill, IcChart } from '../ui/art'
 import { profile, APP, adminIsSet, unlockAdmin } from '../profile'
 import { primeSound } from '../ui/sound'
 import { ROLES, ROLE_NAME, ROLE_SD, ROLE_WHAT, pinSet, checkRolePin, signIn, type Role } from '../roles'
@@ -24,7 +24,10 @@ import { ROLES, ROLE_NAME, ROLE_SD, ROLE_WHAT, pinSet, checkRolePin, signIn, typ
  */
 const ICON: Record<Role, (p: { size?: number }) => JSX.Element> = {
   counter: IcRupee,
+  compounder: IcQueue,
   doctor: IcUser,
+  pharmacy: IcPill,
+  clinicadmin: IcChart,
   admin: IcCog,
 }
 
