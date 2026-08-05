@@ -4,6 +4,7 @@ import { profile, APP, adminIsSet, unlockAdmin } from '../profile'
 import { primeSound } from '../ui/sound'
 import { ROLES, ROLE_NAME, ROLE_SD, ROLE_WHAT, pinSet, checkRolePin, signIn, setDoctorIdentity, type Role } from '../roles'
 import { multiRoom, activeDoctors, isSitting } from '../doctors'
+import { buildingMode } from '../building'
 
 /**
  * The front door, and the only place a role is chosen.
@@ -91,7 +92,14 @@ export default function Lock({ onOpen }: { onOpen: () => void }) {
             English for the chemist. Sindhi for the family. Pictures for whoever reads neither.
           </p>
           <div className="db-art"><ArtSlip /></div>
-          <p className="db-foot">Works with the internet down. Nothing leaves this computer.</p>
+          <p className="db-foot">
+            {buildingMode() === 'off'
+              ? 'Works with the internet down. Nothing leaves this computer.'
+              // A building must not print the solo promise: names and printed
+              // medicine lines DO cross the clinic's own wire to its phones.
+              // The true promise is the one worth making.
+              : 'Works with the internet down. Records live on this machine only; the building’s phones are mirrors that keep nothing, and nothing reaches the internet.'}
+          </p>
         </div>
       </aside>
 

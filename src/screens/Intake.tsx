@@ -13,7 +13,7 @@ import {
 } from '../doctors'
 import {
   db, uid, nextToken, nextPatientNum, findByCode, patientCode, parseCode, closeVisit,
-  daySummary, markRefunded, owedRefund,
+  daySummary, markRefunded, owedRefund, setFee,
 } from '../db'
 import type { Visit, VisitStatus, FeeState } from '../types'
 import { isDemo } from '../version'
@@ -78,7 +78,15 @@ export default function Intake({ visits, onOpen, onChange }: {
    * the fee, the token numbering, the name on the receipt.
    */
   const multi = multiRoom()
-  const [selDoc, setSelDoc] = useState<string>(() => (sittingDoctors()[0] ?? activeDoctors()[0])?.id ?? '')
+  // A doctor at his own desk at eight in the evening issues tokens for HIS
+  // room, so his identity seeds the pick. Everyone else starts on the first
+  // sitting room. Without this, Dr Soomro's first token went to Room 1 at
+  // Room 1's fee, into a row he then could not even open.
+  const [selDoc, setSelDoc] = useState<string>(() => {
+    const me = role() === 'doctor' ? currentDoctorId() : null
+    if (me && isSitting(me) && activeDoctors().some(d => d.id === me)) return me
+    return (sittingDoctors()[0] ?? activeDoctors()[0])?.id ?? ''
+  })
   const sel = !multi ? undefined : (() => {
     const d = doctorById(selDoc)
     return d && !d.archived && isSitting(d.id) ? d : (sittingDoctors()[0] ?? activeDoctors()[0])
@@ -133,9 +141,10 @@ export default function Intake({ visits, onOpen, onChange }: {
     if (pt) {
       // Tell the doctor's screen. A message, never a record: the visit is
       // already written above and does not depend on anyone hearing this.
+      const said = sel ? `${pt.name} · R${sel.room}` : pt.name
       signal(wasUrgent
-        ? { kind: 'urgent', token, name: pt.name }
-        : { kind: 'patient', token, name: pt.name })
+        ? { kind: 'urgent', token, name: said }
+        : { kind: 'patient', token, name: said })
       printToken({
         token, patientName: pt.name, patientCode: patientCode(pt.num),
         fee: fee.amount, feeState: fee.state === 'due' ? 'due' : fee.state === 'waived' ? 'waived' : 'paid',
@@ -261,7 +270,7 @@ export default function Intake({ visits, onOpen, onChange }: {
       <div className="row">
         <div className="fld" style={{ flex: 2 }}>
           <input value={code} inputMode="numeric" maxLength={13} placeholder="the number on the slip"
-                 style={{ fontSize: 26, letterSpacing: 6, fontWeight: 700 }}
+                 className="codebox"
                  onChange={e => { setCode(scanned(e.target.value)); setMsg('') }}
                  onKeyDown={e => { if (e.key === 'Enter') lookup() }} />
         </div>
@@ -361,7 +370,7 @@ export default function Intake({ visits, onOpen, onChange }: {
         const shut = v.status !== 'waiting'
         return (
           <div key={v.id} className={`qwrap ${shut ? 'shut' : ''}`}>
-            <button className={`qrow ${v.status === 'done' ? 'done' : ''}${v.urgent && v.status === 'waiting' ? ' urgent' : ''}${mayOpen(v) ? '' : ' flat'}`}
+            <button className={`qrow ${v.status === 'done' ? 'done' : ''}${v.urgent && v.status === 'waiting' ? ' urgent' : ''}${mayOpen(v) ? '' : ' flat'}${!mayOpen(v) && can('prescribe') ? ' notmine' : ''}`}
                     onClick={() => mayOpen(v) && onOpen(v.id)}
                     disabled={!mayOpen(v)}>
               <span className="tk">{v.token}</span>
@@ -369,7 +378,7 @@ export default function Intake({ visits, onOpen, onChange }: {
                 <small>
                   {roomTag(v)}
                   {can('history')
-                    ? (v.lines.length ? `${v.lines.length} medicines` : 'no prescription yet')
+                    ? (v.lines.length ? `${v.lines.length} medicine${v.lines.length === 1 ? '' : 's'}` : 'no prescription yet')
                     : (v.printedAt ? 'prescription printed' : 'with the doctor')}
                   {v.fee ? ` · ${v.fee.state === 'waived' ? 'fee waived'
                     : v.fee.state === 'due' ? `Rs ${v.fee.amount} due` : `Rs ${v.fee.amount} received`}` : ''}
@@ -407,6 +416,17 @@ export default function Intake({ visits, onOpen, onChange }: {
                   Handed back
                 </button>
               </div>
+            )}
+
+            {/* Money promised at the door and paid on the way out. Without this
+                button a fee marked "not paid yet" stayed a debt for ever, the
+                figures under-counted the drawer, and the owed list slowly
+                filled with people who had in fact paid. */}
+            {v.fee?.state === 'due' && v.fee.amount > 0 && (
+              <button className="lnk qclose" onClick={async () => {
+                await setFee(v.id, { ...v.fee!, state: 'paid', at: Date.now() })
+                onChange()
+              }}>Rs {v.fee.amount} received now</button>
             )}
 
             {!v.printedAt && (

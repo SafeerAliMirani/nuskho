@@ -51,6 +51,12 @@ function Clinic() {
   // announce this window so the bell can honestly say whether anyone hears it
   useEffect(() => startPresence(), [])
 
+  // A new screen starts at its top. Opening a patient from the bottom of a
+  // forty-row queue used to keep the queue's scroll position, so Compose
+  // opened on the middle of the medicine grid with the patient's name out of
+  // sight — which looks broken and invites the wrong-patient mistake.
+  useEffect(() => { window.scrollTo(0, 0) }, [visitId, setup, stats, pharm, about])
+
   // Keep the practice copy alive while somebody is actually using it, so a
   // demonstration survives reloads and a walk to another room, and still
   // clears itself by tomorrow. No-op in a real clinic.

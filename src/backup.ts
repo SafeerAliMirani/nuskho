@@ -2,9 +2,9 @@ import { db } from './db'
 import { profile, saveProfile, adminBlob, restoreAdminBlob, type Profile } from './profile'
 import { doctorsBlob, restoreDoctorsBlob } from './doctors'
 import { paper, setPaper, type Paper } from './paper'
-import { bumpHighWaterPastRestore, noteExported } from './safety'
+import { bumpHighWaterPastRestore, noteExported, noteToken, CLINIC_DAY_SHIFT } from './safety'
 import { isDemo } from './version'
-import type { Drug, Patient, Visit } from './types'
+import type { Drug, Patient, Visit, RxSet } from './types'
 
 /**
  * Moving a clinic to another machine, and getting the records back after one
@@ -36,6 +36,9 @@ export type SetupFile = {
   drugs: Drug[]
   patients?: Patient[]
   visits?: Visit[]
+  /** the medicine sets the doctor built himself. They are his shorthand for
+   *  how he practises, and losing them to a disk death costs him evenings. */
+  sets?: RxSet[]
   /** the Nuskho passphrase hash, so the lock survives the move to a new machine */
   admin?: string | null
   /** the building's additional doctors — identity on printed slips, exactly
@@ -54,6 +57,7 @@ export async function makeBackup(kind: 'setup' | 'full'): Promise<SetupFile> {
   if (kind === 'full') {
     out.patients = await db.patients.toArray()
     out.visits = await db.visits.toArray()
+    out.sets = await db.sets.toArray()
   }
   return out
 }
@@ -177,6 +181,30 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
     if (await db.visits.get(v.id)) { rep.skipped++; continue }
     await db.visits.put(v)
     rep.visits++
+  }
+  for (const st of f.sets ?? []) {
+    if (await db.sets.get(st.id)) { rep.skipped++; continue }
+    await db.sets.put(st)
+  }
+
+  // Tokens from TODAY's restored visits may already be on thermal receipts in
+  // the waiting room — the lunchtime-backup-onto-a-replacement-machine case.
+  // Jump each room's counter clear of them, exactly as the patient numbers
+  // were jumped above; a gap in this evening's numbering costs nothing.
+  const dayStart = Date.now() - CLINIC_DAY_SHIFT
+  const todayStart = new Date(new Date(dayStart).toDateString()).getTime() + CLINIC_DAY_SHIFT
+  const perDoc = new Map<string | undefined, number>()
+  for (const v of f.visits ?? []) {
+    if (v.createdAt < todayStart) continue
+    const k = v.doctorId
+    perDoc.set(k, Math.max(perDoc.get(k) ?? 0, v.token || 0))
+  }
+  const SAFE = 20
+  for (const [docId, top] of perDoc) {
+    if (top > 0) {
+      noteToken(top + SAFE, undefined, docId)
+      if (docId) noteToken(top + SAFE)   // the global counter must clear it too
+    }
   }
   return rep
 }

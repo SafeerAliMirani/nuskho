@@ -6,7 +6,7 @@ import './ui/type.css'
 import './app.css'
 import { keepStorage, snapshotDaily } from './safety'
 import { freshenDemo } from './demo'
-import { initBuilding } from './building'
+import { initBuilding, buildingMode } from './building'
 
 // Before anything else: ask the browser not to treat a clinic's records as
 // cache, then take today's local snapshot. Both are silent and both are the
@@ -35,18 +35,24 @@ freshenDemo()
     createRoot(document.getElementById('root')!).render(
       <StrictMode><Boundary><App /></Boundary></StrictMode>
     )
+    // AFTER initBuilding has decided what this copy is: registering from a
+    // top-level 'load' listener ran before the decision existed and would
+    // have installed the cache-first worker on the hub origin anyway.
+    if (location.protocol.startsWith('http') && 'serviceWorker' in navigator && buildingMode() === 'off') {
+      navigator.serviceWorker.register('./sw.js').catch(() => { /* offline is optional */ })
+    }
   })
 
 /**
- * Register the offline worker ONLY when served over http(s).
+ * The offline worker registers ONLY when served over http(s), and NEVER on
+ * the building's wire — see the registration inside the chain above.
  *
  * The clinic install is opened from a folder, where service workers do not
- * exist and must not be asked for. This is for the web copy alone, so a doctor
- * shown the app on a phone can keep it. Failure is silent by design: an app
- * that will not start because a cache did not register would be a worse app.
+ * exist and must not be asked for. The web copy alone uses it, so a doctor
+ * shown the app on a phone can keep it. On the wifi hub's origin the worker
+ * would be a saboteur: the hub serves every file fresh so a new build reaches
+ * every device on reload, and a cache-first worker would pin the whole
+ * building to whatever build it first saw — host and phones silently running
+ * different wire protocols. The wire needs no offline cache anyway: no wifi,
+ * no building.
  */
-if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => { /* offline is optional */ })
-  })
-}

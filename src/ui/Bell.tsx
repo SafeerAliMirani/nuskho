@@ -65,7 +65,7 @@ export default function Bell() {
       {!heard && (
         <p className="hint">
           Open the counter's screen in a second window of this browser and the bell will
-          reach it. Across two computers it needs the sync that is not built yet.
+          reach it. It does not yet travel to the phones on the clinic's wifi.
         </p>
       )}
     </div>

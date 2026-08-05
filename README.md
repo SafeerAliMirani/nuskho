@@ -1,48 +1,72 @@
-# Nuskho — Phase 0 (pilot)
+# Nuskho نسخو
 
-A printed prescription for Larkana. English for the chemist, Sindhi for the
-family, pictograms for whoever reads neither. The doctor writes nothing; the
-compounder operates it.
+The first Sindhi clinic and hospital system. English for the chemist, Sindhi
+for the family, pictograms for whoever reads neither. Offline first: the
+paper comes out with the router unplugged, and that rule outranks everything
+else in this repository.
 
-## What this is
+## What is built
 
-The smallest thing that can be carried into a clinic and **actually print**.
-It exists so that when a doctor says *"come tomorrow evening, ten patients"*,
-there is something to bring.
+All four planned phases are working software, verified end to end:
 
-- React + TypeScript + Vite, builds to a folder you double-click. No server.
-- Dexie / IndexedDB. Nothing leaves the machine. No login, no cloud, no sync.
-- The print layer is framework-free on purpose — see below.
+- **The solo clinic** — queue, fee-first tokens, the doctor's two-pane
+  prescription desk, printed bilingual slips with dose pictograms, history by
+  slip number, backups, and the doctor's private figures page.
+- **Six real roles** behind one front door — Doctor, Compounder, Token
+  counter, Pharmacy, Clinic admin, Nuskho — each with an optional PIN, each
+  enforced in the router and the data layer, never just the menu.
+- **Several doctors' rooms on one machine** — the Tonight strip at the desk,
+  per-room tokens and fees, each slip and receipt carrying its own room's
+  doctor, per-doctor figures.
+- **The building on its own wifi** — `tools/nuskho-wifi.cjs` (a relay that
+  stores nothing) serves phones as mirrors that hold no records: the counter
+  issues tokens, the compounder runs the queue, the pharmacy marks medicines
+  given, all against the one record-holding machine. No internet involved.
+
+React + TypeScript + Vite, Dexie / IndexedDB. Records live on the clinic's
+machine; there is no server, no account, no upload, and no kill switch.
 
 ## What this deliberately is NOT
 
-Not built, and not to be built, for at least two weeks — even if asked:
+Not built, on purpose, until a real clinic pulls for it:
 
-medical-store app · QR patient record · any login, users, cloud or sync ·
-WhatsApp or SMS · printed token chits · patient search and dedup ·
-analytics or reports · configurable slip templates · a national drug database ·
-anything the doctor has to touch.
+standalone medical-store app with stock and billing · QR patient record
+wallet · internet accounts or cloud sync · WhatsApp or SMS · analytics
+beyond the doctor's own figures · a national drug database · anything that
+suggests a medicine the doctor did not choose.
 
 Queue management is the specific trap: no reordering UI, no priority tiers,
-no multiple queues, no wait-time estimates, no "now serving" display.
+no wait-time estimates, no "now serving" display. The one flag is "cannot
+wait", set by a human looking at the patient.
 
 ## Run it
 
     npm install
     npm run dev          # development
-
-    npm run build        # produces dist/ — copy the whole folder anywhere
+    npm test             # vitest
+    npm run build        # tests, typecheck, clinic dist/ AND web dist-web/
+    npm run pilot        # tests, build, and seal a release folder for a clinic
 
 On the clinic machine, launch Chrome like this so there is **no print dialog**:
 
     chrome --kiosk-printing --allow-file-access-from-files "dist\index.html"
 
 At 140 patients an evening, one dialog per patient is on its own enough to
-sink the pilot. Set the A5 printer as the Windows default first.
+sink the pilot. Set the A5 printer as the Windows default first. Inside a
+sealed release, `Start Nuskho.bat` does all of this — never open `index.html`
+by hand.
+
+For a building with phones, run the wire on the one record-holding machine:
+
+    node tools\nuskho-wifi.cjs dist
+
+It prints the address; phones on the clinic wifi scan the join square shown
+under Setup, Wifi. The relay stores nothing, and the phones store nothing.
 
 ## Before a pilot evening
 
-1. Edit `src/clinic.ts` — doctor's name, degrees, registration, paper mode.
+1. Set the doctor's name, degrees and paper under Setup (the first-run wizard
+   walks through it).
 2. Replace `src/data/formulary.ts` with **that doctor's own** 30–50 drugs.
    Photograph 20 of his handwritten prescriptions and transcribe them.
    If the compounder has to search, entry is already too slow.

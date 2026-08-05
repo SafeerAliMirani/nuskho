@@ -82,7 +82,10 @@ export type Stats = {
 }
 
 const DAY = 86400000
-const startOfDay = (t = Date.now()) => new Date(new Date(t).toDateString()).getTime()
+/** The clinical day starts at 4 am (see safety.ts): an evening past midnight
+ *  is one evening here too, or the figures would disagree with the desk. */
+const startOfDay = (t = Date.now()) =>
+  new Date(new Date(t - 14400000).toDateString()).getTime() + 14400000
 const startOfMonth = (t = Date.now()) => {
   const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), 1).getTime()
 }
@@ -155,8 +158,13 @@ export async function computeStats(forDoctor?: string): Promise<Stats> {
     const f = v.fee
     if (!f) continue
     if (f.refund && f.refundedAt) refunded += f.refund
-    if (f.state === 'paid') received += f.amount
-    else if (f.state === 'waived') { waivedCount++; waivedTotal += f.amount }
+    // Anything not still owed was COLLECTED at the desk, including money later
+    // waived and handed back: it enters here and the refund subtraction below
+    // takes it out exactly once. Counting only 'paid' made a collected-then-
+    // waived fee subtract its refund from other patients' money, so this page
+    // disagreed with the drawer by the refunded amount.
+    if (f.state !== 'due') received += f.amount
+    if (f.state === 'waived') { waivedCount++; waivedTotal += f.amount }
     else if (f.state === 'due') {
       dueTotal += f.amount
       const p = pById.get(v.patientId)

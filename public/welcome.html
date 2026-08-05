@@ -453,7 +453,7 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
     </nav>
     <span class="nav-cta">
       <a class="btn btn-ghost btn-sm" href="#demo">Request a demo</a>
-      <a class="btn btn-solid btn-sm" href="login.html">Sign in</a>
+      <a class="btn btn-solid btn-sm" style="white-space:nowrap" href="login.html">Sign in</a>
     </span>
   </div>
 </header>
@@ -644,10 +644,11 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
           <path d="M95 32h14" stroke="#93a19b" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 5"/>
           <rect x="113" y="21" width="26" height="22" rx="3.5" stroke="#0f5c4a" stroke-width="2"/><path d="m120 32 3 3 6-7" stroke="#c9a227" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg></div>
-        <h3><small>Hospital · shared · arriving</small>The connected floor</h3>
+        <h3><small>Hospital · shared · live</small>The connected floor</h3>
         <p>A token counter at the gate, doctors in their rooms, one pharmacy at the exit.
-          The queue feeds every door, prescriptions travel from any desk to the shelf, and
-          the pharmacist never reads handwriting again.</p>
+          Each room counts its own tokens at its own fee, the queue feeds every door, and
+          the pharmacist reads the printed lines, never handwriting. It runs on the
+          building's own wifi, no internet needed.</p>
         <div class="chips"><span class="chip">Token counter</span><span class="chip">Prescription sharing</span><span class="chip">Pharmacy</span></div>
       </article>
 
@@ -660,7 +661,7 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
           <path d="M84 24v16M76 32h16" stroke="#e3eae7" stroke-width="2" stroke-linecap="round"/>
           <circle cx="112" cy="32" r="10" stroke="#93a19b" stroke-width="2" stroke-dasharray="2.5 3.5"/>
         </svg></div>
-        <h3><small>Hospital · independent · arriving</small>His own room, his own rules</h3>
+        <h3><small>Hospital · independent · live</small>His own room, his own rules</h3>
         <p>A doctor who runs his practice inside someone else's building. His own
           compounder if he wants one, tokens if the door needs them, and sharing only
           when he says so. Off by default.</p>
@@ -728,7 +729,7 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
           <span class="role-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#0f5c4a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.5-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.5-1a7 7 0 0 0 2 1.2L10 21h4l.4-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.2-.8.2-1.2Z"/></svg></span>
           <b>Clinic admin</b><span class="sd" dir="rtl" lang="sd">اڊمن</span>
         </div>
-        <p>Runs the building day to day: staff, devices, rooms, money, backups.
+        <p>Sees the building's day: money totals by room, the drawer, backup age, the machines.
           Operations always. The clinical record never.</p>
       </article>
     </div>
@@ -756,6 +757,8 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
           <li>Patient history, recall by slip number</li>
           <li>A5 · A4 · plain paper · the doctor's own letterhead</li>
           <li>Backups, and figures that stay private</li>
+          <li>Several doctors, several rooms, one desk: each room's own tokens and fee</li>
+          <li>Phones on the clinic's own wifi for the counter, the queue and the pharmacy</li>
           <li>Works entirely offline; records never leave the clinic</li>
         </ul>
       </div>

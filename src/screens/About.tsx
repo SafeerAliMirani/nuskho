@@ -3,6 +3,7 @@ import { db } from '../db'
 import { profile, APP } from '../profile'
 import { paper } from '../paper'
 import { role, ROLE_NAME } from '../roles'
+import { buildingMode } from '../building'
 import { daysSinceExport, storageReport } from '../safety'
 import { Mark, IcShield, IcInfo, IcCheck, IcPrint } from '../ui/art'
 import { Note } from '../ui/Note'
@@ -150,9 +151,21 @@ export default function About({ onBack }: { onBack: () => void }) {
 
       <h2><IcShield size={17} /> What this software promises</h2>
       <ul className="promises">
-        <li><b>Nothing about a patient leaves this computer.</b> There is no account, no
-          server and no upload. <b>If that ever changes, this screen will say so first,
-          and you will have to agree before anything is sent.</b></li>
+        {buildingMode() === 'off' ? (
+          <li><b>Nothing about a patient leaves this computer.</b> There is no account, no
+            server and no upload. <b>If that ever changes, this screen will say so first,
+            and you will have to agree before anything is sent.</b></li>
+        ) : (
+          // A building runs phones on its own wifi, and this page must not
+          // pretend otherwise: the promise is restated for what is actually
+          // true, which is stronger than an absolute that is not.
+          <li><b>Records live on this machine and reach the internet never.</b> The
+            building's phones are mirrors that keep nothing: names and money state go to
+            signed-in desk phones, printed medicine lines go only to the pharmacy's, and
+            diagnoses and histories never leave this computer at all. There is no account,
+            no server and no upload. <b>If that ever changes, this screen will say so
+            first, and you will have to agree before anything is sent.</b></li>
+        )}
         <li><b>Nobody at Nuskho can read your prescriptions,</b> including on this machine.
           The setup passphrase we hold opens your letterhead and the medicine review —
           not a consultation, not a history, and not an export.</li>

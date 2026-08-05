@@ -1,7 +1,51 @@
 # Nuskho — where things stand
 
-Written 4 August 2026, at the end of a long session, for whoever picks this up
-next. Read this first; everything else in `docs/decisions/` is detail.
+Written 4 August 2026; updated 5 August 2026 after the four build phases.
+Read this first; everything else in `docs/decisions/` is detail.
+
+---
+
+## Update, 5 August 2026: the designs became software
+
+Four phases were built, reviewed by independent agents, fixed, and verified
+end to end (unit tests plus scripted browser drives). All live, all pushed:
+
+1. **Six real roles** at one front door — Doctor, Compounder, Token counter,
+   Pharmacy (printed slips only, marks medicines given, records shorts),
+   Clinic admin (drawer and machines, nothing clinical), Nuskho. Optional PIN
+   per role; the router is the gate, not the menu.
+2. **The Mirror** — the doctor's figures open on people, not money; received
+   is stated after refunds; a per-evening rhythm chart; and a box naming what
+   the page refuses to show. The prescription screen is a two-pane desk.
+3. **Several doctors' rooms on one machine** — doctors.ts (the first doctor
+   IS the profile, derived, never copied), per-room tokens with per-room
+   restore guards, the Tonight strip, the door asks which doctor, slips and
+   receipts carry their room's doctor, per-doctor figures, per-room drawer.
+4. **The building on its own wifi** — tools/nuskho-wifi.cjs is a relay that
+   stores nothing; one machine marked in Setup holds the records; phones are
+   mirrors holding nothing, signing in through host-checked PINs; intents
+   apply serially through the same functions the solo product runs. Medicine
+   lines cross only to pharmacy sittings, printed slips only. Mirrors pin
+   their host and say so plainly when it is off.
+
+Also fixed in the final review pass, worth knowing about: Compose no longer
+blanket-writes vitals/status (the desk's BP survives the doctor's dose tap —
+verified in a live browser); amend and repeat-last strip pharmacy `given`
+marks; discounts on still-due fees no longer fabricate refunds; **the
+clinical day now ends at 4 am, not midnight** (dayKey/startOfToday/sitting all
+share the shift; day.test.ts pins it); the frozen medicine grid actually
+freezes with usage order and appends typed drugs at the end; the Nuskho
+passphrase cannot be replaced without typing the current one; factoryReset
+sweeps every `nuskho.*` key in both storages; full backups carry the
+doctor's sets and bump today's token high-water on restore.
+
+**Known hardening still open for a real multi-device building** (documented,
+not blocking the solo/one-machine pilot): the wifi host announces itself
+unauthenticated, so a hostile device already inside the clinic wifi could
+race a fresh phone's first sign-in. Mirrors now pin the first host heard and
+drop everything else, which closes it for any phone that has heard the true
+host; the full fix is a host secret carried in the join QR. Do that before
+putting phones in a building you do not control.
 
 ---
 
@@ -105,7 +149,7 @@ clinic*, never silent.
 
 **Inside a clinic, devices talk over the clinic's own network.** The room
 machine holds the records and serves the counter phone and the doctor's tablet.
-All writing happens there.
+All writing happens there. *(Built, 5 August: see the update at the top.)*
 
 **Outside the clinic, one-way and read-only.** The doctor's own records to his
 own devices. He reads at home; he does not prescribe from a sofa. **Two-way

@@ -45,7 +45,10 @@ function extras(): Doctor[] {
   if (cache) return cache
   try {
     const raw = localStorage.getItem(KEY)
-    cache = raw ? (JSON.parse(raw) as Doctor[]) : []
+    const parsed = raw ? JSON.parse(raw) : []
+    // a corrupt or hand-edited value must degrade to "no extra doctors",
+    // never crash the front door of a clinic mid-evening
+    cache = Array.isArray(parsed) ? (parsed as Doctor[]).filter(d => d && typeof d === 'object' && d.id) : []
   } catch { cache = [] }
   return cache
 }
@@ -117,7 +120,9 @@ export function setDoctorArchived(id: string, archived: boolean): void {
  */
 const SIT_KEY = 'nuskho.sitting'
 
-const dayOf = () => new Date().toDateString()
+// the same 4 am boundary as safety.ts dayKey: a sitting that crosses midnight
+// is one evening, and a doctor marked "not in tonight" stays not in
+const dayOf = () => new Date(Date.now() - 4 * 3600 * 1000).toDateString()
 
 function offIds(): string[] {
   try {
@@ -148,7 +153,9 @@ export function doctorsBlob(): string | null {
 export function restoreDoctorsBlob(blob: string | null | undefined): void {
   if (!blob) return
   try {
-    JSON.parse(blob)                       // refuse to store something unreadable
+    // must be an ARRAY of doctors, not merely parseable: a setup file whose
+    // doctors field is "{}" would otherwise crash the door on every load
+    if (!Array.isArray(JSON.parse(blob))) return
     localStorage.setItem(KEY, blob)
     cache = null
   } catch { /* ignore a corrupt field rather than break the restore */ }

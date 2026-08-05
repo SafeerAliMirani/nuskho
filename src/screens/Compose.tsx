@@ -49,9 +49,11 @@ export default function Compose({ visitId, onDone, onBack }: {
       cur.current = v; setVisit(v)
       const p = (await db.patients.get(v.patientId)) ?? null
       setPt(p)
-      setAll(await doctorDrugs(formulary))
-      setUse(await usageCounts())
-      setSets(await listSets())
+      // drugs and usage arrive TOGETHER, in one commit, so the frozen grid
+      // below freezes an order that already has the counts in it. Awaiting
+      // them one after the other froze an alphabetical grid every visit.
+      const [ds, uc, ss] = await Promise.all([doctorDrugs(formulary), usageCounts(), listSets()])
+      setAll(ds); setUse(uc); setSets(ss)
       if (p) setPrev((await lastVisit(p.id, v.id)) ?? null)
     })()
   }, [visitId])
@@ -78,7 +80,17 @@ export default function Compose({ visitId, onDone, onBack }: {
    */
   const frozen = useRef<Drug[] | null>(null)
   const ordered = useMemo(() => {
-    if (frozen.current && frozen.current.length === all.length) return frozen.current
+    // Once frozen, the order NEVER re-sorts this visit. A medicine the doctor
+    // types mid-consultation is APPENDED to the end, where his eye already is,
+    // instead of the whole grid reshuffling by usage under his finger.
+    if (frozen.current) {
+      if (all.length > frozen.current.length) {
+        const have = new Set(frozen.current.map(d => d.id))
+        frozen.current = [...frozen.current, ...all.filter(d => !have.has(d.id))]
+      }
+      return frozen.current
+    }
+    if (!all.length) return all
     const list = [...all].sort((a, b) =>
       (use[b.id] ?? 0) - (use[a.id] ?? 0) || a.brand.localeCompare(b.brand))
     frozen.current = list
@@ -126,8 +138,16 @@ export default function Compose({ visitId, onDone, onBack }: {
    *
    * Compose now writes ONLY the fields it owns, as a patch, inside a
    * transaction. Everything else on the row is left exactly as it was found.
+   *
+   * VITALS AND STATUS ARE DELIBERATELY NOT IN THIS LIST. Both are written by
+   * the desk and by phones on the building's wire while this screen is open —
+   * a blood pressure taken at the door, a patient closed as left. Blanket
+   * re-writing them from this screen's copy silently erased whatever arrived
+   * after the visit opened: a dose tap deleted a BP, and a closed visit came
+   * back to life. Vitals now merge against the LIVE row (see saveVitals), and
+   * status changes only in the explicit print path.
    */
-  const MINE = ['lines', 'diagnosis', 'vitals', 'tests', 'advice', 'printedAt', 'status', 'nextVisit'] as const
+  const MINE = ['lines', 'diagnosis', 'tests', 'advice', 'nextVisit'] as const
 
   async function apply(fn: (v: Visit) => Visit) {
     const next = fn(cur.current!)
@@ -141,6 +161,30 @@ export default function Compose({ visitId, onDone, onBack }: {
       await db.visits.update(next.id, patch)
       // keep our copy honest about the fields the counter owns
       cur.current = { ...live, ...patch }
+      setVisit(cur.current)
+    })
+  }
+
+  /**
+   * Vitals merge against the LIVE row, never replace it. The value this screen
+   * holds may be minutes old, and the compounder may have written a BP from
+   * the door or a phone since. What the doctor typed here wins for the fields
+   * he touched; everything else on the live row survives. An emptied field is
+   * an intentional deletion and is honoured.
+   */
+  async function saveVitals(nv: Record<string, string>) {
+    await db.transaction('rw', db.visits, async () => {
+      const live = await db.visits.get(visitId)
+      if (!live) return
+      const merged: Record<string, string> = { ...(live.vitals ?? {}) }
+      const before = cur.current?.vitals ?? {}
+      for (const k of new Set([...Object.keys(nv), ...Object.keys(before)])) {
+        const v = (nv[k] ?? '').trim()
+        if (v) merged[k] = v
+        else if (before[k] !== undefined && !nv[k]) delete merged[k]
+      }
+      await db.visits.update(visitId, { vitals: merged })
+      cur.current = { ...live, vitals: merged }
       setVisit(cur.current)
     })
   }
@@ -208,7 +252,9 @@ export default function Compose({ visitId, onDone, onBack }: {
     const live = prev.lines.filter(l => drugs[l.drugId] && !have.has(l.drugId))
     const gone = prev.lines.length - live.length - prev.lines.filter(l => have.has(l.drugId)).length
     if (!live.length) { setRepeatMsg('Everything from last time is already here.'); return }
-    await apply(v => ({ ...v, lines: [...v.lines, ...live.map(l => ({ ...l, snap: undefined }))] }))
+    // snap AND given are stripped: this is a fresh prescription, not a copy of
+    // what the pharmacy handed over last month
+    await apply(v => ({ ...v, lines: [...v.lines, ...live.map(l => ({ ...l, snap: undefined, given: undefined }))] }))
     setRepeatMsg(gone > 0
       ? `${live.length} brought back. ${gone} no longer on your list, so left out.`
       : `${live.length} brought back from last time. Check every dose before printing.`)
@@ -316,7 +362,13 @@ export default function Compose({ visitId, onDone, onBack }: {
     try {
       await freeze()
       await printSlip(slipData())
-      await apply(v => ({ ...v, printedAt: Date.now(), status: 'done' }))
+      // status and printedAt are written HERE and only here, as their own
+      // targeted patch: they are not in MINE, so no other tap on this screen
+      // can drag a stale copy of them over what the desk did meanwhile
+      const stamp = { printedAt: Date.now(), status: 'done' as const }
+      await db.visits.update(visitId, stamp)
+      cur.current = { ...cur.current!, ...stamp }
+      setVisit(cur.current)
       signal({ kind: 'printed', token: cur.current?.token ?? 0 })
       setErr('')
     } catch (e) {
@@ -349,10 +401,15 @@ export default function Compose({ visitId, onDone, onBack }: {
     // The fee and the token belong to the ORIGINAL visit. Copying them made the
     // clinic show two rows with the same number, and made the evening's cash
     // total count the same rupees twice, every time a slip was corrected.
-    const { fee: _fee, token: _tok, closedAt: _c, closeNote: _n, ...rest } = v
+    const { fee: _fee, token: _tok, closedAt: _c, closeNote: _n, dispensedAt: _d, ...rest } = v
     await db.visits.add({
-      // the room's own numbering: an amended slip in Room 2 is a Room 2 token
+      // the room's own numbering: an amended slip in Room 2 is a Room 2 token.
+      // dispensedAt and per-line given are stripped: the pharmacy has not
+      // touched THIS slip, whatever it handed over against the old one —
+      // otherwise the corrected medicines show as already given and the
+      // patient walks past the counter empty-handed.
       ...rest, id, token: await nextToken(v.doctorId), printedAt: undefined,
+      lines: rest.lines.map(l => ({ ...l, given: undefined })),
       status: 'waiting', createdAt: Date.now(), amendsId: v.id,
     })
     onDone()
@@ -403,10 +460,10 @@ export default function Compose({ visitId, onDone, onBack }: {
         {/* Vitals the compounder already took, and anything the doctor runs on a
             strip machine while the patient is sitting there. Both print. */}
         <Vitals which="vital" value={visit.vitals ?? {}}
-                onChange={v => apply(x => ({ ...x, vitals: v }))}
+                onChange={saveVitals}
                 title="Checked before you saw them" />
         <Vitals which="test" value={visit.vitals ?? {}}
-                onChange={v => apply(x => ({ ...x, vitals: v }))} />
+                onChange={saveVitals} />
 
         {/* THE DESK. On a wide screen the prescription grows on the left while
             the picking surface stays put on the right, so adding the fourth

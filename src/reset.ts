@@ -66,8 +66,13 @@ export async function factoryReset(): Promise<ResetReport> {
     for (const k of doomed) localStorage.removeItem(k)
   } catch { /* private mode */ }
   try {
-    sessionStorage.removeItem('nuskho.role')
-    sessionStorage.removeItem('nuskho.doctorId')
+    // same sweep discipline for the session keys, same reason
+    const doomed: string[] = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i)
+      if (k && k.startsWith('nuskho.')) doomed.push(k)
+    }
+    for (const k of doomed) sessionStorage.removeItem(k)
   } catch { /* ignore */ }
   return { patients, visits, drugs }
 }

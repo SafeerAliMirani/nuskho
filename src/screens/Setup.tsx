@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { adminIsSet, adminUnlocked, unlockAdmin, lockAdmin, setAdminKey } from '../profile'
 import { role, can, ROLE_NAME, ROLE_SD, ROLES, pinSet, setRolePin, type Role } from '../roles'
 import { downloadBackup, readBackup, readFile, restore, type RestoreReport } from '../backup'
@@ -56,6 +56,13 @@ export default function Setup({ onBack }: { onBack: () => void }) {
   function save() {
     dr.commit(); pp.commit(); setSaved(true)
   }
+
+  // On a phone the tab row scrolls sideways with the scrollbar hidden, so the
+  // active tab could sit entirely off-screen and nothing said more existed.
+  // The chosen tab now pulls itself into view.
+  useEffect(() => {
+    document.querySelector('.tabs .tab.on')?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [tab])
 
   return (
     <div className="pane setup">
@@ -224,9 +231,9 @@ function PinTab() {
       {msg && <p className="usable">{msg}</p>}
 
       <p className="hint">
-        <b>There is no way to recover a forgotten PIN.</b> If the doctor\'s is lost, his screen
-        on this machine is lost with it, and the records go with the machine. Write them down
-        somewhere only you can reach.
+        <b>There is no way to recover a forgotten PIN.</b> If the doctor's PIN is lost, his
+        screen on this machine is lost with it, and the records go with the machine. Write
+        them down somewhere only you can reach.
       </p>
 
       <SoundBox />
@@ -341,7 +348,7 @@ function WifiTab() {
   if (mode === 'off') {
     return (
       <>
-        <h3>Phones and tabs in the building</h3>
+        <h3>Phones and tablets in the building</h3>
         <p className="hint">
           This copy is not on a building wire right now, which is normal for a solo
           clinic. To put the building on its own wifi: on the one machine that will
@@ -399,7 +406,8 @@ function WifiTab() {
             paper register at the gate already shows. Medicine lines go only to a phone
             signed in as Pharmacy, only for printed slips. Diagnoses, histories and the
             records themselves never leave this machine, and nothing here touches the
-            internet.
+            internet. The wifi password is the building's front gate: give it only as you
+            would give a key to the building.
           </Note>
         </>
       )}
@@ -505,7 +513,7 @@ function DoctorsTab() {
             {fld('degreesEn', 'Degrees, English — optional')}
             {fld('degreesSd', 'Degrees, Sindhi — optional', { dir: 'rtl', lang: 'sd' })}
           </div>
-          <div className="row">
+          <div className="row" style={{ alignItems: 'flex-end' }}>
             {fld('reg', 'PMC registration — optional, prints only if entered')}
             {fld('fee', 'His fee, Rs', { inputMode: 'numeric', maxLength: 6 })}
             {fld('room', 'Room', { maxLength: 4 })}
@@ -555,15 +563,31 @@ function SoundBox() {
   )
 }
 
+/**
+ * CHANGING THE LOCK REQUIRES THE LOCK.
+ *
+ * This box lives on the clinic-side Lock tab, so anyone who can reach Setup
+ * could reach it. It used to overwrite the Nuskho passphrase without asking
+ * for the old one — which unlocked admin in the same breath, so whoever was
+ * at the keyboard could change the doctor's name, degrees and registration
+ * number on every future printed prescription. The exact bypass the restore()
+ * path had already closed, still open here. Now: if a passphrase exists and
+ * is not currently unlocked, the current one must be typed first.
+ */
 function AdminKeyBox() {
+  const [cur, setCur] = useState('')
   const [a, setA] = useState('')
   const [b, setB] = useState('')
   const [m, setM] = useState('')
+  const needsCurrent = adminIsSet() && !adminUnlocked()
   async function go() {
     if (a !== b) { setM('The two entries do not match.'); return }
+    if (needsCurrent) {
+      if (!await unlockAdmin(cur)) { setM('The current passphrase is not right.'); setCur(''); return }
+    }
     await setAdminKey(a)
     setM(a ? 'Nuskho passphrase set.' : 'Nuskho passphrase removed. Nothing is locked.')
-    setA(''); setB('')
+    setA(''); setB(''); setCur('')
   }
   return (
     <div className="lhbox">
@@ -573,14 +597,18 @@ function AdminKeyBox() {
         changed at the keyboard. Set it before handing the machine over.
         {adminIsSet() ? ' One is set.' : ' None is set, so nothing is locked yet.'}
       </p>
+      {needsCurrent && (
+        <div className="fld"><label>Current passphrase, first</label>
+          <input type="password" value={cur} onChange={e => { setCur(e.target.value); setM('') }} /></div>
+      )}
       <div className="row">
-        <div className="fld"><label>Passphrase</label>
+        <div className="fld"><label>New passphrase</label>
           <input type="password" value={a} onChange={e => { setA(e.target.value); setM('') }} /></div>
         <div className="fld"><label>Type it again</label>
           <input type="password" value={b} onChange={e => { setB(e.target.value); setM('') }} /></div>
       </div>
       {m && <p className="usable">{m}</p>}
-      <button className="btn" onClick={go}>Set passphrase</button>
+      <button className="btn" disabled={needsCurrent && !cur} onClick={go}>Set passphrase</button>
     </div>
   )
 }

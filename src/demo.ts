@@ -1,6 +1,7 @@
 import { factoryReset } from './reset'
 import { isDemo } from './version'
 import { signedIn, signIn } from './roles'
+import { profile, saveProfile } from './profile'
 
 /**
  * THE PRACTICE COPY, AND WHY IT FORGETS.
@@ -71,6 +72,16 @@ export async function freshenDemo(): Promise<boolean> {
   // is a screen where a curious doctor gives up. Sign-out still shows the role
   // door, which is itself worth seeing; no PIN exists here, so one tap returns.
   if (!signedIn()) signIn('doctor')
+  // The practice doctor has a NAME. A blank profile put the word "Doctor" and
+  // "Rs 0" on the demo's flagship surfaces — the door, the Tonight strip, the
+  // Doctors tab — which is data-honest and demo-ugly. The name is fictional,
+  // the same one the design studies use.
+  if (!profile().doctorEn) {
+    saveProfile({
+      doctorEn: 'Dr G. Abro', doctorSd: 'ڊاڪٽر غلام ابڙو',
+      degreesEn: 'MBBS', fee: 500, timing: '5:00 pm – 10:00 pm',
+    })
+  }
   return stale
 }
 

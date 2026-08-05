@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie'
 import type { Patient, Visit, Drug, VisitStatus, Fee, RxSet, RxLine } from './types'
 import { profile } from './profile'
 import { FIRST_DOCTOR } from './doctors'
-import { highWater, noteIssued, tokenHighWater, noteToken } from './safety'
+import { highWater, noteIssued, tokenHighWater, noteToken, CLINIC_DAY_SHIFT } from './safety'
 import { isDemo } from './version'
 
 // Everything is written the moment it changes. Load-shedding is normal here:
@@ -66,7 +66,11 @@ export function uid(): string {
   ).toUpperCase()
 }
 
-const startOfToday = () => new Date(new Date().toDateString()).getTime()
+/** When the clinical day began: 4 am, so an evening that runs past midnight
+ *  stays ONE day — same rule as safety.ts dayKey, or tokens would disagree
+ *  with the queue about what "today" means. */
+const startOfToday = () =>
+  new Date(new Date(Date.now() - CLINIC_DAY_SHIFT).toDateString()).getTime() + CLINIC_DAY_SHIFT
 
 export async function todaysVisits(): Promise<Visit[]> {
   const from = startOfToday()
@@ -212,14 +216,30 @@ export async function setFee(id: string, fee: Fee | undefined) {
   await db.visits.update(id, { fee })
 }
 
-/** The doctor reduces a fee already collected. The counter owes the difference. */
+/** The doctor reduces a fee. What that MEANS depends on whether the money was
+ *  ever taken: a collected fee produces a refund the counter owes back; a fee
+ *  still due simply becomes a smaller debt. Computing a "refund" of money that
+ *  was never collected made the drawer count itself short. */
 export async function grantDiscount(id: string, newAmount: number, note?: string) {
   const v = await db.visits.get(id)
   if (!v?.fee) return
-  const back = Math.max(0, v.fee.amount - Math.max(0, newAmount))
+  const want = Math.max(0, newAmount)
+  if (v.fee.state === 'due') {
+    // nothing was collected, so nothing can be owed back: the debt shrinks
+    await db.visits.update(id, {
+      fee: { ...v.fee, amount: want, refund: undefined, refundedAt: undefined,
+             refundNote: note?.trim() || undefined,
+             state: want === 0 ? 'waived' : 'due' },
+    })
+    return
+  }
+  if (v.fee.amount === 0) return   // free from the start: nothing to reduce
+  const back = Math.max(0, v.fee.amount - want)
   await db.visits.update(id, {
+    // cancelling a full waive puts the state back to paid: the money was
+    // collected and is being kept, so calling it waived was a lie in figures
     fee: { ...v.fee, refund: back || undefined, refundNote: note?.trim() || undefined,
-           refundedAt: undefined, state: newAmount === 0 ? 'waived' : v.fee.state },
+           refundedAt: undefined, state: back === v.fee.amount ? 'waived' : 'paid' },
   })
 }
 

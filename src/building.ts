@@ -179,6 +179,8 @@ const pending = new Map<number, (m: Msg) => void>()
 let stateCb: ((s: WireState) => void) | null = null
 let rxCb: ((r: WireRx) => void) | null = null
 let upCb: ((up: boolean) => void) | null = null
+let errCb: ((why: string) => void) | null = null
+let expiredCb: (() => void) | null = null
 
 export const hostUp = () => Date.now() - hostSeen < 10000
 
@@ -186,17 +188,36 @@ export function mirrorSubscribe(cb: {
   state: (s: WireState) => void
   rx?: (r: WireRx) => void
   up?: (up: boolean) => void
+  /** an intent the host refused or lost — the screen says so, never swallows it */
+  err?: (why: string) => void
+  /** the host restarted and forgot this sitting: back to the door, visibly */
+  expired?: () => void
 }): void {
   stateCb = cb.state
   rxCb = cb.rx ?? null
   upCb = cb.up ?? null
+  errCb = cb.err ?? null
+  expiredCb = cb.expired ?? null
 }
 
 function startMirror(): void {
   try { sid = sessionStorage.getItem('nuskho.mirrorSid') ?? '' } catch { sid = '' }
   listeners.add(m => {
+    /**
+     * THE MIRROR PINS ITS HOST. The first machine heard claiming to be the
+     * record holder is the record holder for this sitting, and every message
+     * that only a host may send — state, medicine lines, replies — is dropped
+     * unless it comes from that pinned sender. Without this, any device
+     * inside the wifi could shout "I am the host" and the next sign-in would
+     * hand it a PIN. The pin only moves when the real host has been silent
+     * long enough to be honestly called off (a reboot), because a host that
+     * is speaking cannot be impersonated, only raced — and this closes the
+     * race for every phone that has ever heard the true one.
+     */
     if (m.t === 'host') {
+      if (hostId && m.from !== hostId && Date.now() - hostSeen < 15000) return
       const was = hostUp()
+      if (hostId !== m.from) resumedThisSocket = false
       hostId = m.from ?? 0
       hostSeen = Date.now()
       if (!was && upCb) upCb(true)
@@ -204,6 +225,7 @@ function startMirror(): void {
       if (sid && !resumedThisSocket) { resumedThisSocket = true; send({ t: 'resume', to: hostId, sid }) }
       return
     }
+    if (hostId && m.from !== hostId) return   // only the pinned host is heard
     if (m.t === 'state' && stateCb) stateCb(m.s as WireState)
     if (m.t === 'rx' && rxCb) rxCb(m.r as WireRx)
     if ((m.t === 'done' || m.t === 'authok' || m.t === 'authno') && typeof m.req === 'number') {
@@ -247,17 +269,29 @@ export function mirrorSignOut(): void {
 
 export async function intent(kind: IntentKind, p: Record<string, unknown>): Promise<Msg> {
   const r = await ask({ t: 'intent', kind, p, sid })
-  // a host restart forgot the sitting: sign in again with what we know
-  if (r.ok === false && r.why === 'sitting expired' && lastAuth) {
-    const again = await mirrorAuth(lastAuth.role, lastAuth.pin)
-    if (again.ok) return ask({ t: 'intent', kind, p, sid })
+  // a host restart forgot the sitting: sign in again with what we know,
+  // or — after a page reload lost the PIN from memory — go back to the door
+  // VISIBLY instead of showing buttons that silently do nothing
+  if (r.ok === false && r.code === 'expired') {
+    if (lastAuth) {
+      const again = await mirrorAuth(lastAuth.role, lastAuth.pin)
+      if (again.ok) {
+        const r2 = await ask({ t: 'intent', kind, p, sid })
+        if (r2.ok === false && errCb) errCb(String(r2.why ?? 'That did not go through.'))
+        return r2
+      }
+    }
+    mirrorSignOut()
+    if (expiredCb) expiredCb()
+    return r
   }
+  if (r.ok === false && errCb) errCb(String(r.why ?? 'That did not go through.'))
   return r
 }
 
 /* ------------------------------------------------------------------- the host */
 
-type Sitting = { role: Role; fromId: number }
+type Sitting = { role: Role; fromId: number; at: number }
 
 const sittings = new Map<string, Sitting>()   // sid -> who
 
@@ -310,6 +344,32 @@ async function buildRx(): Promise<WireRx> {
   }))
 }
 
+/**
+ * Each role receives ITS OWN cut of the day, decided here, once, before the
+ * wire — the mirror never gets to choose what it holds. The pharmacy screen
+ * needs no fees and no vitals flag, so its phones never receive them; the
+ * counter and the clinic admin have no business with a medicine count or a
+ * vitals flag, so theirs are stripped; the doctor's private refund note goes
+ * only to the money roles that will read it out at the counter. The rule for
+ * every field is the one from the paper world: it crosses only to a desk that
+ * would already have it on paper.
+ */
+function shapeFor(role: Role, s: WireState): WireState {
+  const money = can('money', role)
+  const history = can('history', role)
+  const dispense = can('dispense', role)
+  return {
+    ...s,
+    visits: s.visits.map(v => ({
+      ...v,
+      fee: dispense && !money ? undefined
+        : v.fee ? { ...v.fee, refundNote: money ? v.fee.refundNote : undefined } : undefined,
+      hasVitals: history ? v.hasVitals : false,
+      linesN: history || dispense ? v.linesN : 0,
+    })),
+  }
+}
+
 let pushQueued = false
 async function pushState(): Promise<void> {
   if (pushQueued) return
@@ -321,11 +381,16 @@ async function pushState(): Promise<void> {
     const rxHolders = [...sittings.values()].filter(x => can('dispense', x.role))
     const rx = rxHolders.length ? await buildRx() : null
     for (const [, sit] of sittings) {
-      send({ t: 'state', to: sit.fromId, s })
+      if (sit.fromId < 0) continue   // waiting to resume after a hub restart
+      send({ t: 'state', to: sit.fromId, s: shapeFor(sit.role, s) })
       if (rx && can('dispense', sit.role)) send({ t: 'rx', to: sit.fromId, r: rx })
     }
   }, 120)
 }
+
+/** A wire string is untrusted: cut to size, or a 1 MB "name" ends up in the
+ *  database, in every push, and on a thermal receipt. */
+const clip = (v: unknown, n: number): string => String(v ?? '').slice(0, n).trim()
 
 /** The one place a mirror's asked-for change becomes a record: the same
  *  functions the solo product calls, on the one database that exists. */
@@ -333,24 +398,27 @@ async function applyIntent(kind: IntentKind, p: Record<string, unknown>): Promis
   if (kind === 'addPatient' || kind === 'openByCode') {
     let patientId: string
     if (kind === 'openByCode') {
-      const found = await findByCode(String(p.code ?? ''))
+      const found = await findByCode(clip(p.code, 13))
       if (!found) return { ok: false, why: 'No patient with that number. Add as new.' }
       patientId = found.id
     } else {
-      const name = String(p.name ?? '').trim()
+      const name = clip(p.name, 80)
       if (!name) return { ok: false, why: 'A name is needed.' }
       patientId = uid()
       await db.patients.add({
         id: patientId, num: await nextPatientNum(), name,
-        phone: String(p.phone ?? '').trim() || undefined,
-        age: String(p.age ?? '').trim() || undefined,
-        city: String(p.city ?? '').trim() || undefined,
+        phone: clip(p.phone, 15).replace(/[^0-9+ ]/g, '') || undefined,
+        age: clip(p.age, 3).replace(/\D/g, '') || undefined,
+        city: clip(p.city, 40) || undefined,
         createdAt: Date.now(),
       })
     }
-    const doctorId = p.doctorId ? String(p.doctorId) : undefined
+    // a doctor this building does not have cannot be issued a token for
+    const wantDoc = p.doctorId ? String(p.doctorId) : undefined
+    const doctorId = wantDoc && activeDoctors().some(d => d.id === wantDoc) ? wantDoc : undefined
+    if (wantDoc && !doctorId) return { ok: false, why: 'That room is not in this building.' }
     const token = await nextToken(doctorId)
-    const amount = Math.max(0, +(p.amount ?? 0) || 0)
+    const amount = Math.min(100000, Math.max(0, Math.round(+(p.amount ?? 0) || 0)))
     const state = (['paid', 'due', 'waived'].includes(String(p.feeState)) ? p.feeState : 'paid') as FeeState
     const fee = { amount: state === 'waived' ? 0 : amount, state: (amount === 0 ? 'waived' : state) as FeeState, at: Date.now() }
     const vid = uid()
@@ -405,8 +473,22 @@ async function applyIntent(kind: IntentKind, p: Record<string, unknown>): Promis
   }
   if (kind === 'setVitals') {
     if (!v) return { ok: false, why: 'That token is gone.' }
-    const vt = (p.vitals && typeof p.vitals === 'object') ? p.vitals as Record<string, string> : {}
-    await db.visits.update(vid, { vitals: vt })
+    // MERGED, never replaced: two phones each typing one number must end with
+    // both numbers on the record, not with the later phone erasing the first.
+    // Values are strings, short, and at most a handful — anything else off
+    // the wire would crash the slip renderer and make PRINT fail for ever.
+    const raw = (p.vitals && typeof p.vitals === 'object' && !Array.isArray(p.vitals))
+      ? p.vitals as Record<string, unknown> : {}
+    const merged: Record<string, string> = { ...(v.vitals ?? {}) }
+    let n = 0
+    for (const [k, val] of Object.entries(raw)) {
+      if (++n > 12) break
+      const key = String(k).slice(0, 16)
+      const s = typeof val === 'string' ? val.slice(0, 24).trim() : ''
+      if (s) merged[key] = s
+      else delete merged[key]
+    }
+    await db.visits.update(vid, { vitals: merged })
     return { ok: true }
   }
   if (kind === 'markRefunded') {
@@ -447,9 +529,32 @@ async function applyIntent(kind: IntentKind, p: Record<string, unknown>): Promis
   return { ok: false, why: 'Unknown ask.' }
 }
 
+/**
+ * Intents apply ONE AT A TIME, in arrival order, like print jobs. Two
+ * pharmacy phones ticking two lines of the same slip within milliseconds are
+ * two read-modify-writes on one row; unserialised, the later write erased the
+ * earlier tick. A queue of two is invisible; a lost tick at a busy counter
+ * is a patient short a medicine.
+ */
+let intentChain: Promise<unknown> = Promise.resolve()
+function queuedIntent(job: () => Promise<Record<string, unknown>>): Promise<Record<string, unknown>> {
+  const next = intentChain.then(job, job)
+  intentChain = next.catch(() => {})
+  return next
+}
+
 function startHost(): void {
   listeners.add(async m => {
     if (mode !== 'host') return
+
+    // OUR socket reconnected: the hub restarted or the wifi blinked, and
+    // every id it ever assigned is void. Sittings survive — the PINs were
+    // typed and the day is live — but nothing is pushed anywhere until each
+    // phone proves itself again with its sid.
+    if (m.t === 'you') {
+      for (const sit of sittings.values()) sit.fromId = -1
+      return
+    }
 
     if (m.t === 'auth') {
       const role = m.role as Role
@@ -460,14 +565,14 @@ function startHost(): void {
       const ok = await checkRolePin(role, String(m.pin ?? ''))
       if (!ok) { send({ t: 'authno', to: m.from, req: m.req, why: 'That is not right. Try again.' }); return }
       const sid2 = newSid()
-      sittings.set(sid2, { role, fromId: m.from! })
+      sittings.set(sid2, { role, fromId: m.from!, at: Date.now() })
       send({ t: 'authok', to: m.from, req: m.req, sid: sid2, role })
       pushState()
       return
     }
     if (m.t === 'resume') {
       const sit = sittings.get(String(m.sid ?? ''))
-      if (sit && m.from) { sit.fromId = m.from; pushState() }
+      if (sit && m.from) { sit.fromId = m.from; sit.at = Date.now(); pushState() }
       return
     }
     if (m.t === 'bye') {
@@ -475,22 +580,27 @@ function startHost(): void {
       return
     }
     if (m.t === 'gone') {
-      for (const [k, sit] of sittings) if (sit.fromId === m.from) sittings.delete(k)
+      // the phone's socket dropped — wifi blink, screen lock. The sitting
+      // waits for its sid to resume rather than dying: signing in again for
+      // every walk past the corridor's dead spot would get the PINs taped to
+      // the wall. A sitting nobody resumes is swept after twelve hours.
+      for (const sit of sittings.values()) if (sit.fromId === m.from) sit.fromId = -1
       return
     }
     if (m.t === 'intent') {
       const sit = sittings.get(String(m.sid ?? ''))
       if (!sit || sit.fromId !== m.from) {
-        send({ t: 'done', to: m.from, req: m.req, ok: false, why: 'sitting expired' })
+        send({ t: 'done', to: m.from, req: m.req, ok: false, code: 'expired', why: 'Your sitting expired. Sign in again.' })
         return
       }
+      sit.at = Date.now()
       const kind = m.kind as IntentKind
       if (!NEED[kind] || !can(NEED[kind], sit.role)) {
         send({ t: 'done', to: m.from, req: m.req, ok: false, why: 'That role may not do this.' })
         return
       }
       let out: Record<string, unknown>
-      try { out = await applyIntent(kind, (m.p ?? {}) as Record<string, unknown>) }
+      try { out = await queuedIntent(() => applyIntent(kind, (m.p ?? {}) as Record<string, unknown>)) }
       catch { out = { ok: false, why: 'That did not go through. Try again.' } }
       send({ t: 'done', to: m.from, req: m.req, ...out })
       pushState()
@@ -502,8 +612,13 @@ function startHost(): void {
   })
 
   // I am here, every few seconds. Mirrors that cannot hear this say
-  // "the clinic machine is off" instead of pretending.
-  setInterval(() => send({ t: 'host' }), 4000)
+  // "the clinic machine is off" instead of pretending. The same tick sweeps
+  // sittings nobody has resumed since yesterday.
+  setInterval(() => {
+    send({ t: 'host' })
+    const old = Date.now() - 12 * 3600 * 1000
+    for (const [k, sit] of sittings) if (sit.at < old) sittings.delete(k)
+  }, 4000)
 
   // The doctor prints, the desk refunds, a patient is closed at this
   // keyboard: every local change a mirror could care about already raises a

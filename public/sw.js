@@ -18,7 +18,7 @@
 // BUMP THIS when welcome.html or login.html change: they are served cache-first
 // out of this cache, so an edit that does not bump the version is an edit a
 // returning visitor never sees.
-const CACHE = 'nuskho-v11'
+const CACHE = 'nuskho-v12'
 
 self.addEventListener('install', e => {
   // Take the shell now so the first offline open works. './' is the welcome
@@ -39,7 +39,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const r = e.request
   if (r.method !== 'GET') return
-  if (new URL(r.url).origin !== self.location.origin) return
+  const u = new URL(r.url)
+  if (u.origin !== self.location.origin) return
+  // The building's wire is never cached: a cached /hub.json would pin a
+  // device into (or out of) building mode for ever, against a live answer.
+  if (u.pathname === '/hub.json' || u.pathname === '/bus') return
   e.respondWith((async () => {
     const hit = await caches.match(r, { ignoreSearch: true })
     if (hit) return hit

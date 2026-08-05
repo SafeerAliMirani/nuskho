@@ -87,7 +87,19 @@ export function bumpHighWaterPastRestore(seen: number): void {
 
 const TOKEN_HWM = 'nuskho.tokenHighWater'
 
-export const dayKey = (t = Date.now()): string => new Date(t).toDateString()
+/**
+ * THE CLINICAL DAY ENDS AT 4 AM, NOT MIDNIGHT.
+ *
+ * A famous doctor's evening runs past twelve. At the stroke of midnight a
+ * calendar day would empty the queue mid-sitting, restart every room's tokens
+ * at 1 while a family holds receipt 1 from eleven o'clock, and flip a "not
+ * sitting tonight" doctor back on — three lies at once, at the worst hour.
+ * Shifting the boundary to 4 am means a sitting is one day however late it
+ * runs, and nobody is at the desk at 4 am to notice the seam.
+ */
+export const CLINIC_DAY_SHIFT = 4 * 3600 * 1000
+
+export const dayKey = (t = Date.now()): string => new Date(t - CLINIC_DAY_SHIFT).toDateString()
 
 /** Rooms count their own tokens, so each room guards its own mark. The solo
  *  clinic passes nothing and keeps the key it has used since the pilot. */

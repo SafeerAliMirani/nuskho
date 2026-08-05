@@ -62,6 +62,8 @@ const server = createServer((req, res) => {
       'content-type': MIME[extname(file)] || 'application/octet-stream',
       // phones must pick up a new build on reload; the wire is fast and local
       'cache-control': 'no-cache',
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'no-referrer',
     })
     res.end(body)
   } catch {

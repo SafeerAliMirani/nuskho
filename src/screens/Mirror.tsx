@@ -46,16 +46,30 @@ export default function Mirror() {
   const [s, setS] = useState<WireState | null>(null)
   const [rx, setRx] = useState<WireRx>([])
   const [up, setUp] = useState(hostUp())
-
-  useEffect(() => {
-    mirrorSubscribe({ state: setS, rx: setRx, up: setUp })
-  }, [])
+  const [err, setErr] = useState('')
 
   const out = () => {
     mirrorSignOut()
     try { sessionStorage.removeItem(ROLE_KEY) } catch { /* ignore */ }
     setRole(null); setS(null)
   }
+
+  useEffect(() => {
+    mirrorSubscribe({
+      state: setS, rx: setRx, up: setUp,
+      err: w => {
+        setErr(w)
+        setTimeout(() => setErr(''), 5000)
+      },
+      // the clinic machine restarted and forgot this sitting, and the PIN is
+      // no longer in memory: the honest place to be is the door, not a screen
+      // whose buttons quietly do nothing
+      expired: () => {
+        try { sessionStorage.removeItem(ROLE_KEY) } catch { /* ignore */ }
+        setRole(null); setS(null)
+      },
+    })
+  }, [])
 
   return (
     <div className="app mirror">
@@ -79,6 +93,16 @@ export default function Mirror() {
           )}
         </div>
       </header>
+
+      {/* Losing the clinic machine is said in a banner, in words, on every
+          signed-in screen — not with a six-pixel dot the rush will not see. */}
+      {role && !up && (
+        <div className="mirwarn">
+          The clinic machine is not answering. What you see may be old, and
+          nothing new can be saved until it is back. The paper pad takes over.
+        </div>
+      )}
+      {err && role && <div className="mirwarn err">{err}</div>}
 
       {!role
         ? <MirrorDoor up={up} onIn={r => {
@@ -286,7 +310,7 @@ function MDesk({ s }: { s: WireState }) {
         <span><IcWarn size={15} /> <b>Cannot wait</b></span>
       </label>
       <div className="fld feerow">
-        <label><IcRupee size={13} /> Fee taken now</label>
+        <label><IcRupee size={13} /> Fee taken now &nbsp; في</label>
         <div className="row">
           <input value={amt} inputMode="numeric" placeholder="Rs"
                  onChange={e => setAmt(e.target.value.replace(/\D/g, '').slice(0, 6))} />
@@ -408,14 +432,14 @@ function MPharm({ s, rx }: { s: WireState; rx: WireRx }) {
             <div className="hd" style={{ cursor: 'pointer' }} onClick={() => setOpen(isOpen ? null : v.id)}>
               <div>
                 <b>Token {v.token} · {v.name}</b>
-                <small>No. {v.code}{done ? ' · given ✓' : ` · ${lines.length} medicines`}</small>
+                <small>No. {v.code}{done ? ' · given ✓' : ` · ${lines.length} medicine${lines.length === 1 ? '' : 's'}`}</small>
               </div>
               <span className="lnk">{isOpen ? 'close' : done ? 'given ✓' : 'open'}</span>
             </div>
             {isOpen && (
               <>
                 {lines.map((l, i) => (
-                  <div className="row" key={i}
+                  <div className="row pline" key={i}
                        style={{ alignItems: 'baseline', gap: 10, padding: '7px 0', borderTop: '1px solid #eef2f0' }}>
                     <button className={'chip ' + (l.given !== undefined ? 'on' : '')}
                             onClick={() => intent('setGiven', { visitId: v.id, index: i, given: l.given !== undefined ? null : l.n })}>
@@ -479,7 +503,7 @@ function MOps({ s }: { s: WireState }) {
         <div className="line" key={d.id}>
           <div className="hd"><div>
             <b>Room {d.room} · {d.nameEn}</b>
-            <small>{n} tokens · {printed} printed · Rs {collected} taken</small>
+            <small>{n} token{n === 1 ? '' : 's'} · {printed} printed · Rs {collected} taken</small>
           </div></div>
         </div>
       ))}
