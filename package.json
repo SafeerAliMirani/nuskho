@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vitest run && tsc -b && vite build && vite build --mode demo --base=/ --outDir=dist-web",
+    "build": "vitest run && tsc -b && vite build && vite build --mode demo --base=/ --outDir=dist-web && node scripts/weblayout.mjs",
     "preview": "vite preview",
     "clinic": "vite build && start chrome --kiosk-printing --allow-file-access-from-files \"%CD%\\dist\\index.html\"",
-    "build:web": "vite build --mode demo --base=/ --outDir=dist-web",
+    "build:web": "vite build --mode demo --base=/ --outDir=dist-web && node scripts/weblayout.mjs",
     "build:clinic": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",

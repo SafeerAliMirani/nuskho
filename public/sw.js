@@ -18,14 +18,14 @@
 // BUMP THIS when welcome.html or login.html change: they are served cache-first
 // out of this cache, so an edit that does not bump the version is an edit a
 // returning visitor never sees.
-const CACHE = 'nuskho-v5'
+const CACHE = 'nuskho-v6'
 
 self.addEventListener('install', e => {
   // Take the shell now so the first offline open works. './' is the welcome
-  // page (the host rewrites the root there); './index.html' is the app itself.
+  // page (the physical index of the web build); './app' is the app itself.
   e.waitUntil((async () => {
     const c = await caches.open(CACHE)
-    await c.addAll(['./', './index.html', './login.html', './manifest.webmanifest', './icon.svg'])
+    await c.addAll(['./', './app', './manifest.webmanifest', './icon.svg'])
   })())
 })
 
@@ -54,7 +54,7 @@ self.addEventListener('fetch', e => {
       // A navigation with no network falls back to the shell rather than to a
       // browser error page, which is what makes "add to home screen" honest.
       if (r.mode === 'navigate') {
-        const shell = await caches.match('./index.html')
+        const shell = await caches.match('./app')
         if (shell) return shell
       }
       throw new Error('offline and not cached')
