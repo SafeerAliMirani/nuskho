@@ -86,3 +86,30 @@ export function qrSvgSafe(code: string, mm = 14): string {
     return ''
   }
 }
+
+/**
+ * A square carrying exactly the text given, for SCREENS, never for slips.
+ *
+ * The building's join square encodes the wifi address a phone should open,
+ * and an address has characters the patient-code encoder strips on purpose.
+ * This stays off paper: the one QR a slip carries is the patient code above.
+ */
+export function qrSvgRaw(text: string, px = 200): string {
+  try {
+    const q = QRCode.create(text, { errorCorrectionLevel: 'M' })
+    const n = q.modules.size
+    let d = ''
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        if (q.modules.get(x, y)) d += `M${x} ${y}h1v1h-1z`
+      }
+    }
+    return `<svg width="${px}" height="${px}" viewBox="-2 -2 ${n + 4} ${n + 4}" `
+         + `shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" role="img" `
+         + `aria-label="join address">`
+         + `<rect x="-2" y="-2" width="${n + 4}" height="${n + 4}" fill="#fff"/>`
+         + `<path d="${d}" fill="#000"/></svg>`
+  } catch {
+    return ''
+  }
+}

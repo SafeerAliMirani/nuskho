@@ -14,6 +14,8 @@ import { profile, saveProfile } from '../profile'
 import {
   allDoctors, addDoctor, updateDoctor, setDoctorArchived, FIRST_DOCTOR, type Doctor,
 } from '../doctors'
+import { buildingMode, hostHere, setHostHere, sittingsList } from '../building'
+import { qrSvgRaw } from '../print/qr'
 
 /**
  * Who may change what.
@@ -27,15 +29,15 @@ import {
  * a medical document, they change roughly never, and we install in person. The
  * medicine list is the opposite on every count, so it stays with the doctor.
  */
-type Tab = 'Fee' | 'Paper' | 'Medicines' | 'Diagnoses' | 'Lock' | 'Backup' | 'You' | 'Doctors' | 'Heading' | 'Review' | 'Market'
+type Tab = 'Fee' | 'Paper' | 'Medicines' | 'Diagnoses' | 'Lock' | 'Wifi' | 'Backup' | 'You' | 'Doctors' | 'Heading' | 'Review' | 'Market'
 
 /** Each tab names the ONE permission that opens it. Nothing decides twice. */
 const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
   Fee: 'rate', Paper: 'paper', Medicines: 'medicines', Diagnoses: 'medicines',
-  Lock: 'lock', Backup: 'backup',
+  Lock: 'lock', Wifi: 'paper', Backup: 'backup',
   You: 'identity', Doctors: 'identity', Heading: 'identity', Market: 'review', Review: 'review',
 }
-const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Lock']
+const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Lock', 'Wifi']
 const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review', 'Backup']
 
 export default function Setup({ onBack }: { onBack: () => void }) {
@@ -109,6 +111,7 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             {tab === 'Medicines' && <DrugsStep />}
             {tab === 'Diagnoses' && <DxTab />}
             {tab === 'Backup' && <BackupTab />}
+            {tab === 'Wifi' && <WifiTab />}
             {tab === 'Doctors' && <DoctorsTab />}
             {tab === 'You' && <IdentityFields v={dr.v} on={on(dr.on)} />}
             {tab === 'Review' && <ReviewQueue />}
@@ -137,7 +140,7 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             {tab === 'Lock' && <PinTab />}
 
             {tab !== 'Medicines' && tab !== 'Backup' && tab !== 'Review' && tab !== 'Market'
-              && tab !== 'Lock' && tab !== 'Diagnoses' && tab !== 'Doctors' && (
+              && tab !== 'Lock' && tab !== 'Diagnoses' && tab !== 'Doctors' && tab !== 'Wifi' && (
               <button className="btn wide save" onClick={save}>{saved ? 'Saved ✓' : 'Save'}</button>
             )}
           </>}
@@ -316,6 +319,90 @@ function DxTab() {
         reads symptoms, ranks anything, or offers an opinion about what is wrong with a patient,
         and it never will.
       </Note>
+    </>
+  )
+}
+
+/* ------------------------------------------------------------------- wifi */
+
+/**
+ * The building's own wire, explained where the person who runs it stands.
+ *
+ * Three states, told apart honestly: not on the wire at all (a solo folder or
+ * the public copy — the common case, and nothing here applies), a MIRROR (a
+ * phone that joined and should never be marked as the record holder), and
+ * the RECORD HOLDER, which is the one machine whose browser keeps the
+ * database, marked here by a human, once, during the install.
+ */
+function WifiTab() {
+  const mode = buildingMode()
+  const [, redraw] = useState(0)
+
+  if (mode === 'off') {
+    return (
+      <>
+        <h3>Phones and tabs in the building</h3>
+        <p className="hint">
+          This copy is not on a building wire right now, which is normal for a solo
+          clinic. To put the building on its own wifi: on the one machine that will
+          hold the records, run <code>node tools\nuskho-wifi.cjs</code> in the clinic
+          folder. It prints an address; open the app AT that address on this machine,
+          mark it as the record holder under this same tab, and every phone on the
+          clinic wifi joins by scanning the square that appears here. No internet is
+          involved at any point, and the phones hold no records, ever.
+        </p>
+        <Note tone="safe" title="What a phone can never do">
+          A phone is a door and a screen. It signs in with a role PIN checked by the
+          record holder, shows the queue, and asks the record holder to make changes.
+          Steal the phone and you have stolen a mirror: there is nothing inside it.
+        </Note>
+      </>
+    )
+  }
+
+  const host = hostHere()
+  const joined = sittingsList()
+
+  return (
+    <>
+      <h3>This machine on the building's wire</h3>
+      <label className="check">
+        <input type="checkbox" checked={host}
+               onChange={e => {
+                 setHostHere(e.target.checked)
+                 redraw(n => n + 1)
+               }} />
+        <span><b>This machine holds the records</b>
+          <small>Exactly one machine in the building should have this ticked: the one whose
+            browser keeps the database. Phones must leave it off. Reload after changing it.</small></span>
+      </label>
+
+      {mode === 'host' && (
+        <>
+          <div className="lhbox">
+            <h3>Phones join by scanning this</h3>
+            <p>
+              On the clinic wifi, point the phone's camera here. The address opens in the
+              browser; add it to the home screen once and it is an app icon from then on.
+            </p>
+            <div dangerouslySetInnerHTML={{ __html: qrSvgRaw(location.origin, 190) }} />
+            <p className="hint"><code>{location.origin}</code></p>
+          </div>
+          <div className="lhbox">
+            <h3>Signed in on the wire now — {joined.length}</h3>
+            {joined.length
+              ? <p>{joined.map((j, i) => <span key={i} className="chip" style={{ marginRight: 6 }}>{ROLE_NAME[j.role]}</span>)}</p>
+              : <p className="hint">No phone has signed in yet this sitting.</p>}
+          </div>
+          <Note tone="safe" title="What crosses the wire">
+            Names, numbers and money state go to signed-in desk phones, the same facts the
+            paper register at the gate already shows. Medicine lines go only to a phone
+            signed in as Pharmacy, only for printed slips. Diagnoses, histories and the
+            records themselves never leave this machine, and nothing here touches the
+            internet.
+          </Note>
+        </>
+      )}
     </>
   )
 }

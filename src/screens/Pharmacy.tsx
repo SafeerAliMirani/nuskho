@@ -18,8 +18,10 @@ import type { Visit, RxLine } from '../types'
  * same screen; nothing here will need to be unlearned.
  */
 
-/** How many units the printed course amounts to. Same arithmetic as the slip. */
-function course(l: RxLine): { n: number; unit: string } {
+/** How many units the printed course amounts to. Same arithmetic as the slip.
+ *  Exported because the building host sends these same counts to a pharmacy
+ *  phone, and two copies of this arithmetic would one day disagree. */
+export function course(l: RxLine): { n: number; unit: string } {
   const perDay = (l.dose.m || 0) + (l.dose.d || 0) + (l.dose.n || 0)
   const form = l.snap?.form ?? 'tab'
   if (form === 'syr' || form === 'other') return { n: 0, unit: `${l.days} days` }

@@ -1632,3 +1632,9 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .rc-sit{align-self:flex-start;margin:0 14px 10px;font-size:11.5px}
 
 /* the mixed queue a shared desk reads: rows already carry their room tag */
+
+/* ---- the building's wire: mirror chrome and the host status dot ---- */
+.hostdot{width:10px;height:10px;border-radius:50%;background:#c14b3a;display:inline-block}
+.hostdot.up{background:#1d8a5f}
+.mirror .top{position:sticky;top:0;z-index:5}
+.chip.off{opacity:.55}

@@ -11,6 +11,8 @@ import Lock from './screens/Lock'
 import { profile, adminIsSet, lockAdmin } from './profile'
 import { role, can, signOut, currentDoctorId, ROLE_NAME, ROLE_SD } from './roles'
 import { multiRoom, doctorById, visitDoctorId } from './doctors'
+import { buildingMode } from './building'
+import Mirror from './screens/Mirror'
 import { todaysVisits } from './db'
 import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo } from './ui/art'
 import Toasts from './ui/Toasts'
@@ -20,6 +22,14 @@ import { clearDemo, touchDemo } from './demo'
 import type { Visit } from './types'
 
 export default function App() {
+  // A phone in the building never sees the app below: it is a mirror, a door
+  // and a screen holding nothing. The record holder and every copy outside a
+  // building fall through to the app exactly as it has always been.
+  if (buildingMode() === 'mirror') return <Mirror />
+  return <Clinic />
+}
+
+function Clinic() {
   const [visitId, setVisitId] = useState<string | null>(null)
   const [setup, setSetup] = useState(false)
   const [stats, setStats] = useState(false)
@@ -73,6 +83,9 @@ export default function App() {
     const h = (e: Event) => { setVisitId((e as CustomEvent).detail); refresh() }
     const p = () => bump(n => n + 1)
     const w = () => { setSetup(false); setVisitId(null); setWelcome(true) }
+    // a phone in the building changed the day: re-read, disturb nothing
+    const r = () => refresh()
+    window.addEventListener('nuskho:refresh', r)
     window.addEventListener('nuskho:open', h)
     window.addEventListener('nuskho:profile', p)
     window.addEventListener('nuskho:admin', p)
@@ -80,6 +93,7 @@ export default function App() {
     window.addEventListener('nuskho:doctors', p)
     window.addEventListener('nuskho:wizard', w)
     return () => {
+      window.removeEventListener('nuskho:refresh', r)
       window.removeEventListener('nuskho:open', h)
       window.removeEventListener('nuskho:profile', p)
       window.removeEventListener('nuskho:admin', p)
