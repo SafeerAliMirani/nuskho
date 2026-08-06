@@ -445,6 +445,32 @@ function WifiTab() {
  */
 const BLANK = { nameEn: '', nameSd: '', degreesEn: '', degreesSd: '', reg: '', fee: '', room: '' }
 
+/**
+ * THE APP'S OWN HINT MUST NEVER BECOME A DOCTOR'S NAME.
+ *
+ * This field's label used to read "Name, Sindhi — سنڌي ۾ نالو", which is the
+ * Sindhi for "name in Sindhi". Safeer added a second doctor and that exact
+ * phrase ended up saved as her name, so the front door read "Pirah, name in
+ * Sindhi" and it would have printed in the letterhead of every slip out of
+ * Room 2. Nobody who cannot read Sindhi would ever have caught it, which is
+ * the whole reason the rule about unreviewed Sindhi exists.
+ *
+ * The label no longer offers a Sindhi phrase to copy. This is the second line:
+ * whatever the route, typed, pasted or predicted by a phone keyboard, the app
+ * refuses to accept a word it wrote itself as somebody's name.
+ */
+const OUR_OWN_WORDS = [
+  'سنڌي ۾ نالو',      // name in Sindhi
+  'نالو',              // name
+  'ڊاڪٽر جو نالو',     // the doctor's name
+  'سنڌي',              // Sindhi
+  'name in sindhi', 'name, sindhi', 'sindhi',
+]
+const isOurHint = (s: string) => {
+  const t = s.trim().toLowerCase().replace(/\s+/g, ' ')
+  return t.length > 0 && OUR_OWN_WORDS.some(w => t === w.toLowerCase())
+}
+
 function DoctorsTab() {
   const [, redraw] = useState(0)
   const [editing, setEditing] = useState<string | null>(null)   // doctor id, or 'new'
@@ -468,6 +494,13 @@ function DoctorsTab() {
 
   function saveDoc() {
     if (!f.nameEn.trim() || !f.room.trim()) return
+    // Refused, not silently cleaned: a name that vanishes on save is its own
+    // small mystery, and the person needs to know WHY so he types a real one.
+    if (isOurHint(f.nameSd) || isOurHint(f.degreesSd)) {
+      setMsg('That Sindhi box still holds the hint text, not a name. It would print on ' +
+             'every slip from this room. Type the doctor’s real Sindhi name, or leave it empty.')
+      return
+    }
     const rec = {
       nameEn: f.nameEn.trim(), nameSd: f.nameSd.trim(),
       degreesEn: f.degreesEn.trim(), degreesSd: f.degreesSd.trim(),
@@ -521,7 +554,10 @@ function DoctorsTab() {
           <h3>{editing === 'new' ? 'Add a doctor' : 'Edit doctor'}</h3>
           <div className="row">
             {fld('nameEn', 'Name, English — printed on his slips')}
-            {fld('nameSd', 'Name, Sindhi — سنڌي ۾ نالو', { dir: 'rtl', lang: 'sd' })}
+            {/* No Sindhi phrase in this label. It sat next to a right-to-left
+                box and read like an example to copy, and once it did exactly
+                that it went onto a letterhead. */}
+            {fld('nameSd', 'Name in Sindhi — printed on his slips', { dir: 'rtl', lang: 'sd' })}
           </div>
           <div className="row">
             {fld('degreesEn', 'Degrees, English — optional')}

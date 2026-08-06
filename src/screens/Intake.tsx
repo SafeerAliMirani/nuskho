@@ -219,54 +219,33 @@ export default function Intake({ visits, onOpen, onChange }: {
     return d ? `R${d.room} ${d.nameEn} · ` : ''
   }
 
-  return (
-    <div className="pane">
-      <BackupNudge />
+  /**
+   * WHOSE SCREEN IS THIS, AND WHAT SHOULD BE AT THE TOP OF IT.
+   *
+   * One component serves the counter, the compounder and the doctor, because
+   * in a one room clinic they are frequently the same person and splitting it
+   * would mean maintaining the same queue three times.
+   *
+   * But the order was written for the counter, and it stayed that way for the
+   * doctor. Safeer signed in as the doctor in a two room clinic and got, top to
+   * bottom: which room are you (a question he had just answered at the door),
+   * the old-slip box, then the whole New patient form with the fee, and only
+   * then, below all of it, his own patients. He asked whether he had opened the
+   * compounder's screen or the receptionist's. That is the correct reading of
+   * what was on the page.
+   *
+   * So the doctor's queue leads for the doctor, and taking a patient in stays
+   * on the screen underneath, because a solo doctor really does do both. Nobody
+   * else's order changes.
+   */
+  const queueFirst = role() === 'doctor'
 
-      {/* TONIGHT. Only a building with several rooms sees this. The default is
-          that everyone active is sitting, so the normal evening costs the desk
-          nothing; the strip earns its place on the night a doctor does not
-          come, and as the switch that decides where the next token goes. */}
-      {multi && (
-        <>
-          <h2><IcQueue size={17} /> Tonight <span className="sd">اڄ رات</span></h2>
-          <div className="rooms">
-            {activeDoctors().map(d => {
-              const mine = visits.filter(v => visitDoctorId(v.doctorId) === d.id)
-              const waiting = mine.filter(v => v.status === 'waiting').length
-              const nextTok = mine.reduce((m, v) => Math.max(m, v.token), 0) + 1
-              const sitting = isSitting(d.id)
-              const on = sel?.id === d.id
-              return (
-                <div key={d.id} className={'roomcard' + (on ? ' on' : '') + (sitting ? '' : ' off')}>
-                  <button className="rc-main" disabled={!sitting} onClick={() => setSelDoc(d.id)}>
-                    <span className="rc-room">R{d.room}</span>
-                    <span className="rc-who"><b>{d.nameEn}</b>{d.nameSd ? <i className="sd">{d.nameSd}</i> : null}</span>
-                    {sitting
-                      ? <small>Rs {d.fee} · {waiting} waiting · next token {nextTok}</small>
-                      : <small>not sitting tonight</small>}
-                  </button>
-                  <button className="lnk rc-sit" onClick={() => {
-                    setSitting(d.id, !sitting)
-                    if (sitting && sel?.id === d.id) {
-                      const next = sittingDoctors().find(x => x.id !== d.id)
-                      if (next) setSelDoc(next.id)
-                    }
-                  }}>{sitting ? 'not in tonight' : 'sitting after all'}</button>
-                </div>
-              )
-            })}
-          </div>
-          {sel && (
-            <p className="hint">
-              Tokens below are issued for <b>Room {sel.room} · {sel.nameEn}</b>, at his fee.
-              Tap another room to change.
-            </p>
-          )}
-        </>
-      )}
-
-      <h2 style={multi ? { marginTop: 22 } : undefined}><IcScan size={17} /> Been here before? Number from the old slip, or scan it</h2>
+  /** The desk's own work: find a returning patient, or take a new one in. */
+  const intakeBlock = (
+    <>
+      <h2 style={multi && !queueFirst ? { marginTop: 22 } : { marginTop: queueFirst ? 30 : undefined }}>
+        <IcScan size={17} /> Been here before? Number from the old slip, or scan it
+      </h2>
       <div className="row">
         <div className="fld" style={{ flex: 2 }}>
           <input value={code} inputMode="numeric" maxLength={13} placeholder="the number on the slip"
@@ -286,7 +265,13 @@ export default function Intake({ visits, onOpen, onChange }: {
         allowed to open a camera at all, so scanning happens at this desk.
       </Tip>
 
-      <h2 style={{ marginTop: 24 }}><IcUser size={17} /> New patient</h2>
+      <h2 id="newpatient" style={{ marginTop: 24 }}><IcUser size={17} /> New patient</h2>
+      {queueFirst && (
+        <p className="hint" style={{ marginTop: -6 }}>
+          Normally the counter does this. It is here because plenty of evenings there is
+          nobody else at the door.
+        </p>
+      )}
       <div className="fld"><label>Name — نالو</label>
         <input value={name} onChange={e => setName(e.target.value)}
                onKeyDown={e => { if (e.key === 'Enter') addNew() }} /></div>
@@ -344,6 +329,64 @@ export default function Intake({ visits, onOpen, onChange }: {
         {adding ? 'Adding…' : <>Add to queue &nbsp; قطار ۾ شامل ڪريو</>}
       </button>
       <p className="hint">No old slip? Add as new. A duplicate costs nothing; asking questions at the door costs the evening.</p>
+    </>
+  )
+
+  return (
+    <div className="pane">
+      <BackupNudge />
+
+      {/* TONIGHT. Only a building with several rooms sees this. The default is
+          that everyone active is sitting, so the normal evening costs the desk
+          nothing; the strip earns its place on the night a doctor does not
+          come, and as the switch that decides where the next token goes. */}
+      {multi && (
+        <>
+          <h2><IcQueue size={17} /> Tonight <span className="sd">اڄ رات</span></h2>
+          <div className="rooms">
+            {activeDoctors().map(d => {
+              const mine = visits.filter(v => visitDoctorId(v.doctorId) === d.id)
+              const waiting = mine.filter(v => v.status === 'waiting').length
+              const nextTok = mine.reduce((m, v) => Math.max(m, v.token), 0) + 1
+              const sitting = isSitting(d.id)
+              const on = sel?.id === d.id
+              return (
+                <div key={d.id} className={'roomcard' + (on ? ' on' : '') + (sitting ? '' : ' off')}>
+                  <button className="rc-main" disabled={!sitting} onClick={() => setSelDoc(d.id)}>
+                    <span className="rc-room">R{d.room}</span>
+                    <span className="rc-who"><b>{d.nameEn}</b>{d.nameSd ? <i className="sd">{d.nameSd}</i> : null}</span>
+                    {sitting
+                      ? <small>Rs {d.fee} · {waiting} waiting · next token {nextTok}</small>
+                      : <small>not sitting tonight</small>}
+                  </button>
+                  <button className="lnk rc-sit" onClick={() => {
+                    setSitting(d.id, !sitting)
+                    if (sitting && sel?.id === d.id) {
+                      const next = sittingDoctors().find(x => x.id !== d.id)
+                      if (next) setSelDoc(next.id)
+                    }
+                  }}>{sitting ? 'not in tonight' : 'sitting after all'}</button>
+                </div>
+              )
+            })}
+          </div>
+          {sel && (
+            <p className="hint">
+              {/* He answered "which doctor" at the door thirty seconds ago. Saying
+                  it back to him as a statement, not as a fresh question, is the
+                  difference between a screen that knows him and one that forgot. */}
+              {queueFirst
+                ? <>You are in <b>Room {sel.room}</b>. The queue below is yours, and any token you
+                    take is issued for your room at your fee. The other rooms are here so you can
+                    see the evening, and to hand the desk over if you take a token for a colleague.</>
+                : <>Tokens below are issued for <b>Room {sel.room} · {sel.nameEn}</b>, at his fee.
+                    Tap another room to change.</>}
+            </p>
+          )}
+        </>
+      )}
+
+      {!queueFirst && intakeBlock}
 
       <h2 style={{ marginTop: 22 }}><IcQueue size={17} /> Today — {visits.length}</h2>
       {sum && visits.length > 0 && (
@@ -364,7 +407,20 @@ export default function Intake({ visits, onOpen, onChange }: {
         <div className="blank">
           <ArtEmpty />
           <b>Nobody waiting yet</b>
-          <p>Take the fee, add the patient above, and the number appears here.</p>
+          {/* The form is above for the desk and below for the doctor, so the
+              empty state cannot say "above" to everyone. For the doctor it
+              carries the jump instead, which keeps the page order stable
+              between an empty queue and a full one. */}
+          {queueFirst ? (
+            <>
+              <p>The counter's tokens appear here as they are taken.</p>
+              <button className="btn" onClick={() => {
+                document.getElementById('newpatient')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}>Take a patient in yourself</button>
+            </>
+          ) : (
+            <p>Take the fee, add the patient above, and the number appears here.</p>
+          )}
         </div>
       )}
       <div className="qlist">
@@ -453,6 +509,8 @@ export default function Intake({ visits, onOpen, onChange }: {
       </div>
       {visits.length > 0 &&
         <p className="hint">Tap <b>any</b> row, in any order. The queue does not force you.</p>}
+
+      {queueFirst && intakeBlock}
     </div>
   )
 }
