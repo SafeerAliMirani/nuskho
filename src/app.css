@@ -148,7 +148,15 @@ svg{flex:none}
 .top::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1.5px;
   background:linear-gradient(90deg,transparent,var(--gold) 22%,var(--gold) 78%,transparent);
   opacity:.55}
-.top{position:sticky;overflow:hidden}
+/* THE HEADER MUST NOT CLIP. The role menu hangs BELOW this bar, so
+   `overflow:hidden` here cut 532 of its 544 pixels away and left a sliver
+   under the chip: My figures, Setup, the tour, Sign out, all unreachable by
+   anyone using a mouse. Nothing in this bar needs clipping — the gradient and
+   the woven texture are backgrounds, which never overflow, and the name has
+   its own ellipsis. Found by a person looking at the screen; every scripted
+   drive clicked the menu happily, because a clipped element is still a real
+   element to a robot. */
+.top{position:sticky;overflow:visible}
 .top .brandwrap{display:flex;align-items:center;gap:var(--s3);min-width:0;flex:1 1 auto}
 .top .brandwrap .mk{opacity:.92;flex:none}
 .top .who2{min-width:0}
