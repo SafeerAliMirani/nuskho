@@ -282,6 +282,8 @@ export default function Intake({ visits, onOpen, onChange }: {
       <Tip tone="info">
         A USB barcode scanner types into this box like a keyboard. Point it at the square on
         the patient's old slip and his record opens. No software, nothing to connect.
+        A phone camera cannot take its place: on the clinic's own wifi a browser is not
+        allowed to open a camera at all, so scanning happens at this desk.
       </Tip>
 
       <h2 style={{ marginTop: 24 }}><IcUser size={17} /> New patient</h2>

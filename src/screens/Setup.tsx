@@ -37,8 +37,22 @@ const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
   Lock: 'lock', Wifi: 'paper', Backup: 'backup',
   You: 'identity', Doctors: 'identity', Heading: 'identity', Market: 'review', Review: 'review',
 }
-const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Lock', 'Wifi']
-const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review', 'Backup']
+/**
+ * BACKUP IS THE DOCTOR'S, AND IT WAS SITTING BEHIND OUR LOCK.
+ *
+ * roles.ts gives `backup` to the doctor and deliberately withholds it from the
+ * Nuskho role, because an export is a complete copy of every prescription in
+ * the building. This list said otherwise: Backup lived in the admin group, so
+ * a doctor could not take his own records out without our passphrase, while
+ * anyone holding that passphrase could. The agreement tells the clinic that
+ * backups are their duty; the app was making them impossible, and it was
+ * quietly reopening the vendor key the roles were written to close.
+ *
+ * It is a clinic tab now, filtered by `can('backup')` like every other one, so
+ * the doctor reaches it and the Nuskho role does not see it at all.
+ */
+const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Lock', 'Wifi', 'Backup']
+const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review']
 
 export default function Setup({ onBack }: { onBack: () => void }) {
   const mine = CLINIC.filter(t => can(NEEDS[t]))
@@ -74,9 +88,9 @@ export default function Setup({ onBack }: { onBack: () => void }) {
         <span className="who">{ROLE_NAME[role()]} <span className="sd">{ROLE_SD[role()]}</span></span>
         <span className="can">
           {role() === 'admin'
-            ? 'Everything, including the doctor\u2019s name, logo, the medicine review and backups.'
+            ? 'The doctor\u2019s name, logo and the medicine review. Not his records, and not his backups.'
             : role() === 'doctor'
-            ? 'The fee, paper and page size, the medicine list, and the PINs.'
+            ? 'The fee, paper and page size, the medicine list, the PINs, and your own backups.'
             : 'The fee the counter charges. Nothing else on this machine.'}
         </span>
         {open && adminIsSet()
@@ -652,7 +666,7 @@ function BackupTab() {
       <div className="lhbox">
         <h3>Everything, including patients</h3>
         <p>
-          The same, plus every patient and every prescription. <b>This is medical records.</b>
+          The same, plus every patient and every prescription. <b>This is medical records.</b>{' '}
           Keep it in the clinic, on a drive that does not leave the room. Do not email it,
           and do not send it to us.
         </p>
@@ -679,7 +693,11 @@ function BackupTab() {
         </div>
       )}
 
-      {adminUnlocked() && <DangerZone />}
+      {/* Same rule: roles.ts gives `erase` to the doctor and not to us. It used
+          to hang off the admin passphrase, so on a machine with no passphrase
+          set every role could reach it and the Nuskho role could reach it
+          always. */}
+      {can('erase') && <DangerZone />}
     </>
   )
 }

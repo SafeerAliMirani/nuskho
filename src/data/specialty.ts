@@ -144,7 +144,7 @@ export const SPECIALTIES: Specialty[] = [
     ],
   },
   {
-    id: 'gynae', name: 'Gynaecologist', sd: 'زالن جي ڊاڪٽر',
+    id: 'gynae', name: 'Gynaecologist', sd: 'زنانين بيمارين جي ڊاڪٽر',
     dx: [
       ['Pregnancy check', 'حمل جو معائنو'],
       ['Anaemia in pregnancy', 'حمل ۾ رت جي گھٽتائي'],

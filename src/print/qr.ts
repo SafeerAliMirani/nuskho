@@ -26,6 +26,22 @@ import QRCode from 'qrcode'
  * keyboard: point it at a returning patient's slip and the code appears in the
  * search box, no software, no internet, no typing mistakes. That is the entire
  * feature, and it is worth having.
+ *
+ * WHY NOT THE PHONE CAMERA, WHICH EVERY PERSON IN THE BUILDING ALREADY HAS.
+ * Because the browser will not hand it over. getUserMedia is gated behind a
+ * "secure context", and the building's wire serves plain http on a LAN address.
+ * Measured, not assumed, on the real build:
+ *
+ *   http://localhost:8141   isSecureContext true   navigator.mediaDevices present
+ *   http://<lan-host>:8141  isSecureContext false  navigator.mediaDevices UNDEFINED
+ *   file:///.../index.html  isSecureContext true   navigator.mediaDevices present
+ *
+ * So the camera exists exactly where it is not wanted — the record machine,
+ * which already has the scanner plugged into it — and is absent on every phone
+ * and tab, which is where a camera would have been useful. Https on the LAN
+ * would mean a certificate for an IP address, which means a red warning screen
+ * on every phone in the clinic every morning. A Rs 1,500 wedge scanner on the
+ * one desk that does lookups is the cheaper honest answer.
  */
 
 export const QR_PREFIX = 'NUSKHO:'

@@ -89,7 +89,9 @@ export const ROLE_WHAT: Record<Role, string> = {
   doctor: 'See patients and print prescriptions',
   pharmacy: 'Read printed slips, mark the medicines given',
   clinicadmin: 'The building: money totals, the day, the machines',
-  admin: 'Setup, medicine review and backups',
+  // Not backups. The grants below withhold 'backup' from this role on purpose,
+  // and the door must not promise a power the role does not have.
+  admin: 'Setup, the letterhead and the medicine review',
 }
 
 /* ------------------------------------------------------------ what each may do */
