@@ -8,7 +8,7 @@ import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
 import { printToken } from '../print/print'
 import { paper } from '../paper'
-import { Mark, IcRupee, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn } from '../ui/art'
+import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn } from '../ui/art'
 import { APP } from '../profile'
 import type { TokenSlip } from '../print/token'
 
@@ -28,7 +28,7 @@ import type { TokenSlip } from '../print/token'
  */
 
 const ICON: Record<string, (p: { size?: number }) => JSX.Element> = {
-  counter: IcRupee, compounder: IcQueue, pharmacy: IcPill, clinicadmin: IcChart,
+  counter: IcMoney, compounder: IcQueue, pharmacy: IcPill, clinicadmin: IcChart,
 }
 
 const LABEL: Record<string, string> = {
@@ -81,7 +81,13 @@ export default function Mirror() {
           <Mark size={26} className="mk" />
           <div className="who2">
             <b>{APP.en}</b>
-            <span>{up ? 'on the clinic’s wifi' : 'clinic machine not answering'}</span>
+            {/* "not answering" is wrong on the wire's own machine before any
+                record holder exists: nothing is failing to answer, nothing has
+                been chosen yet. Saying it that way sends an installer looking
+                for a fault that is not there. */}
+            <span>{up ? 'on the clinic’s wifi'
+                      : hubIsLocal() ? 'no records machine chosen yet'
+                      : 'clinic machine not answering'}</span>
           </div>
         </div>
         <div className="counts">
@@ -148,13 +154,57 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
     setBad(res.why); setPin('')
   }
 
+  const local = hubIsLocal()
+
+  /**
+   * THE INSTALLER'S FIRST MINUTE, WHICH USED TO BE A DEAD END.
+   *
+   * A building's first machine starts the wire and opens the app at the wire's
+   * own address. Nothing has been marked as the record holder yet, so the app
+   * correctly loads as a mirror and correctly refuses every sign-in: the PINs
+   * live with the records, and there are no records anywhere yet.
+   *
+   * What the screen SHOWED was four large role buttons that lit up under the
+   * mouse and did nothing at all, with the single action that works written in
+   * small grey text at the bottom. Safeer ran the building launcher on his own
+   * laptop, pressed them, and reported that nothing pressed. He was right. The
+   * screen was leading with the impossible and hiding the possible.
+   *
+   * So on the wire's own machine, with no record holder answering, the marking
+   * offer IS the screen, and the roles come after it.
+   */
+  const setupHere = local && !up
+
   return (
     <div className="pane">
-      <p className="pick" style={{ marginTop: 8 }}>Who is holding this phone?</p>
+      {setupHere && (
+        <div className="lhbox hostset">
+          <h3>Set the clinic up on this computer</h3>
+          <p>
+            This computer is running the building's wifi, but nobody has said yet which
+            machine keeps the clinic's records. Until that is settled nothing can be
+            signed into and no token can be issued, here or on any phone.
+          </p>
+          <button className="btn wide" onClick={() => { setHostHere(true); location.reload() }}>
+            This computer holds the clinic's records
+          </button>
+          <small>
+            The records will live in this browser, at this address. Open the clinic here
+            every evening from the same shortcut and every phone on the wifi follows it.
+            If the desk machine is a different computer, leave this alone and start
+            Nuskho over there instead.
+          </small>
+        </div>
+      )}
+
+      <p className="pick" style={{ marginTop: setupHere ? 24 : 8 }}>
+        {local ? 'Who is at this computer?' : 'Who is holding this phone?'}
+      </p>
       {!up && (
         <p className="hint" style={{ color: '#8a5b00' }}>
-          The clinic machine is not answering. Signing in needs it on, because the
-          PINs live there and nowhere else.
+          {setupHere
+            ? 'None of these can open until a machine is marked above. The PINs live with the records, and there are no records yet.'
+            : 'The clinic machine is not answering. Signing in needs it on, because the PINs live there and nowhere else.'}
         </p>
       )}
       {want ? (
@@ -179,32 +229,46 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
           <div className="whos">
             {MIRROR_ROLES.map(r => {
               const I = ICON[r]
+              const off = busy || !up
               return (
-                <button key={r} className={'whobtn ' + r} disabled={busy || !up}
+                <button key={r} className={'whobtn ' + r} disabled={off}
+                        // A disabled button that still lifts and turns green under
+                        // the mouse is a lie told sixty times an evening. The arrow
+                        // goes too: it is the part that says "this leads somewhere".
+                        title={off && !busy ? 'The clinic machine is not answering' : undefined}
                         onClick={() => { setBad(''); go(r, '') }}>
                   <span className="wi"><I size={20} /></span>
                   <span className="n">{ROLE_NAME[r]} <i className="sd">{ROLE_SD[r]}</i></span>
                   <small>{ROLE_WHAT[r]}</small>
-                  <span className="go">→</span>
+                  <span className="go">{off && !busy ? '' : '→'}</span>
                 </button>
               )
             })}
           </div>
           {bad && <p className="usable bad">{bad}</p>}
+          {/* On a phone this is the rule. On the wire's own machine, before it
+              has been marked, telling the person to go and sign in "at the
+              clinic machine" is telling him to walk to the chair he is sitting
+              in, which is how a screen loses someone's trust. */}
           <p className="hint">
-            The doctor and the Nuskho role sign in at the clinic machine itself, not on a phone.
+            {setupHere
+              ? 'The doctor and the Nuskho role sign in once this computer is marked above, or at whichever machine holds the records.'
+              : 'The doctor and the Nuskho role sign in at the clinic machine itself, not on a phone.'}
           </p>
-          {/* The installer's bootstrap, and it appears ONLY on the machine
-              running the wire. A building's first machine loads as a mirror
-              because nothing has been marked yet, and this is how it is
-              marked. Every phone used to see this too; a phone that took it
-              became a second record holder with an empty database, and a
-              whole evening's tokens would have gone into nowhere. */}
-          {hubIsLocal() && (
+          {/* The other half of the same offer, and a far rarer case: this
+              machine runs the wire AND another machine is already answering as
+              the record holder. That is legitimate, a small PC can run nothing
+              but the wire, so the offer stays. It stays SMALL and it keeps its
+              confirm, because taking it here would make a second record holder
+              with an empty database and split the evening's tokens in two.
+              Phones never see this at all: hubIsLocal() is answered by the wire
+              from the request's own address. */}
+          {local && up && (
             <p className="hint" style={{ marginTop: 18, opacity: .85 }}>
-              This computer is running the wire. If it is also the one that holds the
-              clinic's records, <button className="lnk" onClick={() => {
-                if (confirm('Mark THIS computer as the one that holds the records?\n\nEverything the clinic types will live in THIS browser, at THIS address. Set the clinic up here, and open the app here every evening.')) {
+              This computer is running the wire, and another machine is answering as the
+              one that holds the records. If that is wrong and the records belong
+              here, <button className="lnk" onClick={() => {
+                if (confirm('Mark THIS computer as the one that holds the records?\n\nAnother machine is already answering as the record holder. Two record holders means two separate sets of records, and tokens issued tonight would split between them.\n\nOnly do this if the other machine is wrong.')) {
                   setHostHere(true)
                   location.reload()
                 }
@@ -322,7 +386,7 @@ function MDesk({ s }: { s: WireState }) {
         <span><IcWarn size={15} /> <b>Cannot wait</b></span>
       </label>
       <div className="fld feerow">
-        <label><IcRupee size={13} /> Fee taken now &nbsp; في</label>
+        <label><IcMoney size={13} /> Fee taken now &nbsp; في</label>
         <div className="row">
           <input value={amt} inputMode="numeric" placeholder="Rs"
                  onChange={e => setAmt(e.target.value.replace(/\D/g, '').slice(0, 6))} />

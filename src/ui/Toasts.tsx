@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { onSignal, signal, type Signal } from './bus'
-import { IcUser, IcWarn, IcRupee, IcPrint, IcCheck, IcQueue } from './art'
+import { IcUser, IcWarn, IcMoney, IcPrint, IcCheck, IcQueue } from './art'
 
 /**
  * WHAT ARRIVES ON SCREEN WHEN SOMETHING HAPPENS SOMEWHERE ELSE.
@@ -25,7 +25,7 @@ import { IcUser, IcWarn, IcRupee, IcPrint, IcCheck, IcQueue } from './art'
 type Toast = { id: number; kind: Signal['kind']; text: string; sub?: string; sticky?: boolean }
 
 const ICON = {
-  bell: IcQueue, patient: IcUser, urgent: IcWarn, refund: IcRupee,
+  bell: IcQueue, patient: IcUser, urgent: IcWarn, refund: IcMoney,
   printed: IcPrint, seen: IcCheck, coming: IcCheck,
 }
 

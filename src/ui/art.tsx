@@ -78,9 +78,26 @@ export const IcPill = ({ size = 20, className }: P) => (
   </svg>
 )
 
-export const IcRupee = ({ size = 20, className }: P) => (
+/**
+ * A BANKNOTE, NOT A CURRENCY LETTER, AND THE REASON MATTERS.
+ *
+ * This used to draw ₹, the Indian rupee: two bars and a stem. Safeer spotted it
+ * on the token counter's own door. Pakistan's rupee is ₨ or plain Rs, and a
+ * Larkana clinic being handed software with India's currency sign on the money
+ * button is not a small blemish, it is the kind of thing a doctor mentions to
+ * every other doctor he knows.
+ *
+ * The replacement is a banknote rather than ₨, on purpose. ₨ is a two letter
+ * ligature that turns to mush at the 13 pixels this is drawn at in the fee row,
+ * and every place this icon appears already writes the amount as "Rs 500" in
+ * words beside it. So the picture carries "money" and the text carries the
+ * currency, which is the division of labour the rest of this file follows.
+ */
+export const IcMoney = ({ size = 20, className }: P) => (
   <svg {...box(size, className)}>
-    <path d="M7 4h10M7 8.6h10M15.4 4c0 3.4-2.6 4.6-5.4 4.6H7l8.4 11.4" />
+    <rect x="2.4" y="5.8" width="19.2" height="12.4" rx="2.4" />
+    <circle cx="12" cy="12" r="2.9" />
+    <path d="M6 9.5v5M18 9.5v5" />
   </svg>
 )
 

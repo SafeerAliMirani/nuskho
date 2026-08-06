@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readQrPayload } from '../print/qr'
-import { ArtEmpty, IcScan, IcUser, IcRupee, IcQueue } from '../ui/art'
+import { ArtEmpty, IcScan, IcUser, IcMoney, IcQueue } from '../ui/art'
 import { Note, Tip } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Vitals from '../ui/Vitals'
@@ -320,7 +320,7 @@ export default function Intake({ visits, onOpen, onChange }: {
       </label>
 
       <div className="fld feerow">
-        <label><IcRupee size={13} /> Fee taken now &nbsp; في</label>
+        <label><IcMoney size={13} /> Fee taken now &nbsp; في</label>
         <div className="row">
           <input value={amt} inputMode="numeric" placeholder="Rs"
                  onChange={e => setAmt(e.target.value.replace(/\D/g, '').slice(0, 6))} />

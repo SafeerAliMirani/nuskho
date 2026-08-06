@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { IcClock, IcCalendar, IcHeart, IcRupee, ArtNoFigures } from '../ui/art'
+import { IcClock, IcCalendar, IcHeart, IcMoney, ArtNoFigures } from '../ui/art'
 import { Note } from '../ui/Note'
 import { computeStats, MIN_CELL, MIN_TREND, type Stats, type Bar } from '../stats'
 import { cardData, drawCard, downloadCard, printCard, CARD_W, CARD_H } from '../print/card'
@@ -82,10 +82,10 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
           )}
 
           {/* ---- money. Private. Never on the card, never in an export. ---- */}
-          <h2><IcRupee size={17} /> Fees this month</h2>
+          <h2><IcMoney size={17} /> Fees this month</h2>
           <div className="tiles money">
             <Tile big={`Rs ${s.received.toLocaleString('en-GB')}`} lab="received"
-                  tone="k" icon={IcRupee} cap="in hand"
+                  tone="k" icon={IcMoney} cap="in hand"
                   sub={s.refunded > 0 ? `after Rs ${s.refunded.toLocaleString('en-GB')} given back on your word` : ''} />
             <Tile big={`Rs ${s.dueTotal.toLocaleString('en-GB')}`} lab="still due"
                   tone={s.dueTotal > 0 ? 'w' : undefined} icon={IcClock} cap="owed"

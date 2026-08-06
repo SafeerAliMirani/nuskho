@@ -1018,6 +1018,28 @@ body{
 .whobtn.admin:hover{border-color:var(--adm)}
 .whobtn.admin:hover .wi{background:var(--adm);color:#fff}
 
+/* A DEAD BUTTON MUST LOOK DEAD.
+   On a phone with the clinic machine off, every role button is disabled, and
+   it was still lifting off the page and filling its icon dark green under the
+   mouse. Safeer pressed them one after another and reported that nothing
+   pressed. Nothing was going to: the promise was in the styling, not the code.
+   Every hover rule above is cancelled here, and the cursor says so before the
+   finger arrives. */
+.whobtn:disabled{cursor:not-allowed;opacity:.55;background:var(--line-2);
+  box-shadow:none;transform:none;border-color:var(--line)}
+.whobtn:disabled:hover{border-color:var(--line);box-shadow:none;transform:none}
+.whobtn:disabled .wi,.whobtn:disabled:hover .wi{background:var(--line);color:var(--mut)}
+.whobtn:disabled .n,.whobtn:disabled small{color:var(--mut)}
+.whobtn:disabled:active{transform:none}
+
+/* The installer's one live action, on the machine that runs the wire before
+   any record holder exists. It is the only thing on that screen that can work,
+   so it is the only thing that looks like it can. */
+.hostset{border-color:var(--g-500);box-shadow:var(--sh-2)}
+.hostset h3{font-size:16.5px;font-family:var(--display);letter-spacing:var(--tr-snug)}
+.hostset small{display:block;margin-top:var(--s3);color:var(--mut);
+  font-size:var(--t-sm);line-height:1.55}
+
 .whoback{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
   margin:var(--s6) 0 var(--s4);padding-top:var(--s5);border-top:1px solid var(--line)}
 .whoback b{font-size:17px;font-family:var(--display);letter-spacing:var(--tr-snug)}
