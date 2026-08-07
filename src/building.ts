@@ -7,7 +7,7 @@ import { activeDoctors, isSitting, setSitting, multiRoom, doctorById, visitDocto
 import { course } from './course'
 import { printToken } from './print/print'
 import { paper } from './paper'
-import { onSignal, signal } from './ui/bus'
+import { onSignal, signal, setRelay, deliverFromWire, type Signal } from './ui/bus'
 import { storeKind, storeSeesTheDay, type Store } from './store'
 import { chargesFor, chargeTotal } from './testfees'
 import { staffRoles } from './staff'
@@ -128,6 +128,49 @@ const NEED: Record<IntentKind, Parameters<typeof can>[0]> = {
  *  machine, and the Nuskho role changes identity — neither belongs on a
  *  mirror in this first building. */
 export const MIRROR_ROLES: Role[] = ['counter', 'compounder', 'pharmacy', 'clinicadmin']
+
+/* ------------------------------------------------- the bell, across machines
+ *
+ * A chime is not a record, but it still names a person and a number, and a
+ * message bus is exactly the sort of convenience through which the rules about
+ * who may know what get quietly broken. So the same question is asked of a
+ * signal as of everything else that leaves this machine: may this role hear it?
+ *
+ * The refund one is the sharp case. "Give back Rs 200 to Ali, number 14" is
+ * money, and the rented medical store downstairs has no business hearing it.
+ */
+const SAY_NEEDS: Record<Signal['kind'], 'queue' | 'money' | 'dispense'> = {
+  bell: 'queue',       // the doctor calling the desk in
+  coming: 'queue',     // the desk answering him
+  patient: 'queue',
+  urgent: 'queue',
+  seen: 'queue',
+  refund: 'money',
+  printed: 'dispense', // and the queue too, see below
+}
+
+/** Who this signal is allowed to reach. */
+function saySeenBy(kind: Signal['kind'], role: Role): boolean {
+  if (kind === 'printed') {
+    // a slip is ready: the room and the desk want to know, and so does a
+    // pharmacy that is part of this clinic. A rented store does not get the
+    // day's roll one chime at a time, for the same reason it is not pushed
+    // the day's medicine lines.
+    return can('queue', role) || (can('dispense', role) && storeSeesTheDay())
+  }
+  return can(SAY_NEEDS[kind], role)
+}
+
+/**
+ * What a PHONE may raise.
+ *
+ * Deliberately two things, and both of them are pure nudges with no record
+ * behind them: the bell, and the answer to it. Everything else on that list
+ * means something was written down, and a thing that was written down is
+ * announced by the machine that wrote it. A phone that could raise "number 14
+ * printed" could announce a slip that does not exist.
+ */
+const MIRROR_MAY_SAY: Signal['kind'][] = ['bell', 'coming']
 
 /* -------------------------------------------------------------- mode detection */
 
@@ -261,6 +304,10 @@ export function mirrorSubscribe(cb: {
 
 function startMirror(): void {
   try { sid = sessionStorage.getItem('nuskho.mirrorSid') ?? '' } catch { sid = '' }
+  // The counter taps Coming on his phone and the doctor's bell stops glowing in
+  // the room. The host decides whether a phone is allowed to say a given thing,
+  // so this end sends and does not judge.
+  setRelay(s => { if (sid && hostId) send({ t: 'say', to: hostId, sid, s }) })
   listeners.add(m => {
     /**
      * THE MIRROR PINS ITS HOST. The first machine heard claiming to be the
@@ -289,6 +336,10 @@ function startMirror(): void {
     if (hostId && m.from !== hostId) return   // only the pinned host is heard
     if (m.t === 'state' && stateCb) stateCb(m.s as WireState)
     if (m.t === 'rx' && rxCb) rxCb(m.r as WireRx)
+    // A chime from the clinic machine. It is already filtered by role there,
+    // and it is dropped here unless it came from the pinned host, so a phone in
+    // the waiting room cannot ring every other phone in the building.
+    if (m.t === 'say' && m.s) deliverFromWire(m.s as Signal)
     if ((m.t === 'done' || m.t === 'authok' || m.t === 'authno') && typeof m.req === 'number') {
       pending.get(m.req)?.(m); pending.delete(m.req)
     }
@@ -707,6 +758,19 @@ function startHost(): void {
       sittings.delete(String(m.sid ?? ''))
       return
     }
+    if (m.t === 'say') {
+      const sit = sittings.get(String(m.sid ?? ''))
+      if (!sit || sit.fromId !== m.from) return
+      const said = m.s as Signal
+      // a phone may nudge; it may not announce something that was written down
+      if (!said || !MIRROR_MAY_SAY.includes(said.kind)) return
+      if (!saySeenBy(said.kind, sit.role)) return
+      // this machine hears it (the doctor's bell button stops glowing), and so
+      // does every other phone entitled to it, but not the one that sent it
+      deliverFromWire(said)
+      tellTheBuilding(said, m.from)
+      return
+    }
     if (m.t === 'gone') {
       // the phone's socket dropped — wifi blink, screen lock. The sitting
       // waits for its sid to resume rather than dying: signing in again for
@@ -755,6 +819,45 @@ function startHost(): void {
   // signal, so the push rides on it.
   onSignal(() => pushState())
   setInterval(() => pushState(), 7000)
+
+  // And the signal itself goes out to the phones. This is installed on
+  // `signal()` rather than on `onSignal`, which matters: only a signal raised
+  // ON THIS MACHINE goes out. One that arrived from a phone has already been
+  // given to everyone entitled to it, and re-broadcasting it would be a room
+  // full of devices ringing each other for ever.
+  setRelay(s => tellTheBuilding(s))
+}
+
+/**
+ * Send a signal to every sitting allowed to hear it.
+ *
+ * `except` is the socket it came from, when a phone raised it: the counter who
+ * pressed Coming does not need his own phone to chime at him.
+ */
+function tellTheBuilding(s: Signal, except?: number): void {
+  for (const [, sit] of sittings) {
+    if (sit.fromId < 0 || sit.fromId === except) continue
+    if (!saySeenBy(s.kind, sit.role)) continue
+    send({ t: 'say', to: sit.fromId, s })
+  }
+}
+
+/**
+ * How many phones could hear a bell right now.
+ *
+ * The doctor's bell says out loud whether anyone can hear it, because a bell
+ * that rings in an empty room is worse than no bell. Before the wire carried
+ * signals this counted only the other WINDOWS of this browser, so a clinic
+ * whose compounder was on a phone was told nobody was listening while the
+ * compounder sat there with the app open.
+ */
+export function earsOnTheWire(): number {
+  if (mode !== 'host') return 0
+  let n = 0
+  for (const [, sit] of sittings) {
+    if (sit.fromId >= 0 && saySeenBy('bell', sit.role)) n++
+  }
+  return n
 }
 
 /** How many devices are on the wire right now, for the Setup tab. */

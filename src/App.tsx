@@ -18,6 +18,7 @@ import { tourFor, tourSeen } from './tour'
 import { todaysVisits } from './db'
 import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo, IcBook } from './ui/art'
 import Toasts from './ui/Toasts'
+import Broke from './ui/Broke'
 import Bill from './ui/Bill'
 import Frozen from './screens/Frozen'
 import { frozen as licenceRanOut } from './service'
@@ -182,6 +183,9 @@ function Clinic() {
   return (
     <div className="app">
       <Toasts />
+      {/* Above everything, including the practice bar: if the screen has
+          stopped being trustworthy, that is the first thing to know. */}
+      <Broke />
       {/* Never hidden, never dismissible. The failure this prevents is not
           somebody deciding to misuse the practice copy — it is a doctor who
           was shown it, liked it, and simply never stopped. He should not be

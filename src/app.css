@@ -1616,6 +1616,29 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .demobar .lnk:hover{color:#fff}
 @media print{ .demobar{display:none} }
 
+/* THE BAND FOR A FAILURE NOBODY CAUGHT.
+   Red rather than the practice copy's amber, because those two must never be
+   confused at a glance: one says "none of this is real", the other says "this
+   screen may have stopped telling you the truth". It sits at the very top,
+   above the header, so it cannot end up under a control the queue needs. */
+.brokebar{
+  display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;
+  padding:11px 16px;
+  background:#5b1b12;color:#ffd9d1;
+  font-size:13px;line-height:1.4;
+  border-bottom:1px solid #7d2c20;
+}
+.brokebar .bb-i{flex:none;color:#ff9b87;margin-top:1px}
+.brokebar .bb-b{flex:1 1 280px;min-width:0}
+.brokebar .bb-b b{display:block;color:#fff;font-size:13px;margin-bottom:2px}
+.brokebar .bb-b p{margin:0}
+.brokebar .bb-a{flex:none;display:flex;align-items:center;gap:12px}
+.brokebar .bb-a .btn{padding:6px 14px;font-size:12.5px;background:#fff;color:#5b1b12;border:0}
+.brokebar .bb-a .btn:hover{background:#ffe9e4}
+.brokebar .bb-a .lnk{color:#ffd9d1;text-decoration:underline;padding:0}
+.brokebar .bb-a .lnk:hover{color:#fff}
+@media print{ .brokebar{display:none} }
+
 
 /* ---------------- phase two: the Mirror's face + the doctor's desk ---------------- */
 .mheroes{display:grid;grid-template-columns:1.1fr 1.1fr .9fr;gap:12px;margin:14px 0 6px}

@@ -14,6 +14,8 @@ import { printToken } from '../print/print'
 import { paper } from '../paper'
 import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn } from '../ui/art'
 import { APP } from '../profile'
+import Broke from '../ui/Broke'
+import Toasts from '../ui/Toasts'
 import type { TokenSlip } from '../print/token'
 
 /**
@@ -80,6 +82,13 @@ export default function Mirror() {
 
   return (
     <div className="app mirror">
+      {/* The chimes. This was missing entirely, so the doctor's bell reached a
+          phone that had no way to show it, and the compounder holding that
+          phone was the one person in the building the bell was FOR. */}
+      <Toasts />
+      {/* A phone breaks the same ways a laptop does, and the person holding it
+          is further from anybody who could tell them what happened. */}
+      <Broke />
       <header className="top">
         <div className="brandwrap">
           <Mark size={26} className="mk" />

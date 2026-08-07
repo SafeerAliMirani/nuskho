@@ -16,6 +16,7 @@ import {
   daySummary, markRefunded, owedRefund, setFee, markTestsPaid,
 } from '../db'
 import { chargesFor, chargeTotal } from '../testfees'
+import { whyItFailed } from '../fail'
 import { cameFrom } from '../refer'
 import { INSTANT } from '../data/vitals'
 import type { Visit, VisitStatus, FeeState } from '../types'
@@ -72,6 +73,36 @@ export default function Intake({ visits, onOpen, onChange }: {
   const [msg, setMsg] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
   const [closing, setClosing] = useState<string | null>(null)
+
+  /**
+   * WHEN A WRITE REFUSES, IT SAYS SO WHERE THE BUTTON IS.
+   *
+   * Every write on this screen used to be `await` with nothing around it. A
+   * database that refused left the button back in its resting state, the form
+   * still full, and the patient not in the list, and said nothing at all. The
+   * compounder's only reasonable reading of that is that the computer is being
+   * slow, so he presses it again and carries on, and at closing time the drawer
+   * does not match the screen and nobody knows why.
+   *
+   * `where` is which button failed, because a message about adding a patient
+   * that appears next to the queue is a message nobody connects to what they
+   * just did. It shows at the control that refused, and it clears the moment
+   * anything else is tried.
+   */
+  const [err, setErr] = useState<{ where: 'add' | 'code' | 'queue'; text: string } | null>(null)
+
+  /**
+   * `did` is the thing that did not happen, said in the words of this room.
+   * It is the first half of the sentence a person reads, so it is never
+   * "an error occurred": it is "the patient was not added".
+   */
+  async function guard(where: 'add' | 'code' | 'queue', did: string, fn: () => Promise<void>) {
+    setErr(null)
+    try { await fn() } catch (e) {
+      console.error('[nuskho] ' + did, e)
+      setErr({ where, text: whyItFailed(e, did) })
+    }
+  }
 
   /**
    * The building's rooms. With one doctor none of this exists on screen and
@@ -186,6 +217,10 @@ export default function Intake({ visits, onOpen, onChange }: {
     onOpen(await openVisitFor(p.id))
   }
 
+  /** The Open button and the scanner's Enter both come through here, so a
+   *  database that refuses is reported rather than swallowed. */
+  const openOld = () => guard('code', 'The patient was not opened', lookup)
+
   async function addNew() {
     if (!name.trim()) return
     const pid = uid()
@@ -201,9 +236,11 @@ export default function Intake({ visits, onOpen, onChange }: {
   }
 
   async function close(id: string, s: VisitStatus) {
-    await closeVisit(id, s)
-    setClosing(null)
-    onChange()
+    await guard('queue', 'The token was not closed', async () => {
+      await closeVisit(id, s)
+      setClosing(null)
+      onChange()
+    })
   }
 
   /**
@@ -265,14 +302,17 @@ export default function Intake({ visits, onOpen, onChange }: {
         <div className="fld" style={{ flex: 2 }}>
           <input value={code} inputMode="numeric" maxLength={13} placeholder="the number on the slip"
                  className="codebox"
-                 onChange={e => { setCode(scanned(e.target.value)); setMsg('') }}
-                 onKeyDown={e => { if (e.key === 'Enter') lookup() }} />
+                 onChange={e => { setCode(scanned(e.target.value)); setMsg(''); setErr(null) }}
+                 onKeyDown={e => { if (e.key === 'Enter') openOld() }} />
         </div>
         {/* five was hard-coded here too, so patient 10000 could not be typed in
             at all — the Open button stayed grey however correct the number was */}
-        <button className="btn" style={{ flex: 1 }} onClick={lookup} disabled={code.length < 5}>Open</button>
+        <button className="btn" style={{ flex: 1 }} onClick={openOld} disabled={code.length < 5}>Open</button>
       </div>
       {msg && <p className="hint" style={{ color: '#8a5b00' }}>{msg}</p>}
+      {err?.where === 'code' && (
+        <div className="saidno"><Note tone="stop" title="Not opened">{err.text}</Note></div>
+      )}
       <Tip tone="info">
         A USB barcode scanner types into this box like a keyboard. Point it at the square on
         the patient's old slip and his record opens. No software, nothing to connect.
@@ -339,10 +379,20 @@ export default function Intake({ visits, onOpen, onChange }: {
               onClick={async () => {
                 if (adding) return
                 setAdding(true)
-                try { await addNew() } finally { setAdding(false) }
+                try { await guard('add', 'The patient was not added', addNew) }
+                finally { setAdding(false) }
               }}>
         {adding ? 'Adding…' : <>Add to queue &nbsp; قطار ۾ شامل ڪريو</>}
       </button>
+      {/* Under the button that refused, not in a corner, and it does not
+          disappear on its own: the queue is the record of who paid, and a
+          person needs as long as they need to read why somebody is missing
+          from it. */}
+      {err?.where === 'add' && (
+        <div className="saidno" style={{ marginTop: 10 }}>
+          <Note tone="stop" title="Not added">{err.text}</Note>
+        </div>
+      )}
       <p className="hint">No old slip? Add as new. A duplicate costs nothing; asking questions at the door costs the evening.</p>
     </>
   )
@@ -441,6 +491,13 @@ export default function Intake({ visits, onOpen, onChange }: {
           )}
         </div>
       )}
+      {/* Above the list, because everything that can fail down there is about a
+          row in it: closing a token, taking test money, handing back a refund.
+          The row itself is too narrow to carry three sentences a person has to
+          act on. */}
+      {err?.where === 'queue' && (
+        <div className="saidno"><Note tone="stop" title="That did not go through">{err.text}</Note></div>
+      )}
       <div className="qlist">
       {[...visits].sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0)).map(v => {
         const shut = v.status !== 'waiting'
@@ -495,7 +552,9 @@ export default function Intake({ visits, onOpen, onChange }: {
               <div className="collect">
                 <b>Take Rs {chargeTotal(chargesFor(v.vitals, INSTANT))} for the test{chargesFor(v.vitals, INSTANT).length === 1 ? '' : 's'}</b>
                 <span>{chargesFor(v.vitals, INSTANT).map(c => `${c.en} Rs ${c.amount}`).join(' · ')}</span>
-                <button className="btn" onClick={async () => { await markTestsPaid(v.id); onChange() }}>
+                <button className="btn" onClick={() => guard('queue', 'The test money was not marked as taken', async () => {
+                  await markTestsPaid(v.id); onChange()
+                })}>
                   Received
                 </button>
               </div>
@@ -505,7 +564,9 @@ export default function Intake({ visits, onOpen, onChange }: {
               <div className="refund">
                 <b>Give back Rs {v.fee!.refund}</b>
                 {v.fee!.refundNote ? <span>{v.fee!.refundNote}</span> : null}
-                <button className="btn warn" onClick={async () => { await markRefunded(v.id); onChange() }}>
+                <button className="btn warn" onClick={() => guard('queue', 'The refund was not marked as handed back', async () => {
+                  await markRefunded(v.id); onChange()
+                })}>
                   Handed back
                 </button>
               </div>
@@ -516,10 +577,10 @@ export default function Intake({ visits, onOpen, onChange }: {
                 figures under-counted the drawer, and the owed list slowly
                 filled with people who had in fact paid. */}
             {v.fee?.state === 'due' && v.fee.amount > 0 && (
-              <button className="lnk qclose" onClick={async () => {
+              <button className="lnk qclose" onClick={() => guard('queue', 'The money was not marked as received', async () => {
                 await setFee(v.id, { ...v.fee!, state: 'paid', at: Date.now() })
                 onChange()
-              }}>Rs {v.fee.amount} received now</button>
+              })}>Rs {v.fee.amount} received now</button>
             )}
 
             {!v.printedAt && (

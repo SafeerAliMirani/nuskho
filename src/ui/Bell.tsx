@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { signal, onSignal, peerCount, startPresence } from './bus'
+import { earsOnTheWire } from '../building'
 
 /**
  * THE BELL ON THE DOCTOR'S DESK.
@@ -10,10 +11,15 @@ import { signal, onSignal, peerCount, startPresence } from './bus'
  *
  * Two decisions worth stating.
  *
- * IT TELLS THE TRUTH ABOUT WHETHER ANYONE CAN HEAR IT. If no other window of
- * this app is open, the button says so instead of pretending. A bell that rings
- * only in the room it was pressed in is worse than no bell, because the doctor
- * presses it three times and concludes the compounder is ignoring him.
+ * IT TELLS THE TRUTH ABOUT WHETHER ANYONE CAN HEAR IT. If nothing is listening
+ * the button says so instead of pretending. A bell that rings only in the room
+ * it was pressed in is worse than no bell, because the doctor presses it three
+ * times and concludes the compounder is ignoring him.
+ *
+ * "Listening" is two things now: another WINDOW of this browser, which is how a
+ * one-computer clinic works, and a PHONE signed in on the building's wifi. It
+ * used to count only the first, so a clinic whose compounder was on a phone was
+ * told nobody was listening while the compounder stood there with it open.
  *
  * IT ANSWERS BACK. The compounder taps "Coming" on his toast and the doctor's
  * button says so for a few seconds. Without that the doctor presses it again,
@@ -34,7 +40,10 @@ export default function Bell() {
     return () => { stop(); clearInterval(t); off() }
   }, [])
 
-  const heard = peerCount() > 0
+  // the redraw timer above is what keeps this current: both counts move on
+  // their own, as windows open and phones sign in and out
+  const ears = peerCount() + earsOnTheWire()
+  const heard = ears > 0
 
   function ring() {
     if (rang) return
@@ -47,7 +56,7 @@ export default function Bell() {
     <div className="bellwrap">
       <button className={'bell' + (rang ? ' ringing' : '') + (coming ? ' answered' : '')}
               onClick={ring} disabled={rang}
-              title={heard ? 'Ring the counter' : 'No other screen of this app is open'}>
+              title={heard ? 'Ring the counter' : 'Nothing is listening: no other window, and no phone signed in'}>
         <span className="bellcup">
           {/* the clapper is a separate element so it can swing on its own */}
           <svg viewBox="0 0 32 32" fill="none" aria-hidden>
@@ -64,8 +73,8 @@ export default function Bell() {
       </button>
       {!heard && (
         <p className="hint">
-          Open the counter's screen in a second window of this browser and the bell will
-          reach it. It does not yet travel to the phones on the clinic's wifi.
+          Open the counter's screen in a second window of this browser, or have the
+          compounder sign in on his phone on the clinic's wifi. The bell reaches both.
         </p>
       )}
     </div>
