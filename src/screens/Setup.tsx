@@ -16,6 +16,7 @@ import {
 } from '../doctors'
 import { buildingMode, hostHere, setHostHere, sittingsList } from '../building'
 import { qrSvgRaw } from '../print/qr'
+import { service, setService, daysOverdue } from '../service'
 
 /**
  * Who may change what.
@@ -29,13 +30,14 @@ import { qrSvgRaw } from '../print/qr'
  * a medical document, they change roughly never, and we install in person. The
  * medicine list is the opposite on every count, so it stays with the doctor.
  */
-type Tab = 'Fee' | 'Paper' | 'Medicines' | 'Diagnoses' | 'Lock' | 'Wifi' | 'Backup' | 'You' | 'Doctors' | 'Heading' | 'Review' | 'Market'
+type Tab = 'Fee' | 'Paper' | 'Medicines' | 'Diagnoses' | 'Lock' | 'Wifi' | 'Backup' | 'You' | 'Doctors' | 'Heading' | 'Review' | 'Market' | 'Service'
 
 /** Each tab names the ONE permission that opens it. Nothing decides twice. */
 const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
   Fee: 'rate', Paper: 'paper', Medicines: 'medicines', Diagnoses: 'medicines',
   Lock: 'lock', Wifi: 'paper', Backup: 'backup',
   You: 'identity', Doctors: 'identity', Heading: 'identity', Market: 'review', Review: 'review',
+  Service: 'identity',
 }
 /**
  * BACKUP IS THE DOCTOR'S, AND IT WAS SITTING BEHIND OUR LOCK.
@@ -52,7 +54,7 @@ const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
  * the doctor reaches it and the Nuskho role does not see it at all.
  */
 const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Lock', 'Wifi', 'Backup']
-const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review']
+const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review', 'Service']
 
 export default function Setup({ onBack }: { onBack: () => void }) {
   const mine = CLINIC.filter(t => can(NEEDS[t]))
@@ -137,6 +139,7 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             {tab === 'You' && <IdentityFields v={dr.v} on={on(dr.on)} />}
             {tab === 'Review' && <ReviewQueue />}
             {tab === 'Market' && <MarketPaste />}
+            {tab === 'Service' && <ServiceTab />}
             {tab === 'You' && (
               <div className="lhbox" style={{ marginTop: 18 }}>
                 <h3>Set this machine up again from the start</h3>
@@ -166,6 +169,82 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             )}
           </>}
     </div>
+  )
+}
+
+
+/**
+ * WHERE NUSKHO WRITES DOWN WHEN THE MONEY IS DUE.
+ *
+ * Under the passphrase, because a reminder the payer can switch off is not a
+ * reminder. Blank means silent: a clinic on a free pilot, or Safeer's own
+ * machine, shows nothing at all until somebody types a date.
+ *
+ * This is the whole of the commercial machinery in the app. There is no licence
+ * key, no expiry, no check of any kind. Leave the date years in the past and
+ * every prescription still prints, because the promise on the website says so
+ * and it has to stay true.
+ */
+function ServiceTab() {
+  const [v, setV] = useState(service())
+  const [saved, setSaved] = useState(false)
+  const d = daysOverdue()
+
+  const on = <K extends keyof typeof v>(k: K, val: (typeof v)[K]) => {
+    setV(p => ({ ...p, [k]: val })); setSaved(false)
+  }
+
+  return (
+    <>
+      <h3>Service and payment</h3>
+      <p className="hint">
+        Written by Nuskho at install and again at every renewal. From a week before
+        the date, and every evening after it, the doctor and the clinic admin see one
+        line asking for it. Nobody else sees anything, it never reaches a printed
+        slip, and nothing in the app behaves differently because of it.
+      </p>
+
+      <div className="row">
+        <div className="fld">
+          <label>Paid up to — the date the next payment is due</label>
+          <input type="date" value={v.paidUntil}
+                 onChange={e => on('paidUntil', e.target.value)} />
+          <span className="unit">Leave empty and Nuskho never mentions money. That is the
+            right setting for a pilot clinic.</span>
+        </div>
+        <div className="fld">
+          <label>Amount due, Rs — optional</label>
+          <input value={v.amount || ''} inputMode="numeric" maxLength={7}
+                 onChange={e => on('amount', +e.target.value.replace(/\D/g, '') || 0)} />
+        </div>
+      </div>
+      <div className="fld">
+        <label>WhatsApp number shown on the reminder</label>
+        <input value={v.contact} inputMode="tel" placeholder="0333 3368189"
+               onChange={e => on('contact', e.target.value)} />
+      </div>
+
+      {d !== null && (
+        <p className="usable">
+          {d < 0
+            ? `Paid up. ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'} to run, and the reminder starts seven days before.`
+            : d === 0 ? 'Due today. The reminder is showing now.'
+            : `${d} day${d === 1 ? '' : 's'} past due. The reminder is showing every evening.`}
+        </p>
+      )}
+
+      <button className="btn wide" onClick={() => { setService(v); setSaved(true) }}>
+        {saved ? 'Saved ✓' : 'Save'}
+      </button>
+
+      <Note tone="safe" title="This cannot stop the clinic working">
+        There is no licence and no expiry anywhere in Nuskho. A clinic that has not
+        paid for a year still prints every prescription, keeps every record and can
+        take every backup. What stops is support, updates, the medicine list being
+        kept current and the Sindhi review, and none of that is enforced by software.
+        It stops because a person stops doing it.
+      </Note>
+    </>
   )
 }
 

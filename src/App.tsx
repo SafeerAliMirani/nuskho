@@ -18,6 +18,7 @@ import { tourFor, tourSeen } from './tour'
 import { todaysVisits } from './db'
 import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo, IcBook } from './ui/art'
 import Toasts from './ui/Toasts'
+import Bill from './ui/Bill'
 import { startPresence, onSignal } from './ui/bus'
 import { isDemo } from './version'
 import { clearDemo, touchDemo } from './demo'
@@ -242,6 +243,11 @@ function Clinic() {
             <button className="lnk paper" onClick={() => setSetup(s => !s)}>Setup</button>}
         </div>
       </header>
+
+      {/* Asking for the money, and only asking. It renders for the doctor, the
+          clinic admin and the Nuskho role, sits above the work rather than over
+          it, and changes nothing about how the app behaves. See service.ts. */}
+      <Bill />
 
       {/* The router is the gate, not the menu. Hiding a button is a courtesy;
           refusing to render the screen is the rule. A counter that reaches

@@ -1737,3 +1737,24 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 @media (max-width:520px){ .mirror .who2{display:none} .mirror .brandwrap{gap:0} }
 .tourcard.top{top:14px;bottom:auto}
 @media (max-width:620px){ .tourcard.top{top:8px;bottom:auto} }
+
+
+/* THE PAYMENT REMINDER.
+   Under the header, above the work, never over it. Amber when it is coming,
+   a shade firmer when it is late, and never red: red in this app means a
+   patient cannot wait, and a bill is not that. It has no fixed or sticky
+   position on purpose, so it can never sit on top of a control. */
+.billbar{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);align-items:baseline;
+  justify-content:space-between;padding:11px var(--s5);
+  background:#fdf6e3;border-bottom:1px solid #eadfbe;color:#6b4e06;font-size:var(--t-sm)}
+.billbar.due{background:#fbeecf;border-bottom-color:#e0cf9c;color:#5c4205}
+.billbar .bb-t{min-width:240px;flex:1 1 340px;line-height:1.5}
+.billbar .bb-s{color:#8a6c1e}
+.billbar.due .bb-s{color:#7a5c14}
+.billbar .bb-a{display:flex;gap:var(--s4);align-items:baseline;flex:none}
+.billbar .lnk{color:inherit;font-weight:700;text-decoration:underline;
+  text-underline-offset:3px;background:none;border:0;padding:0}
+@media (max-width:640px){
+  .billbar{padding:10px var(--s3);font-size:12.5px}
+  .billbar .bb-s{display:block}
+}
