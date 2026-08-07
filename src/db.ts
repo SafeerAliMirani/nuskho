@@ -4,6 +4,8 @@ import { profile } from './profile'
 import { FIRST_DOCTOR } from './doctors'
 import { highWater, noteIssued, tokenHighWater, noteToken, CLINIC_DAY_SHIFT } from './safety'
 import { isDemo } from './version'
+import { chargesFor, chargeTotal } from './testfees'
+import { INSTANT } from './data/vitals'
 
 // Everything is written the moment it changes. Load-shedding is normal here:
 // power will cut mid-session and reopening Chrome must lose nothing.
@@ -271,7 +273,22 @@ export async function daySummary(visits: Visit[]) {
     waived: fees.filter(f => f.state === 'waived').length,
     due: fees.filter(f => f.state === 'due').reduce((a, f) => a + f.amount, 0),
     unrecorded: visits.filter(v => !v.fee && v.status !== 'waiting').length,
+
+    /* Tests done in the clinic, kept apart from the consultation fee in every
+       figure. A clinic that cannot tell the two apart cannot tell whether the
+       strip machine pays for itself. Owed until the compounder marks it taken,
+       because money nobody collected must never look collected. */
+    testsTaken: visits.filter(v => v.testsPaidAt)
+                      .reduce((a, v) => a + chargeTotal(chargesFor(v.vitals, INSTANT)), 0),
+    testsOwed: visits.filter(v => !v.testsPaidAt)
+                     .reduce((a, v) => a + chargeTotal(chargesFor(v.vitals, INSTANT)), 0),
+    testsOwedCount: visits.filter(v => !v.testsPaidAt && chargesFor(v.vitals, INSTANT).length).length,
   }
+}
+
+/** The compounder took the money for the tests, outside the room, after. */
+export async function markTestsPaid(visitId: string): Promise<void> {
+  await db.visits.update(visitId, { testsPaidAt: Date.now() })
 }
 
 

@@ -1774,3 +1774,14 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .frz-out{background:var(--line-2)}
 .frz-foot{margin-top:var(--s6);text-align:center}
 @media (max-width:640px){ .frz h1{font-size:21px} }
+
+/* MONEY COMING IN FOR A TEST DONE IN THE ROOM.
+   It mirrors the refund row, and it is deliberately the opposite colour: the
+   refund row is warm because money is going out and somebody is waiting for
+   it; this is green because money is coming in and nobody is owed anything. */
+.collect{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);align-items:center;
+  justify-content:space-between;margin:var(--s2) 0 0;padding:11px var(--s4);
+  background:var(--g-50);border:1px solid var(--g-100);border-radius:var(--r2)}
+.collect b{font-size:15px;color:var(--g-700,var(--g))}
+.collect span{color:var(--mut);font-size:var(--t-sm);flex:1 1 200px}
+.collect .btn{padding:8px var(--s4);font-size:14px}

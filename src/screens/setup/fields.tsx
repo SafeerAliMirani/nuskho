@@ -3,6 +3,8 @@ import { profile, saveProfile, type Profile } from '../../profile'
 import { SPECIALTIES, seedDiagnoses } from '../../data/specialty'
 import { paper, setPaper, PAGE_MM, usableHeightMm, type Paper } from '../../paper'
 import { printCalibration, printToken } from '../../print/print'
+import { testFees, setTestFees, type TestFees } from '../../testfees'
+import { INSTANT } from '../../data/vitals'
 
 /**
  * One definition of every setup control, used by BOTH the first-run wizard and
@@ -381,6 +383,53 @@ export function FeeFields({ v, on }: { v: Profile; on: (p: Partial<Profile>) => 
         waive it in the room afterwards. Change this whenever you like, it only sets what
         the desk sees first.
       </p>
+      <TestFeeFields />
     </>
+  )
+}
+
+/**
+ * WHAT THE CLINIC CHARGES FOR A TEST IT DOES ITSELF.
+ *
+ * These are the doctor's prices, not Nuskho's, so they sit under `rate` with
+ * the consultation fee. Leave one blank and that test is free here and no
+ * charge is ever raised for it, which is the honest default: a clinic that
+ * does not charge for a blood pressure should never see a bill for one.
+ */
+function TestFeeFields() {
+  const [f, setF] = useState<TestFees>(() => testFees())
+  const [saved, setSaved] = useState(false)
+  const tests = INSTANT.filter(d => d.kind === 'test')
+
+  return (
+    <div className="lhbox" style={{ marginTop: 22 }}>
+      <h3>Tests done here, in the room</h3>
+      <p>
+        The doctor asks for a sugar or an HbA1c, the compounder does it there and then on
+        the clinic&rsquo;s own machine, and the patient pays for it on the way out. Put the
+        price here and the charge appears on the compounder&rsquo;s screen the moment a
+        reading is written down. Leave a price empty and that test is free.
+      </p>
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        {tests.map(d => (
+          <div className="fld" key={d.key} style={{ minWidth: 140, flex: 1 }}>
+            <label>{d.en} <span className="sd">{d.sd}</span></label>
+            <input value={f[d.key] || ''} inputMode="numeric" maxLength={5} placeholder="free"
+                   onChange={e => {
+                     const n = +e.target.value.replace(/\D/g, '').slice(0, 5) || 0
+                     setF(p => { const q = { ...p }; if (n > 0) q[d.key] = n; else delete q[d.key]; return q })
+                     setSaved(false)
+                   }} />
+          </div>
+        ))}
+      </div>
+      <button className="btn wide" onClick={() => { setTestFees(f); setSaved(true) }}>
+        {saved ? 'Saved ✓' : 'Save the test prices'}
+      </button>
+      <span className="unit" style={{ display: 'block', marginTop: 10 }}>
+        The reading prints on the prescription. The price never does: a slip a family keeps
+        and shows another doctor should carry clinical numbers, not a bill.
+      </span>
+    </div>
   )
 }

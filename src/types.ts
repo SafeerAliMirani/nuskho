@@ -128,6 +128,15 @@ export interface Visit {
   lines: RxLine[]
   tests: string[]
   advice: string[]
+  /**
+   * When the compounder took the money for the tests done in the room.
+   *
+   * The charges themselves are DERIVED from the readings (see testfees.ts), so
+   * there is no separate list here to fall out of step with what was recorded.
+   * This is only the moment the cash changed hands, outside the room, after the
+   * patient stood up. Absent means still owed, and the day's figures say so.
+   */
+  testsPaidAt?: number
   printedAt?: number     // set on every successful print — this is the audit trail
   /** when the visit stopped being open, whatever the outcome */
   closedAt?: number

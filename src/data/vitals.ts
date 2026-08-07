@@ -86,6 +86,7 @@ export const INSTANT: VitalDef[] = [
   { key: 'fbs', short: 'Sugar F', en: 'Fasting sugar', sd: 'شگر خالي', unit: 'mg/dL', kind: 'test', max: 3, lo: 70, hi: 100 },
   { key: 'hba1c', short: 'HbA1c', en: 'HbA1c', sd: 'ايڇ بي اي', unit: '%', kind: 'test', max: 4, lo: 4, hi: 5.7 },
   { key: 'hb', short: 'Hb', en: 'Haemoglobin', sd: 'هيموگلوبن', unit: 'g/dL', kind: 'test', max: 4, lo: 11, hi: 16 },
+  { key: 'chol', short: 'Chol', en: 'Cholesterol', sd: 'ڪوليسٽرول', unit: 'mg/dL', kind: 'test', max: 3, lo: 125, hi: 200 },
   { key: 'urine', short: 'Urine', en: 'Urine strip', sd: 'پيشاب', unit: '', kind: 'test', max: 14 },
 ]
 

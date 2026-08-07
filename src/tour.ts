@@ -102,9 +102,14 @@ const COMPOUNDER: TourStep[] = [
     at: '.qclose',
   },
   {
-    title: 'You may type for the doctor',
-    sd: 'دوا',
-    body: 'Open a patient and you hold the same prescription screen he does. He speaks, you type. The slip still prints under his name.',
+    title: 'The tests the doctor asks for',
+    sd: 'ٽيسٽ',
+    body: 'He asks for a sugar or an HbA1c while the patient is still sitting there. Do it on the clinic\u2019s machine, tell him the number, and he writes it on the slip. The charge appears on your queue, and you take it as the patient leaves.',
+    at: '.qlist, .blank',
+  },
+  {
+    title: 'Medicines are the doctor\u2019s alone',
+    body: 'You cannot open a prescription and you are not meant to. His name is on that paper. Everything else in the evening is yours.',
   },
   {
     title: 'After the print',

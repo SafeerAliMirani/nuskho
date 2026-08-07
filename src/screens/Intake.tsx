@@ -13,8 +13,10 @@ import {
 } from '../doctors'
 import {
   db, uid, nextToken, nextPatientNum, findByCode, patientCode, parseCode, closeVisit,
-  daySummary, markRefunded, owedRefund, setFee,
+  daySummary, markRefunded, owedRefund, setFee, markTestsPaid,
 } from '../db'
+import { chargesFor, chargeTotal } from '../testfees'
+import { INSTANT } from '../data/vitals'
 import type { Visit, VisitStatus, FeeState } from '../types'
 import { isDemo } from '../version'
 import { daysSinceExport } from '../safety'
@@ -400,6 +402,9 @@ export default function Intake({ visits, onOpen, onChange }: {
           {sum.toRefund > 0 && <span className="money back"><b>Rs {sum.toRefund}</b> to give back
             <small> ({sum.refundCount})</small></span>}
           {sum.due > 0 && <span className="money due"><b>Rs {sum.due}</b> due</span>}
+          {sum.testsTaken > 0 && <span className="money"><b>Rs {sum.testsTaken}</b> tests</span>}
+          {sum.testsOwed > 0 && <span className="money due"><b>Rs {sum.testsOwed}</b> tests to collect
+            <small> ({sum.testsOwedCount})</small></span>}
           {sum.unrecorded > 0 && <span className="soft">{sum.unrecorded} with no fee recorded</span>}
         </div>
       )}
@@ -466,6 +471,22 @@ export default function Intake({ visits, onOpen, onChange }: {
                 the evening's figures a lie. One tap, four honest endings. */}
             {/* The doctor sent this one back for money. It has to be loud at the
                 counter, because the patient is walking past it right now. */}
+            {/* THE MONEY FOR A TEST DONE IN THE ROOM.
+                The doctor asked for it, the compounder did it there and then,
+                and the patient pays on the way out. So it is owed from the
+                moment the reading exists and it is collected here, at the
+                door, by the person who did it. It is not a refund and it does
+                not look like one: green, because money is coming in. */}
+            {can('tests') && !v.testsPaidAt && chargesFor(v.vitals, INSTANT).length > 0 && (
+              <div className="collect">
+                <b>Take Rs {chargeTotal(chargesFor(v.vitals, INSTANT))} for the test{chargesFor(v.vitals, INSTANT).length === 1 ? '' : 's'}</b>
+                <span>{chargesFor(v.vitals, INSTANT).map(c => `${c.en} Rs ${c.amount}`).join(' · ')}</span>
+                <button className="btn" onClick={async () => { await markTestsPaid(v.id); onChange() }}>
+                  Received
+                </button>
+              </div>
+            )}
+
             {owedRefund(v) && (
               <div className="refund">
                 <b>Give back Rs {v.fee!.refund}</b>

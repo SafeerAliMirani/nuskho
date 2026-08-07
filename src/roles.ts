@@ -85,7 +85,7 @@ export const ROLE_SD: Record<Role, string> = {
 
 export const ROLE_WHAT: Record<Role, string> = {
   counter: 'Take the fee, give the number, hand back refunds',
-  compounder: 'Run the queue and the room screen for the doctor',
+  compounder: 'Run the queue, the cuff and the clinic\u2019s own tests',
   doctor: 'See patients and print prescriptions',
   pharmacy: 'Read printed slips, mark the medicines given',
   clinicadmin: 'The building: money totals, the day, the machines',
@@ -116,16 +116,28 @@ export type Can =
   | 'erase'        // clear records, factory reset
   | 'dispense'     // read PRINTED slips at the counter and mark medicines given
   | 'ops'          // the building's day: money totals, backup age, the machines
+  | 'tests'        // do a sugar or an HbA1c in the clinic, and take the charge
 
 const GRANTS: Record<Role, Can[]> = {
   counter: ['queue', 'money'],
-  // The compounder OPERATES the room screen — intake, queue, entry, print —
-  // which is why he holds 'prescribe': the doctor speaks, he types. What he
-  // does not hold is anything that shapes the practice itself: the fee rate,
-  // the figures, the paper, the medicine list, the locks, the backups.
-  compounder: ['queue', 'money', 'prescribe', 'history'],
+  /**
+   * THE COMPOUNDER DOES NOT PRESCRIBE, AND THAT IS A CHANGE.
+   *
+   * He used to hold 'prescribe' so he could type at the machine while the
+   * doctor dictated. Safeer, describing how a Larkana clinic actually runs,
+   * took it away: "compounder can not write medicine on prescription, he only
+   * can do blood pressure, sugar or any other instant test at the clinic if
+   * doctor ask".
+   *
+   * That is the medical division of labour as well as the legal one. The name
+   * on the slip is the doctor's, the responsibility for what is on it is his,
+   * and the software should not offer a second pair of hands for the one act
+   * that is his alone. What the compounder holds is the corridor: the queue,
+   * the money at the door, the cuff and the strip machine.
+   */
+  compounder: ['queue', 'money', 'history', 'tests'],
   doctor: ['queue', 'money', 'rate', 'prescribe', 'history', 'figures', 'paper', 'medicines', 'lock',
-           'backup', 'erase', 'dispense'],
+           'backup', 'erase', 'dispense', 'tests'],
   // The pharmacy reads what was PRINTED — the lines a patient already carries
   // on paper — and marks them given. No queue, no fees, no history, no
   // diagnosis: there is no route from this role to any of them.
