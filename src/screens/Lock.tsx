@@ -3,6 +3,7 @@ import { Mark, ArtSlip, IcUser, IcMoney, IcCog, IcQueue, IcPill, IcChart } from 
 import { profile, APP, adminIsSet, unlockAdmin } from '../profile'
 import { primeSound } from '../ui/sound'
 import { ROLES, ROLE_NAME, ROLE_SD, ROLE_WHAT, pinSet, checkRolePin, signIn, setDoctorIdentity, type Role } from '../roles'
+import { roleIsOn } from '../staff'
 import { multiRoom, activeDoctors, isSitting } from '../doctors'
 import { buildingMode } from '../building'
 
@@ -160,8 +161,14 @@ export default function Lock({ onOpen }: { onOpen: () => void }) {
           ) : (
             <>
               <p className="pick">Who is at this computer?</p>
+              {/* ONLY THE JOBS THIS BUILDING HAS.
+                  A doctor alone in one room used to be asked to choose between
+                  six people, five of whom were him. A clinic declares its staff
+                  at install (staff.ts) and this door shows that and nothing
+                  else. Nuskho's own door is always here, because somebody has
+                  to be able to set the building up. */}
               <div className="whos">
-                {ROLES.map(r => {
+                {ROLES.filter(roleIsOn).map(r => {
                   const I = ICON[r]
                   return (
                     <button key={r} className={'whobtn ' + r} onClick={() => choose(r)}>
@@ -174,7 +181,7 @@ export default function Lock({ onOpen }: { onOpen: () => void }) {
                 })}
               </div>
               <p className="hint">
-                {ROLES.some(r => needsSecret(r))
+                {ROLES.filter(roleIsOn).some(r => needsSecret(r))
                   ? 'Set or change these numbers under Setup, Lock.'
                   : 'No PINs are set, so anyone here can pick any of these. Set them under Setup, Lock.'}
               </p>

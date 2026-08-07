@@ -4,6 +4,7 @@ import {
   MIRROR_ROLES, type WireState, type WireRx, type WireVisit, type WireDoctor,
 } from '../building'
 import { ROLE_NAME, ROLE_SD, ROLE_WHAT, type Role } from '../roles'
+import { roleIsOn } from '../staff'
 import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
 import { printToken } from '../print/print'
@@ -227,7 +228,9 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
       ) : (
         <>
           <div className="whos">
-            {MIRROR_ROLES.map(r => {
+            {/* Only the jobs this building has. A clinic with no pharmacy
+                should not be offering a pharmacy door on a phone. */}
+            {MIRROR_ROLES.filter(roleIsOn).map(r => {
               const I = ICON[r]
               const off = busy || !up
               return (

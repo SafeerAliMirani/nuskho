@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { adminIsSet, adminUnlocked, unlockAdmin, lockAdmin, setAdminKey } from '../profile'
-import { role, can, ROLE_NAME, ROLE_SD, ROLES, pinSet, setRolePin, type Role } from '../roles'
+import { role, can, ROLE_NAME, ROLE_SD, ROLE_WHAT, ROLES, pinSet, setRolePin, type Role } from '../roles'
 import { downloadBackup, readBackup, readFile, restore, type RestoreReport } from '../backup'
 import { clearRecords, factoryReset, type ResetReport } from '../reset'
 import { IdentityFields, PaperFields, TokenFields, LogoFields, FeeFields, useDraftProfile, useDraftPaper } from './setup/fields'
@@ -17,6 +17,7 @@ import {
 import { buildingMode, hostHere, setHostHere, sittingsList } from '../building'
 import { qrSvgRaw } from '../print/qr'
 import { service, setService, daysOverdue, makeCode, isoDay } from '../service'
+import { STAFF_ROLES, staffRoles, setStaffRoles, owner, setOwner, type Owner } from '../staff'
 
 /**
  * Who may change what.
@@ -30,12 +31,12 @@ import { service, setService, daysOverdue, makeCode, isoDay } from '../service'
  * a medical document, they change roughly never, and we install in person. The
  * medicine list is the opposite on every count, so it stays with the doctor.
  */
-type Tab = 'Fee' | 'Paper' | 'Medicines' | 'Diagnoses' | 'Lock' | 'Wifi' | 'Backup' | 'You' | 'Doctors' | 'Heading' | 'Review' | 'Market' | 'Service'
+type Tab = 'Fee' | 'Paper' | 'Medicines' | 'Diagnoses' | 'Lock' | 'Wifi' | 'Backup' | 'Staff' | 'You' | 'Doctors' | 'Heading' | 'Review' | 'Market' | 'Service'
 
 /** Each tab names the ONE permission that opens it. Nothing decides twice. */
 const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
   Fee: 'rate', Paper: 'paper', Medicines: 'medicines', Diagnoses: 'medicines',
-  Lock: 'lock', Wifi: 'paper', Backup: 'backup',
+  Lock: 'lock', Wifi: 'paper', Backup: 'backup', Staff: 'staff',
   You: 'identity', Doctors: 'identity', Heading: 'identity', Market: 'review', Review: 'review',
   Service: 'identity',
 }
@@ -53,7 +54,7 @@ const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
  * It is a clinic tab now, filtered by `can('backup')` like every other one, so
  * the doctor reaches it and the Nuskho role does not see it at all.
  */
-const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Lock', 'Wifi', 'Backup']
+const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Staff', 'Lock', 'Wifi', 'Backup']
 const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review', 'Service']
 
 export default function Setup({ onBack }: { onBack: () => void }) {
@@ -135,6 +136,7 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             {tab === 'Diagnoses' && <DxTab />}
             {tab === 'Backup' && <BackupTab />}
             {tab === 'Wifi' && <WifiTab />}
+            {tab === 'Staff' && <StaffTab />}
             {tab === 'Doctors' && <DoctorsTab />}
             {tab === 'You' && <IdentityFields v={dr.v} on={on(dr.on)} />}
             {tab === 'Review' && <ReviewQueue />}
@@ -293,6 +295,101 @@ function ServiceTab() {
         the frozen screen still saves a full backup, so a clinic can always take every
         patient out, paid or not. Those records are their patients&rsquo;, not ours.
       </Note>
+    </>
+  )
+}
+
+
+/**
+ * WHICH JOBS THIS BUILDING HAS.
+ *
+ * Safeer sells Nuskho by asking a clinic what staff it employs, so the app has
+ * to be able to hear the answer. A doctor alone switches nothing on and the
+ * front door is one button. A hospital floor switches on four and gets four.
+ *
+ * The doctor cannot be switched off, because a building with no doors cannot
+ * be opened. And the roles NEST, which is the part worth reading on screen:
+ * one person doing two jobs signs in as the wider one rather than needing a
+ * way to be two people at once.
+ */
+function StaffTab() {
+  const [on, setOn] = useState<Role[]>(() => staffRoles())
+  const [own, setOwn] = useState<Owner>(() => owner())
+  const [saved, setSaved] = useState(false)
+  const iAmNuskho = role() === 'admin'
+
+  const toggle = (r: Role) => {
+    if (r === 'doctor') return
+    setOn(p => p.includes(r) ? p.filter(x => x !== r) : [...p, r])
+    setSaved(false)
+  }
+
+  return (
+    <>
+      <h3>The jobs this clinic has</h3>
+      <p className="hint">
+        Switch on only the people who really work here. The front door, and every phone
+        on the wifi, shows these and nothing else. A doctor working alone leaves them all
+        off and opens Nuskho with one tap.
+      </p>
+
+      {STAFF_ROLES.map(r => {
+        const isOn = on.includes(r)
+        return (
+          <label className={'check' + (r === 'doctor' ? ' fixed' : '')} key={r}>
+            <input type="checkbox" checked={isOn} disabled={r === 'doctor'}
+                   onChange={() => toggle(r)} />
+            <span><b>{ROLE_NAME[r]} <span className="sd">{ROLE_SD[r]}</span></b>
+              <small>{ROLE_WHAT[r]}{r === 'doctor' ? '. Always on: somebody has to be able to open the clinic.' : ''}</small></span>
+          </label>
+        )
+      })}
+
+      <Note tone="safe" title="One person can do two jobs without doing anything here">
+        The jobs contain each other. A compounder can do everything a token counter can,
+        and a doctor can do everything a compounder and a pharmacy can, including handing
+        medicines out. So somebody who runs the queue AND takes the money signs in as the
+        compounder, and a doctor working alone signs in as the doctor and never needs
+        another door. Only <b>Clinic admin</b> stands apart, because it is the building&rsquo;s
+        money and machines and holds no patient record at all.
+      </Note>
+
+      {/* Nuskho records who bought it, at install. It is not the clinic's to
+          change: a staff member who could promote himself to owner would make
+          the whole arrangement decorative. */}
+      {iAmNuskho ? (
+        <div className="lhbox" style={{ marginTop: 20 }}>
+          <h3>Who owns this clinic</h3>
+          <p>
+            Whoever bought Nuskho decides which jobs exist and sets the PINs for the
+            people he employs. Recorded here, at install, and only by us.
+          </p>
+          <div className="chips">
+            {(['doctor', 'clinicadmin'] as Owner[]).map(o => (
+              <button key={o} className={'chip' + (own === o ? ' have' : '')}
+                      onClick={() => { setOwn(o); setSaved(false) }}>
+                {ROLE_NAME[o]}
+              </button>
+            ))}
+          </div>
+          <span className="unit">
+            A clinic admin who owns the building can turn jobs on and off and set the
+            PINs for his staff. He can never set the doctor&rsquo;s PIN, and no permission
+            he holds reaches a prescription. That is what the roles contain, not a
+            promise anybody has to keep.
+          </span>
+        </div>
+      ) : (
+        <p className="hint" style={{ marginTop: 16 }}>
+          This clinic is owned by the <b>{ROLE_NAME[own]}</b>, so that is who may change
+          this list. Ring us if that is wrong.
+        </p>
+      )}
+
+      <button className="btn wide" onClick={() => {
+        setStaffRoles(on); if (iAmNuskho) setOwner(own); setSaved(true)
+        window.dispatchEvent(new CustomEvent('nuskho:role'))
+      }}>{saved ? 'Saved ✓' : 'Save'}</button>
     </>
   )
 }

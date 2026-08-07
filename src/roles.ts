@@ -117,6 +117,7 @@ export type Can =
   | 'dispense'     // read PRINTED slips at the counter and mark medicines given
   | 'ops'          // the building's day: money totals, backup age, the machines
   | 'tests'        // do a sugar or an HbA1c in the clinic, and take the charge
+  | 'staff'        // decide which jobs this building has. The owner's, see staff.ts
 
 const GRANTS: Record<Role, Can[]> = {
   counter: ['queue', 'money'],
@@ -137,18 +138,18 @@ const GRANTS: Record<Role, Can[]> = {
    */
   compounder: ['queue', 'money', 'history', 'tests'],
   doctor: ['queue', 'money', 'rate', 'prescribe', 'history', 'figures', 'paper', 'medicines', 'lock',
-           'backup', 'erase', 'dispense', 'tests'],
+           'backup', 'erase', 'dispense', 'tests', 'staff'],
   // The pharmacy reads what was PRINTED — the lines a patient already carries
   // on paper — and marks them given. No queue, no fees, no history, no
   // diagnosis: there is no route from this role to any of them.
   pharmacy: ['dispense'],
   // Operations, never the clinical record. Money totals the desk collected,
   // the day's shape, backup age, the machines. Not one prescription.
-  clinicadmin: ['ops'],
+  clinicadmin: ['ops', 'staff'],
   // Deliberately no 'queue', 'prescribe', 'history', 'figures', 'money',
   // 'backup' or 'erase'. If a permission here would let us read or copy a
   // patient's record, it is in the wrong list.
-  admin: ['paper', 'medicines', 'lock', 'identity', 'review'],
+  admin: ['paper', 'medicines', 'lock', 'identity', 'review', 'staff'],
 }
 
 export const can = (what: Can, who: Role = role()): boolean => GRANTS[who].includes(what)

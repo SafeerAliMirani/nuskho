@@ -1,5 +1,6 @@
 import { factoryReset } from './reset'
 import { isDemo } from './version'
+import { setStaffRoles, STAFF_ROLES } from './staff'
 import { signedIn, signIn } from './roles'
 import { profile, saveProfile } from './profile'
 
@@ -82,6 +83,11 @@ export async function freshenDemo(): Promise<boolean> {
       degreesEn: 'MBBS', fee: 500, timing: '5:00 pm – 10:00 pm',
     })
   }
+  // A REAL CLINIC SHOWS ONLY THE JOBS IT HAS, and the shipped default is the
+  // doctor alone. The practice copy is the opposite case on purpose: it exists
+  // so somebody can see the whole system, so every job is switched on and the
+  // door shows all of them. A clinic switches off what it does not employ.
+  setStaffRoles(STAFF_ROLES)
   return stale
 }
 

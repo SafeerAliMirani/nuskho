@@ -1785,3 +1785,9 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .collect b{font-size:15px;color:var(--g-700,var(--g))}
 .collect span{color:var(--mut);font-size:var(--t-sm);flex:1 1 200px}
 .collect .btn{padding:8px var(--s4);font-size:14px}
+
+/* A job that cannot be switched off. Dimmed rather than hidden, because the
+   person needs to see that the doctor IS one of the jobs, not wonder where it
+   went. */
+.check.fixed{opacity:.72;cursor:default}
+.check.fixed input{cursor:default}
