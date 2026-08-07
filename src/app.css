@@ -1758,3 +1758,19 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
   .billbar{padding:10px var(--s3);font-size:12.5px}
   .billbar .bb-s{display:block}
 }
+
+
+/* THE FROZEN SCREEN.
+   Calm, not alarming. A doctor reading this has people waiting, so it must be
+   readable in one glance and it must not look like a crash. Nothing red: red
+   in this app means a patient cannot wait. */
+.frozen .top{background:linear-gradient(112deg,#2c2c2c 0%,#3a3a3a 50%,#2c2c2c 100%)}
+.frz{max-width:720px;margin:0 auto;padding-top:var(--s6)}
+.frz h1{font-family:var(--display);font-size:26px;line-height:1.25;
+  letter-spacing:var(--tr-tight);margin:0 0 var(--s3)}
+.frz-lead{font-size:15.5px;line-height:1.65;color:var(--ink-2);margin:0 0 var(--s6)}
+.frz-key{border-color:var(--g-500);box-shadow:var(--sh-2)}
+.frz-key input{font-size:20px;letter-spacing:.08em;text-align:center}
+.frz-out{background:var(--line-2)}
+.frz-foot{margin-top:var(--s6);text-align:center}
+@media (max-width:640px){ .frz h1{font-size:21px} }

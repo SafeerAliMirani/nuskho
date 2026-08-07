@@ -19,6 +19,8 @@ import { todaysVisits } from './db'
 import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo, IcBook } from './ui/art'
 import Toasts from './ui/Toasts'
 import Bill from './ui/Bill'
+import Frozen from './screens/Frozen'
+import { frozen as licenceRanOut } from './service'
 import { startPresence, onSignal } from './ui/bus'
 import { isDemo } from './version'
 import { clearDemo, touchDemo } from './demo'
@@ -39,6 +41,9 @@ function Clinic() {
   const [pharm, setPharm] = useState(false)
   const [about, setAbout] = useState(false)
   const [tour, setTour] = useState(false)
+  // read once, at mount. See the block above the early return.
+  const [dead] = useState(() => licenceRanOut())
+  const [unlocked, setUnlocked] = useState(false)
   const [today, setToday] = useState<Visit[]>([])
   const [welcome, setWelcome] = useState(needsWelcome)
   // The lock stands between the doctor and the app only when opening it. Once
@@ -121,6 +126,22 @@ function Clinic() {
   // back to 'counter' — and the wizard's own last step is "print one slip",
   // which the counter is not allowed to do. The installer's first experience of
   // the app was that it would not print.
+  /**
+   * THE LICENCE, READ ONCE AND NEVER AGAIN.
+   *
+   * `useState(() => ...)` runs the check on the first render of this component
+   * and stores the answer. It is deliberately NOT a hook that re-runs, not a
+   * timer, and not called anywhere in the render path. A clinic already working
+   * at seven in the evening keeps working until somebody closes the app, no
+   * matter how long the evening runs or what midnight does. Whoever edits this
+   * next: rule 1 in service.ts, and it is not a style preference.
+   *
+   * It sits above the wizard and the door on purpose. There is no route around
+   * it, and equally no route into it for a clinic with no licence set at all,
+   * because frozen() answers false the moment paidUntil is empty.
+   */
+  if (dead && !unlocked) return <Frozen onOpen={() => setUnlocked(true)} />
+
   if (welcome) return <Welcome onDone={() => { setWelcome(false); setLocked(true); refresh() }} />
   if (locked) return <Lock onOpen={() => { setLocked(false); if (!tourSeen(role())) setTour(true) }} />
 

@@ -34,7 +34,11 @@ export default function Bill() {
           ? <>Nuskho service is due <b>today</b>{money ? <>, <b>{money}</b></> : null}.</>
           : <>Nuskho service was due <b>{n.days} day{n.days === 1 ? '' : 's'} ago</b>, on {n.on}{money ? <>, <b>{money}</b></> : null}.</>}
         {' '}
-        <span className="bb-s">Support, updates and the medicine list stay stopped until it is paid. Nothing else changes.</span>
+        <span className="bb-s">
+          {n.stopsIn >= 0
+            ? <>Nuskho stops opening on <b>{n.stopsOn}</b>{n.stopsIn > 0 ? <> in {n.stopsIn} day{n.stopsIn === 1 ? '' : 's'}</> : <> today</>}. Your records stay yours either way.</>
+            : <>Support, updates and the medicine list stay stopped until it is paid.</>}
+        </span>
       </span>
       <span className="bb-a">
         <a className="lnk" href={`https://wa.me/${n.contact.replace(/\D/g, '').replace(/^0/, '92')}`}

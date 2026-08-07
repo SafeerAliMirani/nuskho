@@ -16,7 +16,7 @@ import {
 } from '../doctors'
 import { buildingMode, hostHere, setHostHere, sittingsList } from '../building'
 import { qrSvgRaw } from '../print/qr'
-import { service, setService, daysOverdue } from '../service'
+import { service, setService, daysOverdue, makeCode, isoDay } from '../service'
 
 /**
  * Who may change what.
@@ -180,37 +180,63 @@ export default function Setup({ onBack }: { onBack: () => void }) {
  * reminder. Blank means silent: a clinic on a free pilot, or Safeer's own
  * machine, shows nothing at all until somebody types a date.
  *
- * This is the whole of the commercial machinery in the app. There is no licence
- * key, no expiry, no check of any kind. Leave the date years in the past and
- * every prescription still prints, because the promise on the website says so
- * and it has to stay true.
+ * This is the whole of the commercial machinery in the app: a date, a grace
+ * period, an amount, and the code that lifts a stop. Leave the date empty and
+ * none of it exists, which is the right setting for a pilot clinic and for
+ * Safeer's own machine.
  */
 function ServiceTab() {
   const [v, setV] = useState(service())
   const [saved, setSaved] = useState(false)
+  const [genDay, setGenDay] = useState('')
   const d = daysOverdue()
 
   const on = <K extends keyof typeof v>(k: K, val: (typeof v)[K]) => {
     setV(p => ({ ...p, [k]: val })); setSaved(false)
   }
 
+  const stopsOn = v.paidUntil && v.graceDays > 0
+    ? isoDay(new Date(v.paidUntil + 'T00:00:00').getTime() + v.graceDays * 86400000)
+    : ''
+
   return (
     <>
-      <h3>Service and payment</h3>
+      <h3>Service, payment and the licence</h3>
       <p className="hint">
         Written by Nuskho at install and again at every renewal. From a week before
         the date, and every evening after it, the doctor and the clinic admin see one
-        line asking for it. Nobody else sees anything, it never reaches a printed
-        slip, and nothing in the app behaves differently because of it.
+        line asking for it. Once the grace period is over the app stops opening until
+        a code is typed in. Nobody else sees any of this, and it never reaches a
+        printed slip.
       </p>
 
       <div className="row">
         <div className="fld">
-          <label>Paid up to — the date the next payment is due</label>
-          <input type="date" value={v.paidUntil}
-                 onChange={e => on('paidUntil', e.target.value)} />
-          <span className="unit">Leave empty and Nuskho never mentions money. That is the
-            right setting for a pilot clinic.</span>
+          <label>Clinic code</label>
+          <input value={v.clinic} maxLength={12} placeholder="LRK-014"
+                 onChange={e => on('clinic', e.target.value.toUpperCase())} />
+          <span className="unit">Printed on their setup sheet. The unlock code is tied to
+            it, so one clinic&rsquo;s number never opens another.</span>
+        </div>
+        <div className="fld">
+          <label>Paid up to</label>
+          <input type="date" value={v.paidUntil} onChange={e => on('paidUntil', e.target.value)} />
+          <span className="unit">Leave empty and there is no licence at all: no reminder,
+            and the app can never stop. That is the setting for a pilot clinic.</span>
+        </div>
+      </div>
+
+      <div className="row">
+        <div className="fld">
+          <label>Grace, in days, before the app stops</label>
+          <input value={v.graceDays} inputMode="numeric" maxLength={3}
+                 onChange={e => on('graceDays', +e.target.value.replace(/\D/g, '') || 0)} />
+          <span className="unit">
+            {v.graceDays > 0
+              ? <>Stops on <b>{stopsOn || '—'}</b>. Fourteen days is a fair default: long
+                  enough that a payment in the post is never a crisis.</>
+              : <>Zero switches the stop off completely. The reminder still shows.</>}
+          </span>
         </div>
         <div className="fld">
           <label>Amount due, Rs — optional</label>
@@ -219,7 +245,7 @@ function ServiceTab() {
         </div>
       </div>
       <div className="fld">
-        <label>WhatsApp number shown on the reminder</label>
+        <label>WhatsApp number shown to the clinic</label>
         <input value={v.contact} inputMode="tel" placeholder="0333 3368189"
                onChange={e => on('contact', e.target.value)} />
       </div>
@@ -227,7 +253,7 @@ function ServiceTab() {
       {d !== null && (
         <p className="usable">
           {d < 0
-            ? `Paid up. ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'} to run, and the reminder starts seven days before.`
+            ? `Paid up. ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'} to run. The reminder starts seven days before.`
             : d === 0 ? 'Due today. The reminder is showing now.'
             : `${d} day${d === 1 ? '' : 's'} past due. The reminder is showing every evening.`}
         </p>
@@ -237,12 +263,35 @@ function ServiceTab() {
         {saved ? 'Saved ✓' : 'Save'}
       </button>
 
-      <Note tone="safe" title="This cannot stop the clinic working">
-        There is no licence and no expiry anywhere in Nuskho. A clinic that has not
-        paid for a year still prints every prescription, keeps every record and can
-        take every backup. What stops is support, updates, the medicine list being
-        kept current and the Sindhi review, and none of that is enforced by software.
-        It stops because a person stops doing it.
+      {/* Safeer's own tool, on his own machine, for the phone call. He types the
+          clinic's code and the new date and reads back twelve digits. It never
+          needs the clinic's machine and it never needs the internet. */}
+      <div className="lhbox" style={{ marginTop: 22 }}>
+        <h3>Make an unlock code for a clinic</h3>
+        <p>
+          For the call when a clinic has stopped and has just paid. Type their clinic
+          code and the new paid-up date, and read the number back to them. It opens
+          that clinic only, and it moves them to exactly that date and no further.
+        </p>
+        <div className="row">
+          <div className="fld"><label>Their clinic code</label>
+            <input value={v.clinic} maxLength={12}
+                   onChange={e => on('clinic', e.target.value.toUpperCase())} /></div>
+          <div className="fld"><label>New paid up to</label>
+            <input type="date" value={genDay} onChange={e => setGenDay(e.target.value)} /></div>
+        </div>
+        {v.clinic && genDay
+          ? <p className="usable" style={{ fontSize: 22, letterSpacing: '.06em' }}>
+              <b>{makeCode(v.clinic, genDay)}</b>
+            </p>
+          : <p className="hint">Fill both boxes to see the number.</p>}
+      </div>
+
+      <Note tone="safe" title="What the stop can and cannot do">
+        It is decided once, when the app opens, so a clinic already working keeps
+        working all evening however late it runs. A wrong clock cannot trigger it. And
+        the frozen screen still saves a full backup, so a clinic can always take every
+        patient out, paid or not. Those records are their patients&rsquo;, not ours.
       </Note>
     </>
   )
