@@ -205,6 +205,20 @@ table.rx.mx .dysd{font-size:7.4pt}
 .adv .sd{font-size:8.4pt;font-weight:700;line-height:1.2;}
 .adv .aen{font-size:5.6pt;color:#555;}
 
+/* SENT ON — the referral band.
+   Full width and directly under the tests/advice row, because it is an
+   instruction to the patient about where to go next, not a box of detail. The
+   green head is the same head every other box on this slip carries: a referral
+   is normal clinic business and must not read like an alarm. */
+.bx.sent{margin-top:1.2mm;flex:none;}
+.bx.sent .in{padding:1.2mm 2mm;display:flex;align-items:baseline;gap:3mm;}
+.sto{flex:none;display:flex;align-items:baseline;gap:1.6mm;}
+.sto b{font-size:8pt;letter-spacing:.2px;}
+.sto .sd{font-size:9pt;font-weight:700;}
+.swhy{flex:1;font-size:7pt;color:#333;line-height:1.35;}
+.page.a4 .sto b{font-size:9.6pt;}
+.page.a4 .swhy{font-size:8.4pt;}
+
 /* doctor's handwriting strip */
 .note2{margin-top:1.4mm;border-top:1.6pt solid #111;padding-top:1mm}
 .note2 .nh{display:flex;justify-content:space-between;align-items:center;font-size:5.8pt;color:#444;letter-spacing:.4px}

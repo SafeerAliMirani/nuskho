@@ -16,6 +16,7 @@ import {
   daySummary, markRefunded, owedRefund, setFee, markTestsPaid,
 } from '../db'
 import { chargesFor, chargeTotal } from '../testfees'
+import { cameFrom } from '../refer'
 import { INSTANT } from '../data/vitals'
 import type { Visit, VisitStatus, FeeState } from '../types'
 import { isDemo } from '../version'
@@ -219,6 +220,18 @@ export default function Intake({ visits, onOpen, onChange }: {
     if (!multi) return ''
     const d = doctorById(visitDoctorId(v.doctorId))
     return d ? `R${d.room} ${d.nameEn} · ` : ''
+  }
+
+  /**
+   * "walked over from R1". The desk has to know, because a referred patient is
+   * standing in the corridor rather than sitting where he was told to sit, and
+   * because the fee on this token belongs to the SECOND room. No reason, no
+   * finding, no medicine: the queue is read by the counter, and none of that
+   * is the counter's. Just where he came from.
+   */
+  const fromTag = (v: Visit): string => {
+    const d = cameFrom(v, visits)
+    return d ? `walked over from R${d.room} · ` : ''
   }
 
   /**
@@ -440,6 +453,7 @@ export default function Intake({ visits, onOpen, onChange }: {
               <span className="nm">{names[v.id] ?? '…'}
                 <small>
                   {roomTag(v)}
+                  {fromTag(v)}
                   {can('history')
                     ? (v.lines.length ? `${v.lines.length} medicine${v.lines.length === 1 ? '' : 's'}` : 'no prescription yet')
                     : (v.printedAt ? 'prescription printed' : 'with the doctor')}

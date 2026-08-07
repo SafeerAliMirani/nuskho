@@ -157,6 +157,14 @@ export interface SlipData {
    * The address, timing and logo stay the building's.
    */
   doctor?: { nameEn: string; nameSd: string; degreesEn: string; degreesSd: string; reg: string }
+  /**
+   * Where the doctor is sending this patient on, already resolved to words.
+   *
+   * Resolved by the CALLER, exactly like `doctor` above, so this module keeps
+   * needing nothing but the data it is handed — no doctor list, no database.
+   * See refer.ts: `destinationEn` and `destinationSd`.
+   */
+  sentTo?: { en: string; sd: string }
 }
 
 /** How the medicines are laid out across sheets. Produced by planSheets() in
@@ -314,6 +322,26 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
       + '</div></div></div>'
     : ''
 
+  /**
+   * SENT ON — and this is the only channel that cannot fail.
+   *
+   * A token in the other room's queue works inside this building. A note on
+   * screen works while the app is open. The paper in the patient's hand works
+   * in a hospital in Karachi at two in the morning, and it is the one the
+   * patient will not forget to deliver, because it is his.
+   *
+   * The heading is the Sindhi already in the app for this outcome. Everything
+   * else on this band is a name or a line the doctor typed himself, which is
+   * the same rule the diagnosis and the next-visit date already follow.
+   */
+  const sent = visit.sentOn
+    ? `<div class="bx sent"><h4><span>SENT ON TO</span><span class="sd">اڳتي موڪليو</span></h4>
+      <div class="in">
+        <div class="sto"><b>${esc(d.sentTo?.en ?? '')}</b>${d.sentTo?.sd ? `<span class="sd">${esc(d.sentTo.sd)}</span>` : ''}</div>
+        <div class="swhy">${esc(visit.sentOn.note)}</div>
+      </div></div>`
+    : ''
+
   const credit = (dr.showCredit && !lhd)
     ? `<div class="brand">
       <span class="bn"><span class="sd">${esc(APP.sd)}</span> <b>${esc(APP.en)}</b></span>
@@ -329,6 +357,7 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
     ${last ? legend : ''}
     ${sheets > 1 && !last ? `<div class="contbar"><span>${visit.lines.length} medicines in total — continued on sheet ${sheet + 2}</span><span class="sd">ٻي پني تي جاري</span></div>` : ''}
     ${last ? `<div class="boxes">${tests}${advice}</div>` : ''}
+    ${last ? sent : ''}
     ${last ? `<div class="note2">
       <div class="nh"><span class="pen">DOCTOR'S NOTE / REFERRAL / DIET — handwritten</span>
         <span class="sd">ڊاڪٽر جي صلاح ۽ پرهيز</span></div>

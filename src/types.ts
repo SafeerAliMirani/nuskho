@@ -167,6 +167,37 @@ export interface Visit {
    * a solo clinic keeps writing nothing here. See doctors.ts.
    */
   doctorId?: string
+  /**
+   * The doctor sent this patient on. Written on the SENDING consultation, and
+   * only there — see refer.ts for why this fact is not stored twice.
+   */
+  sentOn?: SentOn
+  /**
+   * This token exists because another doctor sent the patient here. It holds
+   * the id of HIS consultation, not a copy of it: the receiving doctor reads
+   * the real record, and if the sender corrects something before the patient
+   * has walked down the corridor, the correction is what is read.
+   */
+  fromVisitId?: string
+}
+
+/**
+ * A patient sent on, in the sending doctor's own words.
+ *
+ * Either to a room in this building — `toDoctorId`, and a token appears in
+ * that room's queue — or out of it entirely, to a hospital or a specialist in
+ * another city, which is `toPlace` and a line on the printed slip.
+ */
+export interface SentOn {
+  /** a room in this building */
+  toDoctorId?: string
+  /** somewhere else: "CMC Hospital, Larkana", "cardiologist, Karachi" */
+  toPlace?: string
+  /** why he is being sent. The doctor's own line, and it is PRINTED. */
+  note: string
+  at: number
+  /** the token raised in the other room, when there was one */
+  toVisitId?: string
 }
 
 /**

@@ -1791,3 +1791,33 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
    went. */
 .check.fixed{opacity:.72;cursor:default}
 .check.fixed input{cursor:default}
+
+/* ------------------------------------------------------------ sent on
+ *
+ * A referral is normal clinic business, so neither of these two blocks is
+ * styled as an alarm. What they must be is unmistakably SOMEBODY ELSE'S: the
+ * incoming card is the one thing on this screen the doctor cannot type into,
+ * and a card that looked like the rest of the form would invite him to try.
+ * Hence the tint, the rule down the left, and the sentence at the bottom of it.
+ */
+.fromdoc{background:var(--g-50);border:1.5px solid var(--g-100);border-left:4px solid var(--g);
+  border-radius:var(--r2);padding:var(--s3) var(--s4);margin-bottom:var(--s4)}
+.fromdoc .fd-h{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s3)}
+.fromdoc .fd-h b{font-size:var(--t-md)}
+.fromdoc .fd-h span{color:var(--mut);font-size:var(--t-sm);flex:none}
+.fromdoc .fd-why{margin:var(--s2) 0 var(--s3);font-size:17px;line-height:1.45;font-weight:600}
+.fromdoc .fd-body{display:flex;flex-direction:column;gap:4px;font-size:var(--t-md);line-height:1.5}
+.fromdoc .fd-body b{font-weight:700;color:var(--mut);font-size:var(--t-xs);text-transform:uppercase;
+  letter-spacing:.9px;margin-right:6px}
+.fromdoc small{display:block;margin-top:var(--s3);padding-top:var(--s2);
+  border-top:1px solid var(--g-100);color:var(--mut);font-size:var(--t-sm);line-height:1.5}
+
+.senton{margin:var(--s4) 0 0}
+.senton.open{padding:var(--s3) var(--s4);border:1.5px solid var(--line);border-radius:var(--r2);
+  background:var(--card);box-shadow:var(--sh-1)}
+.senton.done{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;
+  gap:var(--s2) var(--s4);padding:var(--s3) var(--s4);border-radius:var(--r2);
+  background:var(--g-50);border:1.5px solid var(--g-100)}
+.senton.done b{display:block;font-size:var(--t-md)}
+.senton.done span{display:block;margin-top:3px;line-height:1.45}
+.senton.done small{display:block;margin-top:6px;color:var(--mut);font-size:var(--t-sm);line-height:1.5}

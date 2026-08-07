@@ -150,6 +150,11 @@ const DOCTOR: TourStep[] = [
     body: 'Charge less or free, from your chair. The counter is told at once and owes him the difference on his way out.',
   },
   {
+    title: 'Sending him on',
+    sd: 'اڳتي موڪليو',
+    body: 'To another room here, or to a hospital in another city. Write the one line about why: it prints on his own slip, which is the copy that never fails to arrive, and the doctor you sent him to reads it beside your finding and your medicines. He reads them. He cannot change them.',
+  },
+  {
     title: 'Your figures are yours',
     sd: 'ماڻهو',
     body: 'People served, who came back, evenings worked, money after refunds. Nobody else in the building can open this page, and the month card you can print carries no money and no medicines.',

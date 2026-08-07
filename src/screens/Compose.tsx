@@ -7,7 +7,9 @@ import { profile } from '../profile'
 import { toSindhi, splitBrand } from '../data/translit'
 import { searchDictionary, dictLine, type DictEntry } from '../data/dictionary'
 import { printSlip } from '../print/print'
-import { doctorById, multiRoom } from '../doctors'
+import { doctorById, multiRoom, visitDoctorId } from '../doctors'
+import { sendOn, unsend, incoming, sendTargets, destinationEn, destinationSd, type Incoming } from '../refer'
+import { filled } from '../data/vitals'
 import { IcBook, IcPill } from '../ui/art'
 import { Note } from '../ui/Note'
 import { signal } from '../ui/bus'
@@ -28,6 +30,7 @@ export default function Compose({ visitId, onDone, onBack }: {
   const [all, setAll] = useState<Drug[]>(formulary)
   const [use, setUse] = useState<Record<string, number>>({})
   const [prev, setPrev] = useState<Visit | null>(null)
+  const [inc, setInc] = useState<Incoming | null>(null)
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState<number | null>(null)
@@ -55,6 +58,7 @@ export default function Compose({ visitId, onDone, onBack }: {
       const [ds, uc, ss] = await Promise.all([doctorDrugs(formulary), usageCounts(), listSets()])
       setAll(ds); setUse(uc); setSets(ss)
       if (p) setPrev((await lastVisit(p.id, v.id)) ?? null)
+      setInc(await incoming(v))
     })()
   }, [visitId])
 
@@ -315,6 +319,11 @@ export default function Compose({ visitId, onDone, onBack }: {
         nameEn: room.nameEn, nameSd: room.nameSd,
         degreesEn: room.degreesEn, degreesSd: room.degreesSd, reg: room.reg,
       } : undefined,
+      // Resolved here rather than in the print module, which is handed data and
+      // never looks anything up. See SlipData.sentTo.
+      sentTo: cur.current!.sentOn
+        ? { en: destinationEn(cur.current!.sentOn), sd: destinationSd(cur.current!.sentOn) }
+        : undefined,
     }
   }
 
@@ -425,12 +434,48 @@ export default function Compose({ visitId, onDone, onBack }: {
           <> · Room {doctorById(visit.doctorId)!.room} · {doctorById(visit.doctorId)!.nameEn}</>}
       </span></div>
 
+      {/* THE OTHER DOCTOR'S RECORD, AND IT STAYS HIS.
+          Everything in this card is read from the sending consultation live and
+          rendered as text. There is no control in it, nothing here writes, and
+          the prescription this doctor is about to build below is empty and his
+          own. See refer.ts for why it is a card and not an inbox. */}
+      {inc && (
+        <div className="fromdoc">
+          <div className="fd-h">
+            <b>Sent to you by {inc.doctorEn}{inc.room ? ` · Room ${inc.room}` : ''}</b>
+            <span>{new Date(inc.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <p className="fd-why">{inc.note}</p>
+          <div className="fd-body">
+            {inc.from.diagnosis && <div><b>He found</b> {inc.from.diagnosis}</div>}
+            {filled(inc.from.vitals).length > 0 && (
+              <div><b>He recorded</b> {filled(inc.from.vitals)
+                .map(([d, val]) => `${d.short} ${val}${d.unit ? ' ' + d.unit : ''}`).join(' · ')}</div>
+            )}
+            <div><b>He prescribed</b> {inc.from.lines.length
+              ? inc.from.lines.map(l => `${l.snap?.brand ?? drugs[l.drugId]?.brand ?? '?'} ${l.snap?.strength ?? ''}`.trim()).join(', ')
+              : 'nothing — he sent him straight on'}</div>
+          </div>
+          <small>You are reading {inc.doctorEn}'s consultation, not writing in it. Your prescription
+            below is your own and prints under your name.</small>
+        </div>
+      )}
+
       {/* The returning patient is a large share of an OPD evening, and re-entering
           the same prescription by hand is where transcription errors breed. This
           brings the last one back to be edited, never to be printed unread: the
           doses and days come with it and every one is still tappable. */}
       {prev && (
         <div className="prev">
+          {/* WHOSE last visit. In a building with several rooms this strip has
+              always shown the patient's previous prescription whatever room
+              wrote it, which is right — a doctor treating a man tonight must
+              know what he was given last month, and hiding it is how two
+              courses of the same antibiotic get prescribed. But it said
+              nothing about who wrote it, so a doctor read a colleague's line
+              as his own. It names him now. */}
+          {multiRoom() && doctorById(visitDoctorId(prev.doctorId))?.id !== visitDoctorId(visit.doctorId)
+            ? `${doctorById(visitDoctorId(prev.doctorId))?.nameEn ?? 'Another room'}, ` : ''}
           Last visit {Math.round((Date.now() - prev.createdAt) / 86400000)} days ago
           {prev.diagnosis ? `, ${prev.diagnosis}` : ''}. {prev.lines.map(l => (l.snap?.brand ?? drugs[l.drugId]?.brand ?? '?')).join(', ')}
           {!locked && prev.lines.length > 0 && (
@@ -634,6 +679,12 @@ export default function Compose({ visitId, onDone, onBack }: {
         </div>
       </fieldset>
 
+      {/* OUTSIDE the fieldset, so it works after the slip has printed too.
+          A doctor prints the prescription and then says "and go and see Dr
+          Soomro" constantly. Locking that behind Amend would mean the app can
+          only record referrals decided in the right order. */}
+      <SendOnBar visit={visit} locked={locked} onChange={reload} />
+
       {!locked && (<>
         <Bell />
 
@@ -648,6 +699,136 @@ export default function Compose({ visitId, onDone, onBack }: {
         </div>
       </>)}
       <p className="hint">The paper pad stays on the desk. If anything fails, the doctor handwrites that one patient and we continue.</p>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------- sent on */
+
+/**
+ * SENDING A PATIENT ON.
+ *
+ * One control for both of the things a doctor means by it: down the corridor to
+ * another room in this building, or out of it to a hospital or a specialist in
+ * another city. They feel like one act to him, so they are one control.
+ *
+ * IT IS CLOSED UNTIL HE OPENS IT. Most consultations do not end in a referral,
+ * and a permanently expanded block of destination pickers below the medicines
+ * would be one more thing to scroll past two hundred times an evening.
+ *
+ * THE REASON IS REQUIRED. Not out of tidiness: it is the entire content of the
+ * referral. "Room 4" tells the next doctor nothing he cannot see from the
+ * patient's face. Every referral protocol worth the name is a sentence about
+ * why, and a referral with no why is why specialists complain about referrals.
+ */
+function SendOnBar({ visit, locked, onChange }: {
+  visit: Visit; locked: boolean; onChange: () => Promise<void>
+}) {
+  const rooms = sendTargets()
+  const [open, setOpen] = useState(false)
+  const [to, setTo] = useState(rooms[0]?.id ?? '')
+  const [place, setPlace] = useState('')
+  const [note, setNote] = useState('')
+  const [charge, setCharge] = useState(true)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const s = visit.sentOn
+  const target = rooms.find(d => d.id === to)
+
+  async function go() {
+    if (busy) return
+    setBusy(true)
+    const r = await sendOn(visit.id, {
+      toDoctorId: to || undefined, toPlace: to ? undefined : place, note, charge,
+    })
+    setBusy(false)
+    if (!r.ok) { setErr(r.why); return }
+    setErr(''); setOpen(false); setNote(''); setPlace('')
+    await onChange()
+  }
+
+  if (s) {
+    const where = destinationEn(s)
+    return (
+      <div className="senton done">
+        <div>
+          <b>Sent on to {where}</b>
+          <span>{s.note}</span>
+          {/* Said plainly, because it is the difference between the other
+              doctor reading this and not reading it. */}
+          <small>{s.toVisitId
+            ? locked
+              ? 'That room has the token. It is NOT on the paper he is holding — press Reprint above if he should carry it too.'
+              : 'That room has the token, and it prints on his slip.'
+            : locked
+              ? 'Recorded. It is NOT on the paper he is holding — press Reprint above if he should carry it.'
+              : 'It prints on his slip.'}</small>
+        </div>
+        <button className="lnk" onClick={async () => {
+          const r = await unsend(visit.id)
+          if (!r.ok) { setErr(r.why); return }
+          setErr(''); await onChange()
+        }}>undo</button>
+        {err && <p className="hint" style={{ color: '#8a5b00', width: '100%' }}>{err}</p>}
+      </div>
+    )
+  }
+
+  if (!open) {
+    return (
+      <div className="senton">
+        <button className="lnk" onClick={() => setOpen(true)}>
+          Send this patient on to another doctor
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="senton open">
+      <h2 style={{ marginTop: 0 }}>Send this patient on</h2>
+      <div className="chips">
+        {rooms.map(d => (
+          <button key={d.id} className={'chip' + (to === d.id ? ' on' : '')}
+                  onClick={() => setTo(d.id)}>Room {d.room} · {d.nameEn}</button>
+        ))}
+        <button className={'chip' + (to === '' ? ' on' : '')} onClick={() => setTo('')}>
+          Somewhere else
+        </button>
+      </div>
+
+      {to === '' && (
+        <div className="fld"><label>Where</label>
+          <input value={place} maxLength={80} placeholder="CMC Hospital, Larkana"
+                 onChange={e => setPlace(e.target.value)} /></div>
+      )}
+
+      <div className="fld"><label>Why — the other doctor sees this, and it prints</label>
+        <input value={note} maxLength={240} autoFocus
+               placeholder="chest pain, ECG changes, please see today"
+               onChange={e => { setNote(e.target.value); setErr('') }}
+               onKeyDown={e => { if (e.key === 'Enter') go() }} /></div>
+
+      {target && (
+        <div className="chips">
+          <button className={'chip' + (charge ? ' on' : '')} onClick={() => setCharge(true)}
+                  disabled={target.fee <= 0}>
+            He pays Room {target.room}'s fee, Rs {target.fee}
+          </button>
+          <button className={'chip' + (!charge ? ' on' : '')} onClick={() => setCharge(false)}>
+            No second fee
+          </button>
+        </div>
+      )}
+
+      {err && <p className="hint" style={{ color: '#8a5b00' }}>{err}</p>}
+      <div className="row">
+        <button className="btn" onClick={go} disabled={busy || !note.trim()}>
+          {target ? `Send to Room ${target.room}` : 'Record it'}
+        </button>
+        <button className="btn ghost" onClick={() => { setOpen(false); setErr('') }}>Cancel</button>
+      </div>
     </div>
   )
 }

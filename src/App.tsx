@@ -187,7 +187,11 @@ function Clinic() {
         <div className="brandwrap">
           <Mark size={30} className="mk" />
           <div className="who2">
-            <b>{profile().doctorEn || 'Nuskho'}</b>
+            {/* In a building with rooms this said the FIRST doctor's name to
+                whoever was signed in, so Dr Soomro worked all evening under a
+                heading that read Dr Khan. Whoever is at the keyboard is named
+                here; a solo clinic is unchanged. */}
+            <b>{me?.nameEn ?? (profile().doctorEn || 'Nuskho')}</b>
             <span>{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           </div>
         </div>
