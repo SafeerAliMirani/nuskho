@@ -14,6 +14,9 @@ import { IcBook, IcPill } from '../ui/art'
 import { Note } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Bell from '../ui/Bell'
+import Tour from '../ui/Tour'
+import { tourFor, tourSeen } from '../tour'
+import { role } from '../roles'
 import { warmPlan } from '../print/paginate'
 import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
 import { doseSdFor, defaultRoute } from '../data/forms'
@@ -57,6 +60,16 @@ export default function Compose({ visitId, onDone, onBack }: {
   const [err, setErr] = useState('')
   const [sets, setSets] = useState<RxSet[]>([])
   const [naming, setNaming] = useState('')
+  /**
+   * THE PRESCRIPTION SCREEN TEACHES ITSELF, ONCE.
+   *
+   * Five of the doctor's tour steps describe THIS screen, and they used to run
+   * over the queue where none of their controls exist. The ring vanished for
+   * the middle of the tour and it read as broken, which is exactly how Safeer
+   * described it. They run here now, the first time he opens a patient, with
+   * every step ringing something in front of him.
+   */
+  const [tour, setTour] = useState(false)
 
   // The single source of truth between renders. Two quick taps used to read the
   // same stale copy and the second overwrote the first — which is what put the
@@ -77,6 +90,10 @@ export default function Compose({ visitId, onDone, onBack }: {
       setAll(ds); setUse(uc); setSets(ss)
       if (p) setPrev((await lastVisit(p.id, v.id)) ?? null)
       setInc(await incoming(v))
+      // after the screen has something on it to point at, never before
+      if (!tourSeen(role(), 'compose') && tourFor(role(), 'compose').length > 0) {
+        setTimeout(() => setTour(true), 500)
+      }
     })()
   }, [visitId])
 
@@ -729,6 +746,8 @@ export default function Compose({ visitId, onDone, onBack }: {
         </div>
       </>)}
       <p className="hint">The paper pad stays on the desk. If anything fails, the doctor handwrites that one patient and we continue.</p>
+
+      {tour && <Tour role={role()} screen="compose" onClose={() => setTour(false)} />}
     </div>
   )
 }

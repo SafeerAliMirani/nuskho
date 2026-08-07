@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { tourFor, noteTourSeen, type TourStep } from '../tour'
+import { tourFor, noteTourSeen, type TourStep, type Screen } from '../tour'
 import { ROLE_NAME, ROLE_SD, type Role } from '../roles'
 
 /**
@@ -16,8 +16,10 @@ import { ROLE_NAME, ROLE_SD, type Role } from '../roles'
  * work. Nothing in this app may stand between a person and a patient, and a
  * modal overlay is exactly that.
  */
-export default function Tour({ role, onClose }: { role: Role; onClose: () => void }) {
-  const steps = tourFor(role)
+export default function Tour({ role, screen = 'queue', onClose }: {
+  role: Role; screen?: Screen; onClose: () => void
+}) {
+  const steps = tourFor(role, screen)
   const [i, setI] = useState(0)
   const [box, setBox] = useState<DOMRect | null>(null)
 
@@ -33,6 +35,12 @@ export default function Tour({ role, onClose }: { role: Role; onClose: () => voi
    * candidate has to be big enough to be worth pointing at, and the next
    * selector in the list gets its turn if it is not. When nothing qualifies
    * there is no ring, no dimming, and the step simply reads as a card.
+   *
+   * THE FLOOR WAS 26 PIXELS TALL AND THAT WAS TOO HIGH. A heading is about 24,
+   * so every step that pointed at one silently rang nothing — which is part of
+   * what Safeer saw when he said the middle steps were not working. The guard
+   * exists to reject a collapsed two-pixel list, so twelve is enough for the
+   * height, and the width does the rest of the work.
    */
   const pick = (at?: string): Element | null => {
     if (!at) return null
@@ -41,7 +49,7 @@ export default function Tour({ role, onClose }: { role: Role; onClose: () => voi
       try { el = document.querySelector(sel.trim()) } catch { el = null }
       if (!el) continue
       const r = el.getBoundingClientRect()
-      if (r.height >= 26 && r.width >= 26) return el
+      if (r.height >= 12 && r.width >= 40) return el
     }
     return null
   }
@@ -67,7 +75,7 @@ export default function Tour({ role, onClose }: { role: Role; onClose: () => voi
     }
   }, [i, step])
 
-  const done = () => { noteTourSeen(role); onClose() }
+  const done = () => { noteTourSeen(role, screen); onClose() }
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -109,9 +117,18 @@ export default function Tour({ role, onClose }: { role: Role; onClose: () => voi
         </div>
 
         <div className="tc-foot">
+          {/* THESE WERE SEVEN PIXELS WIDE.
+              Safeer reported the middle ones "not working"; a seven pixel
+              target is not a control, it is a decoration that occasionally
+              responds. The dot still LOOKS seven pixels, and the thing you
+              press is a button with room around it, with a name a screen
+              reader can say. */}
           <span className="tc-dots">
             {steps.map((_, k) => (
-              <i key={k} className={k === i ? 'on' : k < i ? 'past' : ''} onClick={() => setI(k)} />
+              <button key={k} className={'tc-dot' + (k === i ? ' on' : k < i ? ' past' : '')}
+                      aria-label={`Step ${k + 1} of ${steps.length}`}
+                      aria-current={k === i ? 'step' : undefined}
+                      onClick={() => setI(k)}><i /></button>
             ))}
           </span>
           <span className="tc-btns">

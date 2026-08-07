@@ -19,7 +19,26 @@ import type { Role } from './roles'
  * this app and already read by a person. Nothing new is written into Sindhi
  * for a tour, for the same reason nothing unreviewed reaches paper.
  */
+/**
+ * WHICH SCREEN A STEP BELONGS TO.
+ *
+ * Safeer, having walked the tours: "I found the middle numbers are not
+ * working." He was right, and the cause was structural rather than a bug in
+ * any one step. The tour opens over the QUEUE, and five of the doctor's eight
+ * steps describe the PRESCRIPTION screen, which is not open. So those steps
+ * had nothing to ring, the gold ring vanished halfway through, and the middle
+ * of the tour read as broken.
+ *
+ * A step now says which screen it is about. The queue's steps run over the
+ * queue; the prescription screen runs its own the first time a doctor opens a
+ * patient. Every step then rings a control that is actually in front of him,
+ * which was the whole idea.
+ */
+export type Screen = 'queue' | 'compose'
+
 export type TourStep = {
+  /** the screen this step's control lives on. Absent means the queue. */
+  on?: Screen
   title: string
   /** a single word, taken from the vocabulary this app already uses */
   sd?: string
@@ -72,6 +91,7 @@ const COUNTER: TourStep[] = [
   {
     title: 'Money to give back',
     body: 'When the doctor charges less, the row turns and says give back so many rupees. Hand it over and tap it while the patient is still standing there.',
+    at: '.refund, .qlist, .blank',
   },
   {
     title: 'What you will never see here',
@@ -89,17 +109,20 @@ const COMPOUNDER: TourStep[] = [
   {
     title: 'Ready them before the room',
     body: 'Open a row and take the blood pressure, weight and temperature. What you type is on the doctor’s screen already saved, and it prints on the slip.',
-    at: '.vopen',
+    // the row control first, then the list it will appear in: this tour opens
+    // on the first sign-in of the evening, when the queue is usually empty
+    at: '.vopen, .qlist, .blank',
   },
   {
     title: 'Call by number',
     sd: 'ٽوڪن ڪائونٽر',
     body: 'The order of the room stays yours. Nothing here shows a waiting list to the room or tells a family they are next.',
+    at: '.qrow, .qlist, .blank',
   },
   {
     title: 'Every token must end',
     body: 'Somebody gives up and goes home, somebody is sent straight to hospital. Tap close without a prescription and pick the honest ending. A token left open all night makes the evening’s figures a lie.',
-    at: '.qclose',
+    at: '.qclose, .qlist, .blank',
   },
   {
     title: 'The tests the doctor asks for',
@@ -132,33 +155,49 @@ const DOCTOR: TourStep[] = [
     when: multi,
   },
   {
-    title: 'The desk, when you open a patient',
-    body: 'On a wide screen the prescription grows on the left while your medicines stay put on the right, so choosing the next one never scrolls you away from what you wrote.',
-  },
-  {
-    title: 'Doses are taps, not typing',
-    sd: 'گوري',
-    body: 'Tap a dose to cycle one, two, half, none. Days go up and down with plus and minus. Nothing here will ever suggest a medicine you did not choose.',
-  },
-  {
-    title: 'PRINT, then it locks',
-    body: 'Under eight seconds to paper. After that the slip cannot be edited, because the paper in his hand must never quietly stop matching the record. A correction is a new slip with a new number.',
-  },
-  {
-    title: 'Charging less',
-    sd: 'مفت',
-    body: 'Charge less or free, from your chair. The counter is told at once and owes him the difference on his way out.',
-  },
-  {
-    title: 'Sending him on',
-    sd: 'اڳتي موڪليو',
-    body: 'To another room here, or to a hospital in another city. Write the one line about why: it prints on his own slip, which is the copy that never fails to arrive, and the doctor you sent him to reads it beside your finding and your medicines. He reads them. He cannot change them.',
-  },
-  {
     title: 'Your figures are yours',
     sd: 'ماڻهو',
     body: 'People served, who came back, evenings worked, money after refunds. Nobody else in the building can open this page, and the month card you can print carries no money and no medicines.',
     at: '.rolechip',
+  },
+
+  /* ---------------------------------------------- the prescription screen
+   *
+   * These five run when he first opens a patient, not over the queue. Each
+   * one now rings something he can actually see, which is the difference
+   * between a tour and a leaflet. */
+  {
+    on: 'compose',
+    title: 'Who you have in front of you',
+    body: 'His name, his token, his number, and in a building with rooms, which room this slip belongs to. Check it before you write, every time.',
+    at: '.pane .who',
+  },
+  {
+    on: 'compose',
+    title: 'Doses are taps, not typing',
+    sd: 'گوري',
+    body: 'Tap a dose to cycle one, two, half, none. Days go up and down with plus and minus. Nothing here will ever suggest a medicine you did not choose.',
+    at: '.dosegrid, .composegrid',
+  },
+  {
+    on: 'compose',
+    title: 'Charging less',
+    sd: 'مفت',
+    body: 'Charge less or free, from your chair. The counter is told at once and owes him the difference on his way out.',
+    at: '.feebar',
+  },
+  {
+    on: 'compose',
+    title: 'Sending him on',
+    sd: 'اڳتي موڪليو',
+    body: 'To another room here, or to a hospital in another city. Write the one line about why: it prints on his own slip, which is the copy that never fails to arrive, and the doctor you sent him to reads it beside your finding and your medicines. He reads them. He cannot change them.',
+    at: '.senton',
+  },
+  {
+    on: 'compose',
+    title: 'PRINT, then it locks',
+    body: 'Under eight seconds to paper. After that the slip cannot be edited, because the paper in his hand must never quietly stop matching the record. A correction is a new slip with a new number.',
+    at: '.sticky, .lockbar',
   },
 ]
 
@@ -179,6 +218,7 @@ const PHARMACY: TourStep[] = [
     title: 'Tick as you hand over',
     sd: 'دوا',
     body: 'Each line shows the exact count the paper says. Tick it when it goes into the bag.',
+    at: '.line, .pane h2',
   },
   {
     title: 'Short on the shelf',
@@ -206,10 +246,12 @@ const CLINICADMIN: TourStep[] = [
   {
     title: 'Closing the drawer',
     body: 'Count the cash, type what you counted, and the screen says matches exactly, or over, or short, with the sentence worth writing down.',
+    at: '.feebar, .fld',
   },
   {
     title: 'Watch two health lines',
     body: 'How old the last backup is, and whether the records are protected from browser cleanup. Nagging the doctor about the pen drive is part of this job.',
+    at: '.line',
   },
   {
     title: 'What can never reach this desk',
@@ -225,9 +267,14 @@ export const TOURS: Partial<Record<Role, TourStep[]>> = {
   clinicadmin: CLINICADMIN,
 }
 
-/** The steps this clinic actually needs, in order. */
-export const tourFor = (r: Role): TourStep[] =>
-  (TOURS[r] ?? []).filter(s => !s.when || s.when())
+/**
+ * The steps this clinic actually needs, on the screen the person is looking at.
+ *
+ * `screen` defaults to the queue, which is where the tour has always opened.
+ * A step with no `on` is a queue step, so every existing role is unchanged.
+ */
+export const tourFor = (r: Role, screen: Screen = 'queue'): TourStep[] =>
+  (TOURS[r] ?? []).filter(s => (s.on ?? 'queue') === screen).filter(s => !s.when || s.when())
 
 /* ------------------------------------------------------- seen, once, per role
  *
@@ -236,12 +283,15 @@ export const tourFor = (r: Role): TourStep[] =>
  * a tour people learn to dismiss without reading, so it opens itself exactly
  * once and lives in the menu after that.
  */
-const key = (r: Role) => `nuskho.tour.${r}`
+/** One mark per role PER SCREEN: seeing the queue's tour must not silently
+ *  count as having seen the prescription screen's. */
+const key = (r: Role, screen: Screen = 'queue') =>
+  screen === 'queue' ? `nuskho.tour.${r}` : `nuskho.tour.${r}.${screen}`
 
-export function tourSeen(r: Role): boolean {
-  try { return localStorage.getItem(key(r)) === '1' } catch { return true }
+export function tourSeen(r: Role, screen: Screen = 'queue'): boolean {
+  try { return localStorage.getItem(key(r, screen)) === '1' } catch { return true }
 }
 
-export function noteTourSeen(r: Role): void {
-  try { localStorage.setItem(key(r), '1') } catch { /* private mode: shows again, harmless */ }
+export function noteTourSeen(r: Role, screen: Screen = 'queue'): void {
+  try { localStorage.setItem(key(r, screen), '1') } catch { /* private mode: shows again, harmless */ }
 }

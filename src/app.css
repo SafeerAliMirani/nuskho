@@ -1719,10 +1719,17 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .tc-body p{font-size:13.6px;line-height:1.62;color:var(--mut);margin:0}
 
 .tc-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px 6px}
-.tc-dots{display:flex;gap:6px;align-items:center}
-.tc-dots i{width:7px;height:7px;border-radius:50%;background:#dbe5e1;cursor:pointer;transition:.18s}
-.tc-dots i.past{background:#9fc3b6}
-.tc-dots i.on{background:var(--g);width:19px;border-radius:4px}
+.tc-dots{display:flex;gap:0;align-items:center;margin-left:-7px}
+/* The dot is 7px. The BUTTON around it is 24, which is the smallest thing a
+   thumb hits reliably, and it is transparent so the row still looks like dots. */
+.tc-dot{width:21px;height:26px;padding:0;border:0;background:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.tc-dot i{width:7px;height:7px;border-radius:50%;background:#dbe5e1;display:block;transition:.18s}
+.tc-dot:hover i{background:#b9cec6}
+.tc-dot.past i{background:#9fc3b6}
+.tc-dot.on{width:33px}
+.tc-dot.on i{background:var(--g);width:19px;border-radius:4px}
+.tc-dot:focus-visible{outline:2px solid var(--g);outline-offset:-2px;border-radius:6px}
 .tc-btns{display:flex;align-items:center;gap:12px}
 .tc-btns .btn{padding:8px 20px;font-size:14px}
 

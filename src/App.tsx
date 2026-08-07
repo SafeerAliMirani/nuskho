@@ -162,6 +162,20 @@ function Clinic() {
     return !me || !v || visitDoctorId(v.doctorId) === me
   }
 
+  /**
+   * WHICH SCREEN IS SHOWING, so "How this works" opens the tour for THIS one.
+   *
+   * The order below mirrors the router at the bottom of this file exactly. If
+   * one is changed the other must be, or the menu offers the queue's tour over
+   * the prescription screen and every step points at a control that is not
+   * there, which is the fault Safeer found.
+   */
+  const showing: 'queue' | 'compose' =
+    !about && !(ops && can('ops')) && !(stats && can('figures'))
+    && !(setup && (can('paper') || can('identity'))) && !(pharm && can('dispense'))
+    && !!visitId && can('prescribe') && roomOk(visitId)
+      ? 'compose' : 'queue'
+
   /** The signed-in doctor, for the header chip. Null in a solo clinic. */
   const me = multiRoom() && role() === 'doctor' ? doctorById(currentDoctorId() ?? undefined) : undefined
 
@@ -262,7 +276,7 @@ function Clinic() {
                   {/* Learning where things are must never mean finding a
                       manual. It sits one tap away, for ever, in the same
                       menu the role is chosen from. */}
-                  {tourFor(role()).length > 0 && (
+                  {tourFor(role(), showing).length > 0 && (
                     <button onClick={() => { setMenu(false); setTour(true) }}>
                       <IcBook size={16} /> How this works <small>a short tour of your own screen</small>
                     </button>
@@ -329,7 +343,7 @@ function Clinic() {
 
       {/* Over the top of whatever is showing, and deliberately not instead
           of it: the tour rings the real control on the real screen. */}
-      {tour && <Tour role={role()} onClose={() => setTour(false)} />}
+      {tour && <Tour role={role()} screen={showing} onClose={() => setTour(false)} />}
     </div>
   )
 }
