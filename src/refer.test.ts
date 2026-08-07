@@ -106,7 +106,7 @@ describe('naming the destination', () => {
 /* ------------------------------------------------- forms that are not pills */
 
 import { course } from './course'
-import { FORM_WORD, DOSE_WORD, ROUTE_WORD, TIME_WORD, pendingWords } from './data/forms'
+import { FORM_WORD, DOSE_WORD, ROUTE_WORD, TIME_WORD, pendingWords, wordOk } from './data/forms'
 import { sameMolecule, awareOf } from './data/who'
 import type { RxLine, RxSnap, Form, Route } from './types'
 
@@ -192,13 +192,32 @@ describe('a slip for something that is not a pill', () => {
     for (const cell of doses) expect(cell).not.toContain('<svg')
   })
 
-  /** Nothing on a medical document in a language nobody here has read. */
-  it('prints the English word while the Sindhi is still unread', () => {
+  /**
+   * Safeer read all nine on 7 Aug 2026 and confirmed them, so they print.
+   *
+   * This test used to assert the opposite — that the slip showed the English
+   * because nobody had read the Sindhi — and it was RIGHT to, right up until a
+   * person read them. Flipping the assertion is the point of the gate working,
+   * not the gate being weakened: the rule below is what actually holds the
+   * line, and it is unchanged.
+   */
+  it('prints the Sindhi for a drop now that a person has read it', () => {
     const html = slipFor('drop', 'eye')
-    expect(html).not.toContain(DOSE_WORD.drop.sd)
-    expect(html).not.toContain(ROUTE_WORD.eye.sd)
-    expect(html).toContain('drop')
-    expect(html).toContain('in both eyes')
+    expect(html).toContain(DOSE_WORD.drop.sd)      // قطرا
+    expect(html).toContain(ROUTE_WORD.eye.sd)      // ٻنهي اکين ۾
+  })
+
+  /**
+   * THE RULE ITSELF, which no longer has a real unread word to be shown on.
+   *
+   * Every place that prints one of these words asks `wordOk` first, so the rule
+   * is pinned where it is decided rather than through whichever word happens to
+   * be unchecked this month. The day somebody adds a tenth word it takes this
+   * path, and it will print its English until a person has read it.
+   */
+  it('says nothing in Sindhi for a word nobody has read', () => {
+    expect(wordOk('form:notyet', { en: 'inhaler', sd: 'سانس', ok: false })).toBe(false)
+    expect(wordOk('form:tab', { en: 'tablet', sd: 'گوري', ok: true })).toBe(true)
   })
 
   it('still prints the four words that were checked long ago', () => {
@@ -209,18 +228,35 @@ describe('a slip for something that is not a pill', () => {
     expect(slipFor('tab')).toContain('گوري')
   })
 
-  it('offers every unread word for a person to read, once each', () => {
-    const words = pendingWords()
-    const sds = words.map(w => w.sd)
+  /**
+   * THE TRIPWIRE.
+   *
+   * As of 7 Aug 2026 every word this app can print has been read by a person
+   * who speaks Sindhi, so this queue is empty and the failure message names
+   * anything that has crept in since.
+   *
+   * A new word added to `data/forms.ts` ships `ok: false` and lands here, and
+   * this test fails until somebody has read it. That failure is the feature:
+   * the word still prints its English in the meantime, so nothing is broken on
+   * paper, but nobody gets to forget that a suggested spelling is sitting in
+   * the source waiting to be checked.
+   */
+  it('has no word left that a person has not read', () => {
+    const waiting = pendingWords().filter(w => !w.ok)
+    expect(waiting.map(w => `${w.sd} = ${w.en}`)).toEqual([])
+  })
+
+  it('shows each waiting word once, not once per place it is used', () => {
+    // قطرا is both the form and the dose word for a drop. The queue asks about
+    // a WORD, not about every cell that prints it.
+    const sds = pendingWords().map(w => w.sd)
     expect(new Set(sds).size).toBe(sds.length)
-    expect(sds).toContain(DOSE_WORD.drop.sd)
-    expect(sds).toContain(ROUTE_WORD.eye.sd)
-    // the evening is the newest word in the app and must be in the queue too,
-    // or it prints without anybody having read it
-    expect(sds).toContain(TIME_WORD.e.sd)
-    // and nothing already checked is in the queue
+    // and a word already read is never put back in front of anybody
     expect(sds).not.toContain(FORM_WORD.tab.sd)
     expect(sds).not.toContain(TIME_WORD.m.sd)
+    expect(sds).not.toContain(DOSE_WORD.drop.sd)
+    expect(sds).not.toContain(ROUTE_WORD.eye.sd)
+    expect(sds).not.toContain(TIME_WORD.e.sd)
   })
 })
 
@@ -330,5 +366,39 @@ describe('what the slip prints once somebody can set it', () => {
   it('never prints the note somebody typed when closing the token', () => {
     const html = renderSlip(base({ closeNote: 'sent to Chandka, chest pain', status: 'referred' }))
     expect(html).not.toContain('Chandka')
+  })
+})
+
+/**
+ * A WORD THAT IS APPROVED AND REACHES NO PAPER IS THE SAME FAULT AS A FIELD
+ * PRINTED WITH NOTHING SETTING IT, ONE LAYER DOWN.
+ *
+ * Safeer read لڳايو (apply) on 7 Aug and it printed nowhere: a cream's dose
+ * cells carried a bare tick, because `countable` is false for a cream and that
+ * branch never asked for a word. The tick said "at this time of day", which
+ * the column heading had already said. The word says what to DO.
+ */
+describe('a form that is not counted still says what to do', () => {
+  const cell = (form: Form) => {
+    const html = renderSlip(slip({ visit: visit({ lines: [line(form)] }) }))
+    return (html.match(/<td class="tcell">(?!.*off)[\s\S]*?<\/td>/)?.[0] ?? '')
+  }
+
+  it('a cream says apply, and never a number', () => {
+    const c = cell('cream')
+    expect(c).toContain(DOSE_WORD.cream.sd)      // لڳايو
+    expect(c).not.toMatch(/>\s*1\s*</)           // "1.5 creams" is not a thing
+    expect(c).not.toContain('½')
+  })
+
+  /**
+   * An inhaler, a suppository and a patch share no honest single word, so
+   * DOSE_WORD.other is blank on purpose and the tick stays. Inventing a word
+   * here is exactly what the gate exists to prevent.
+   */
+  it('an inhaler keeps the tick, because there is no honest word for it', () => {
+    const c = cell('other')
+    expect(c).toContain('&#10003;')
+    expect(c).not.toContain('دوا')
   })
 })

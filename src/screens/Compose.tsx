@@ -167,6 +167,30 @@ export default function Compose({ visitId, onDone, onBack }: {
     return () => clearTimeout(t)
   }, [visit, pt, drugs])
 
+  /**
+   * A READING TAKEN AT THE DOOR, WHILE THIS SCREEN IS ALREADY OPEN.
+   *
+   * The paper was never in danger: `freeze()` goes through `apply()`, which
+   * re-reads the live row before the slip is built, so a blood pressure typed
+   * at the desk after the doctor opened the patient still printed. But it did
+   * not APPEAR, and the doctor is looking at the screen while he decides. The
+   * compounder's whole job is to have that number ready before the patient sits
+   * down; a number that only shows up on the paper afterwards is a number taken
+   * too late to be worth taking.
+   *
+   * `nuskho:refresh` is raised by the wire when a phone writes; the slow tick
+   * covers a second window on this machine, which raises nothing. Re-reading is
+   * safe now that the vitals boxes hold what is being typed for a moment and a
+   * half: before that, a refresh landing mid-keystroke would have wiped the
+   * box, which is the same fault this pass started with.
+   */
+  useEffect(() => {
+    const again = () => { reload().catch(() => { /* the next tick tries again */ }) }
+    window.addEventListener('nuskho:refresh', again)
+    const t = setInterval(again, 6000)
+    return () => { window.removeEventListener('nuskho:refresh', again); clearInterval(t) }
+  }, [visitId])   // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!visit || !pt) return <div className="pane">…</div>
   const locked = !!visit.printedAt
 

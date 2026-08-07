@@ -17,6 +17,17 @@ import type { Form, Route } from '../types'
  * The four words that were already on paper before this file existed — گوري,
  * ڪيپسول, سيرپ, چمچو — ship as read, because they have been printed and
  * checked since the first sheet.
+ *
+ * EVERYTHING ELSE HERE WAS READ BY SAFEER ON 7 AUG 2026 and confirmed correct:
+ * قطرا, ڪريم, ساشي, لڳايو, شام, and the four sites ٻنهي اکين ۾, ٻنهي ڪنن ۾,
+ * نڪ ۾, چمڙيءَ تي. They ship as read, in the source and not in one machine's
+ * localStorage, for the reason who.ts gives about the formula column: a word
+ * checked once should be checked forever, for every clinic, and not asked
+ * again of every doctor who installs this.
+ *
+ * The gate stays. The NEXT word added to this file ships `ok: false` and prints
+ * its English until somebody who speaks Sindhi has looked at it, and a test
+ * below fails until that happens, by name, so it cannot be forgotten.
  */
 
 export type Word = {
@@ -33,9 +44,9 @@ export const FORM_WORD: Record<Form, Word> = {
   tab: { en: 'tablet', sd: 'گوري', ok: true },
   cap: { en: 'capsule', sd: 'ڪيپسول', ok: true },
   syr: { en: 'syrup', sd: 'سيرپ', ok: true },
-  drop: { en: 'drops', sd: 'قطرا', ok: false },
-  cream: { en: 'cream', sd: 'ڪريم', ok: false },
-  sachet: { en: 'sachet', sd: 'ساشي', ok: false },
+  drop: { en: 'drops', sd: 'قطرا', ok: true },
+  cream: { en: 'cream', sd: 'ڪريم', ok: true },
+  sachet: { en: 'sachet', sd: 'ساشي', ok: true },
   // Deliberately blank. An `other` is an inhaler, a suppository, a patch, a
   // pessary or something nobody here has thought of, and naming it دوا told
   // the patient nothing while looking like it had. The doctor's own written
@@ -48,9 +59,9 @@ export const DOSE_WORD: Record<Form, Word> = {
   tab: { en: 'tablet', sd: 'گوري', ok: true },
   cap: { en: 'capsule', sd: 'ڪيپسول', ok: true },
   syr: { en: 'spoon', sd: 'چمچو', ok: true },
-  drop: { en: 'drops', sd: 'قطرا', ok: false },
-  cream: { en: 'apply', sd: 'لڳايو', ok: false },
-  sachet: { en: 'sachet', sd: 'ساشي', ok: false },
+  drop: { en: 'drops', sd: 'قطرا', ok: true },
+  cream: { en: 'apply', sd: 'لڳايو', ok: true },
+  sachet: { en: 'sachet', sd: 'ساشي', ok: true },
   other: { en: '', sd: '', ok: true },
 }
 
@@ -70,7 +81,7 @@ export const DOSE_WORD: Record<Form, Word> = {
 export const TIME_WORD: Record<'m' | 'd' | 'e' | 'n', Word> = {
   m: { en: 'morning', sd: 'صبح', ok: true },
   d: { en: 'midday', sd: 'منجهند', ok: true },
-  e: { en: 'evening', sd: 'شام', ok: false },
+  e: { en: 'evening', sd: 'شام', ok: true },
   n: { en: 'night', sd: 'رات', ok: true },
 }
 
@@ -83,10 +94,10 @@ export const TIME_WORD: Record<'m' | 'd' | 'e' | 'n', Word> = {
  */
 export const ROUTE_WORD: Record<Route, Word> = {
   mouth: { en: '', sd: '', ok: true },
-  eye: { en: 'in both eyes', sd: 'ٻنهي اکين ۾', ok: false },
-  ear: { en: 'in both ears', sd: 'ٻنهي ڪنن ۾', ok: false },
-  nose: { en: 'in the nose', sd: 'نڪ ۾', ok: false },
-  skin: { en: 'on the skin', sd: 'چمڙيءَ تي', ok: false },
+  eye: { en: 'in both eyes', sd: 'ٻنهي اکين ۾', ok: true },
+  ear: { en: 'in both ears', sd: 'ٻنهي ڪنن ۾', ok: true },
+  nose: { en: 'in the nose', sd: 'نڪ ۾', ok: true },
+  skin: { en: 'on the skin', sd: 'چمڙيءَ تي', ok: true },
 }
 
 /* --------------------------------------------------- what has been read yet */

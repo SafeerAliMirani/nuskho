@@ -67,11 +67,26 @@ function doseCell(m: RxSnap, n: number, sz: string): string {
    *
    * "1.5 creams" is not a thing anybody says, and half a circle beside an
    * ointment is a picture of a tablet cut in two. These cells carry the
-   * pictogram and a tick, meaning "at this time of day", and nothing that
-   * looks like a quantity.
+   * pictogram and nothing that looks like a quantity.
+   *
+   * WHAT THEY CARRY INSTEAD IS THE INSTRUCTION. A bare tick means "at this
+   * time of day", which the column heading already said; لڳايو means APPLY,
+   * which is the thing the patient actually has to do and is not a quantity.
+   * That word sat approved in data/forms.ts with no route to paper until this
+   * was written, which is the same fault as a field printed with nothing
+   * setting it, one layer down.
+   *
+   * An inhaler keeps the tick, because DOSE_WORD.other is deliberately blank:
+   * there is no honest single word for a puff, a suppository and a patch, and
+   * inventing one is what the whole gate exists to prevent.
    */
   if (!countable(m.form)) {
-    return `<td class="tcell">${ic ? ic(sz, sz) : ''}<div class="dose">&#10003;</div></td>`
+    const word = doseUnitSd(m)
+    const en = word ? '' : doseEnFor1(m.form, n)
+    const say = word ? `<span class="sd">${esc(word)}</span>`
+      : en ? `<span class="mlen">${esc(en)}</span>`
+      : '&#10003;'
+    return `<td class="tcell">${ic ? ic(sz, sz) : ''}<div class="dose">${say}</div></td>`
   }
 
   // Syrup counts in spoons, and drops count in drops. This cell used to print
