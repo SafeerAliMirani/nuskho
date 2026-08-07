@@ -152,7 +152,41 @@ const GRANTS: Record<Role, Can[]> = {
   admin: ['paper', 'medicines', 'lock', 'identity', 'review', 'staff'],
 }
 
-export const can = (what: Can, who: Role = role()): boolean => GRANTS[who].includes(what)
+/**
+ * WHO OWNS THE CLINIC, AND WHY IT LIVES IN THIS FILE.
+ *
+ * Safeer: "if the owner is doctor so he can have access to admin and doctor as
+ * well, but if the owner is another person, so he can set roles but can not
+ * see the prescriptions."
+ *
+ * That is a permission fact, so it is decided here beside the grants rather
+ * than in a settings file that happens to be read at the right moment. It is
+ * read straight from storage instead of imported from staff.ts, because
+ * staff.ts imports this file and a cycle between the two would be a permission
+ * that depends on module load order.
+ *
+ * A DOCTOR WHO OWNS HIS CLINIC GETS `ops` — the building's day, money totals by
+ * room, backup age, the machines. He is the owner; that is his to see, and
+ * until now he could not see it in his own building.
+ *
+ * AN OWNER WHO IS NOT A DOCTOR GAINS NOTHING CLINICAL BY OWNING. He is still
+ * `clinicadmin`: ops and staff, and `ops` contains no prescription. There is no
+ * branch anywhere that could give him one, which is why the promise on the
+ * website survives this change.
+ */
+export type Owner = 'doctor' | 'clinicadmin'
+
+export const ownerRole = (): Owner => {
+  try { return localStorage.getItem('nuskho.owner') === 'clinicadmin' ? 'clinicadmin' : 'doctor' }
+  catch { return 'doctor' }
+}
+
+export const can = (what: Can, who: Role = role()): boolean => {
+  if (GRANTS[who].includes(what)) return true
+  // The one thing ownership adds, and it adds it in exactly one direction.
+  if (what === 'ops' && who === 'doctor' && ownerRole() === 'doctor') return true
+  return false
+}
 
 /* ------------------------------------------------------------------- the session */
 

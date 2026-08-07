@@ -1,4 +1,4 @@
-import { ROLES, type Role } from './roles'
+import { ROLES, ownerRole, type Role, type Owner } from './roles'
 
 /**
  * WHICH JOBS THIS BUILDING ACTUALLY HAS, AND WHO DECIDES.
@@ -91,12 +91,10 @@ export const roleIsOn = (r: Role): boolean => r === 'admin' || staffRoles().incl
  * true, and it stays true because of what the roles contain, not because
  * anybody is being trusted.
  */
-export type Owner = 'doctor' | 'clinicadmin'
-
-export function owner(): Owner {
-  try { return localStorage.getItem(OWNER) === 'clinicadmin' ? 'clinicadmin' : 'doctor' }
-  catch { return 'doctor' }
-}
+/** Defined in roles.ts, beside the grants, because it changes what a person
+ *  may do. Re-exported here so callers have one place to look. */
+export type { Owner }
+export const owner = ownerRole
 
 export function setOwner(o: Owner): void {
   try { localStorage.setItem(OWNER, o) } catch { /* ignore */ }

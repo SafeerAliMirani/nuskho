@@ -373,10 +373,14 @@ function StaffTab() {
             ))}
           </div>
           <span className="unit">
-            A clinic admin who owns the building can turn jobs on and off and set the
-            PINs for his staff. He can never set the doctor&rsquo;s PIN, and no permission
-            he holds reaches a prescription. That is what the roles contain, not a
-            promise anybody has to keep.
+            <b>The doctor owns it</b>, which is the ordinary case: he keeps everything he
+            already had and gains the building&rsquo;s day as well, money by room, backup
+            age and the machines, under <b>The building</b> in his own menu.<br />
+            <b>Somebody else owns it</b>, a hospital or a clinic owner: he turns jobs on
+            and off and sets the PINs for the people he employs, and that is all. He can
+            never set the doctor&rsquo;s PIN and no permission he holds reaches a
+            prescription. That is what the roles contain, not a promise anybody has to
+            keep.
           </span>
         </div>
       ) : (

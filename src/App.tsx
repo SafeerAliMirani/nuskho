@@ -44,6 +44,8 @@ function Clinic() {
   // read once, at mount. See the block above the early return.
   const [dead] = useState(() => licenceRanOut())
   const [unlocked, setUnlocked] = useState(false)
+  // the building's day, for a doctor who owns the clinic
+  const [ops, setOps] = useState(false)
   const [today, setToday] = useState<Visit[]>([])
   const [welcome, setWelcome] = useState(needsWelcome)
   // The lock stands between the doctor and the app only when opening it. Once
@@ -207,6 +209,15 @@ function Clinic() {
                       <IcChart size={16} /> My figures <small>patients, fees, month card</small>
                     </button>
                   )}
+                  {/* A doctor who OWNS his clinic gets the building's day, which
+                      until now only a clinic admin could see. `can('ops')` is
+                      true for him only when he is the owner (roles.ts), so this
+                      never appears for an employed doctor. */}
+                  {can('ops') && can('queue') && (
+                    <button onClick={() => { setMenu(false); setSetup(false); setStats(false); setVisitId(null); setOps(true) }}>
+                      <IcChart size={16} /> The building <small>money by room, the day, the machines</small>
+                    </button>
+                  )}
                   {can('dispense') && can('queue') && (
                     <button onClick={() => { setMenu(false); setSetup(false); setStats(false); setVisitId(null); setPharm(true) }}>
                       <IcQueue size={16} /> Pharmacy desk <small>printed slips, mark medicines given</small>
@@ -276,6 +287,10 @@ function Clinic() {
           cannot read a prescription. */}
       {about
         ? <About onBack={() => setAbout(false)} />
+        : ops && can('ops')
+        ? <><button className="btn ghost" style={{ margin: 'var(--s5) 0 0 var(--s5)' }}
+                   onClick={() => setOps(false)}>&larr; Queue</button>
+            <AdminDesk visits={today} /></>
         : stats && can('figures')
         ? <StatsScreen onBack={() => setStats(false)} />
         : setup && (can('paper') || can('identity'))
