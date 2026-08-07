@@ -18,13 +18,23 @@ import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
 import { role } from '../roles'
 import { warmPlan } from '../print/paginate'
+import { notePrinted, printerLikelyCold } from '../safety'
+import { awareOf, sameMolecule } from '../data/who'
 import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
-import { doseSdFor, defaultRoute } from '../data/forms'
+import { doseSdFor, defaultRoute, TIMES, timeEnFor } from '../data/forms'
 
 /** 0 → 1 → 2 → ½ → 0. "2 tablets" is routine for adult paracetamol; without it
  *  the doctor reaches for his pad, and after three reaches he stops opening the app. */
 const cycle = (n: number) => (n === 0 ? 1 : n === 1 ? 2 : n === 2 ? 0.5 : 0)
-const isEmpty = (l: RxLine) => !l.dose.m && !l.dose.d && !l.dose.n
+/**
+ * When to come back, said the way a doctor says it out loud. Free text is
+ * beside them for everything else, and whatever is typed prints exactly as
+ * typed: this line is a sentence to a patient, not a stored date.
+ */
+const NEXT_VISIT = ['in 3 days', 'in 5 days', 'in 1 week', 'in 2 weeks', 'in 1 month',
+                    'only if it gets worse']
+
+const isEmpty = (l: RxLine) => !l.dose.m && !l.dose.d && !l.dose.e && !l.dose.n
 
 export default function Compose({ visitId, onDone, onBack }: {
   visitId: string; onDone: () => void; onBack: () => void
@@ -54,6 +64,9 @@ export default function Compose({ visitId, onDone, onBack }: {
   const [inc, setInc] = useState<Incoming | null>(null)
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
+  /** Read once when this patient is opened, not on every keystroke: it is a
+   *  clock, and re-reading it while he taps doses would flicker. */
+  const [cold, setCold] = useState(() => printerLikelyCold())
   const [flash, setFlash] = useState<number | null>(null)
   const [nearMiss, setNearMiss] = useState<{ text: string; near: Drug[] } | null>(null)
   const [repeatMsg, setRepeatMsg] = useState('')
@@ -340,6 +353,12 @@ export default function Compose({ visitId, onDone, onBack }: {
   }
 
   const badIdx = visit.lines.findIndex(isEmpty)
+  /**
+   * Which lines are the same molecule as some other line, computed once for the
+   * whole prescription rather than once per row. The formula column is the only
+   * thing that can see this: two brands of paracetamol share no letters.
+   */
+  const twins = sameMolecule(visit.lines.map(l => l.snap?.generic ?? drugs[l.drugId]?.generic))
 
   /**
    * A LINE WHOSE MEDICINE CANNOT BE NAMED MUST NOT REACH PAPER.
@@ -425,6 +444,11 @@ export default function Compose({ visitId, onDone, onBack }: {
       cur.current = { ...cur.current!, ...stamp }
       setVisit(cur.current)
       signal({ kind: 'printed', token: cur.current?.token ?? 0 })
+      // The first print after an idle hour is the slow one. Remembering this
+      // one is what lets the NEXT doctor's screen say "the printer has been
+      // idle" instead of looking frozen for eight seconds in front of a room.
+      notePrinted()
+      setCold(false)
       setErr('')
     } catch (e) {
       console.error('[nuskho] print failed', e)
@@ -579,15 +603,35 @@ export default function Compose({ visitId, onDone, onBack }: {
                  ref={el => { rows.current[i] = el }}>
               <div className="hd">
                 <div><b>{i + 1}. {d.brand} {d.strength}</b>
-                  <small>{d.generic || (d.pending ? 'typed in, tidy this up tonight' : '')}</small></div>
+                  <small>{d.generic || (d.pending ? 'typed in, tidy this up tonight' : '')}
+                    {/* WHO's own stewardship label, and only for the two groups
+                        that mean anything: nearly every antibiotic a GP writes
+                        is Access, so tagging those would be noise on every
+                        line. It is a published fact stated flatly, never an
+                        instruction: this app does not tell a doctor what to
+                        prescribe. */}
+                    {(() => {
+                      const a = d.generic ? awareOf(d.generic) : undefined
+                      return a && a !== 'Access'
+                        ? <span className="awtag" title={`WHO AWaRe group: ${a}`}>WHO {a}</span>
+                        : null
+                    })()}
+                  </small></div>
                 <button className="x" onClick={() => apply(v => ({ ...v, lines: v.lines.filter((_, k) => k !== i) }))}>×</button>
               </div>
+              {/* FOUR SLOTS, IN THE ORDER OF THE DAY.
+                  The evening is here for everyone, because a control the
+                  doctor has to find is a control he does not use, and QID is
+                  most of what an eye drop or an antibiotic needs. It costs
+                  nothing on screen: the row already wraps. On PAPER it is only
+                  printed when a line actually uses it, because there the width
+                  is real and measured. */}
               <div className="dosegrid">
-                {(['m', 'd', 'n'] as const).map(k => (
+                {TIMES.map(k => (
                   <button key={k} className={`dbtn ${l.dose[k] ? 'on' : ''}`}
-                          onClick={() => setLine(i, { dose: { ...l.dose, [k]: cycle(l.dose[k]) } })}>
+                          onClick={() => setLine(i, { dose: { ...l.dose, [k]: cycle(l.dose[k] ?? 0) } })}>
                     {l.dose[k] === 0.5 ? '½' : l.dose[k] || '—'}
-                    <small>{k === 'm' ? 'MORNING' : k === 'd' ? 'MIDDAY' : 'NIGHT'}</small>
+                    <small>{timeEnFor(k).toUpperCase()}</small>
                   </button>
                 ))}
                 <button className="dbtn on" style={{ minWidth: 96 }}
@@ -601,6 +645,19 @@ export default function Compose({ visitId, onDone, onBack }: {
                 </div>
               </div>
               {empty && <div className="badmsg">No dose set. This would print with no instruction.</div>}
+              {/* THE SAME MOLECULE UNDER TWO BRANDS.
+                  The duplicate check above this one matches on the medicine's
+                  id, so it catches PANADOL written twice and cannot catch
+                  PANADOL plus CALPOL, which are the same paracetamol. A patient
+                  handed both takes a double dose of the commonest drug in
+                  Pakistan. It warns and does not refuse: a tablet by day and a
+                  syrup a child will swallow at night is a real prescription. */}
+              {twins.get(i) && (
+                <div className="badmsg warn">
+                  Same medicine as line {twins.get(i)!.map(k => k + 1).join(' and ')}:
+                  {' '}both are {drugs[l.drugId]?.generic}. Check the total dose is what you mean.
+                </div>
+              )}
               {flash === i && <div className="badmsg ok">Already on this prescription.
                 <button className="lnk" onClick={() => addDrug(l.drugId, true)}>Add a second line anyway</button></div>}
             </div>
@@ -723,6 +780,27 @@ export default function Compose({ visitId, onDone, onBack }: {
               {a.en}</button>
           })}
         </div>
+
+        {/* COME BACK WHEN.
+            `nextVisit` has printed on the slip since the first sheet, under a
+            Sindhi heading, and NOTHING on any screen could set it. So the line
+            existed on paper and was always blank, which is the same as
+            promising a patient something and then not saying it.
+
+            Chips, not a date picker. "In five days" is what a doctor says out
+            loud and it is what a patient repeats to his family. A calendar date
+            is a thing to be misread, and this clinic runs on two calendars. */}
+        <h2>Come back</h2>
+        <div className="chips">
+          {NEXT_VISIT.map(w => {
+            const on = visit.nextVisit === w
+            return <button key={w} className={`chip ${on ? 'on' : ''}`}
+                     onClick={() => apply(v => ({ ...v, nextVisit: on ? undefined : w }))}>{w}</button>
+          })}
+        </div>
+        <input className="nextvin" value={visit.nextVisit ?? ''} placeholder="or type it, printed as you type it"
+               maxLength={44}
+               onChange={e => apply(v => ({ ...v, nextVisit: e.target.value || undefined }))} />
       </fieldset>
 
       {/* OUTSIDE the fieldset, so it works after the slip has printed too.
@@ -736,6 +814,18 @@ export default function Compose({ visitId, onDone, onBack }: {
 
         <div className="sticky">
           {err && <Note tone="stop" title="Nothing was printed">{err}</Note>}
+          {/* THE FIRST PRINT OF THE EVENING IS THE SLOW ONE.
+              A laser that has been idle an hour takes several seconds to wake,
+              and it does that at nine in the evening in front of a full room,
+              with no sign that anything is happening. Knowing it is coming is
+              most of the fix: a doctor who was told expects it, and a doctor
+              who was not presses PRINT again and gets two slips. */}
+          {cold && !busy && (
+            <p className="hint" style={{ marginTop: 0 }}>
+              The printer has not been used for a while. The first sheet may take a few
+              seconds to wake it. Press once.
+            </p>
+          )}
           <button className={`btn wide ${badIdx >= 0 || namelessIdx >= 0 ? 'warn' : ''}`} onClick={print}
                   disabled={busy || visit.lines.length === 0}>
             {busy ? 'Printing…'

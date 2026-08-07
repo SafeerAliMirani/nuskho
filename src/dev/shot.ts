@@ -30,9 +30,13 @@ const NAMES: [string,string,string,string][] = [
 const drugs: Record<string, Drug> = {}
 NAMES.forEach(([b,g,sd,u],i)=>{ drugs['d'+i] = { id:'d'+i, brand:b.split(' ')[0], strength:b.split(' ').slice(1).join(' '), generic:g, sd, sdReviewed:true, unitEn:'tablet', unitSd:u , form: (b.includes('syrup')?'syr':i===0?'cap':'tab') } as Drug })
 
-function data(n: number, opt: {dx?: boolean; tests?: number; advice?: number; sent?: boolean}): SlipData {
+function data(n: number, opt: {dx?: boolean; tests?: number; advice?: number; sent?: boolean; qid?: boolean}): SlipData {
+  // ?qid puts an evening dose on every line, which is what makes the fourth
+  // column appear. The whole point of measuring it is that this layout is
+  // 14.5mm wider than the one every other check walks.
   const lines: RxLine[] = Array.from({length:n},(_,i)=>({
-    drugId:'d'+i, dose:{m:1,d:0,n:1}, meal:'after', days:5 } as RxLine))
+    drugId:'d'+i, dose: opt.qid ? {m:1,d:1,e:1,n:1} : {m:1,d:0,n:1},
+    meal:'after', days:5 } as RxLine))
   const visit: Visit = { id:'v', patientId:'p', createdAt: Date.parse('2026-08-01'), lines,
     diagnosis: opt.dx ? 'Hypertension' : '',
     tests: Array.from({length:opt.tests||0},(_,i)=>`Blood sugar F/R ${i+1}|رت ۾ کنڊ`),
@@ -60,7 +64,7 @@ const out = document.getElementById('shots')!
   const q = new URLSearchParams(location.search)
   const n = Math.max(1, Math.min(20, +(q.get('n') ?? 8) || 8))
   let d = data(n, {dx:true, tests:+(q.get('tests') ?? 2), advice:+(q.get('advice') ?? 2),
-                   sent: q.has('sent')})
+                   sent: q.has('sent'), qid: q.has('qid')})
   /**
    * ?forms renders one line of every shape a Larkana clinic writes, so the
    * pictograms can be LOOKED at rather than assumed. Everything the eye can

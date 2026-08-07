@@ -83,6 +83,11 @@ table.rx th{font-size:5.8pt;font-weight:400;color:#fff;background:#0f5c4a;paddin
 table.rx th .sd{font-size:7.6pt;display:block;font-weight:700;}
 table.rx td{border-bottom:.7pt solid #bbb;vertical-align:middle;padding:0;}
 .c-no{width:5.6mm}.c-nm{width:44mm}.c-t{width:14.5mm}.c-ml{width:15mm}.c-dy{width:17mm}
+/* FOUR TIMES A DAY. The fourth dose column is 14.5mm the name cannot spare on
+   A5, so all four narrow instead and the name gives up 5.5mm rather than a
+   whole column. Only applied when a line on this prescription has an evening
+   dose; every other slip is byte for byte what it was. */
+table.rx.q4 .c-nm{width:38.5mm}table.rx.q4 .c-t{width:11.5mm}
 td.noc{background:#0f5c4a;color:#fff;font-size:11pt;font-weight:700;text-align:center;}
 .mono td.noc{background:#000;}
 .nmcell{padding:.9mm 2mm .9mm 2.4mm;}
@@ -325,6 +330,8 @@ table.rx.mx .dysd{font-size:7.4pt}
 .page.a4 .c-t{width:19mm}
 .page.a4 .c-ml{width:20mm}
 .page.a4 .c-dy{width:22mm}
+/* A4 has the room, so the fourth column is simply taken off the name. */
+.page.a4 table.rx.q4 .c-nm{width:66mm}.page.a4 table.rx.q4 .c-t{width:18mm}
 .page.a4 table.rx th{font-size:6.8pt;padding:1.1mm 0;}
 .page.a4 table.rx th .sd{font-size:9pt;}
 .page.a4 td.noc{font-size:13pt;}

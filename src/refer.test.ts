@@ -106,8 +106,9 @@ describe('naming the destination', () => {
 /* ------------------------------------------------- forms that are not pills */
 
 import { course } from './course'
-import { FORM_WORD, DOSE_WORD, ROUTE_WORD, pendingWords } from './data/forms'
-import type { RxLine, Form, Route } from './types'
+import { FORM_WORD, DOSE_WORD, ROUTE_WORD, TIME_WORD, pendingWords } from './data/forms'
+import { sameMolecule, awareOf } from './data/who'
+import type { RxLine, RxSnap, Form, Route } from './types'
 
 const line = (form: Form, over: Partial<RxLine> = {}, route?: Route): RxLine => ({
   drugId: 'x', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
@@ -214,7 +215,120 @@ describe('a slip for something that is not a pill', () => {
     expect(new Set(sds).size).toBe(sds.length)
     expect(sds).toContain(DOSE_WORD.drop.sd)
     expect(sds).toContain(ROUTE_WORD.eye.sd)
+    // the evening is the newest word in the app and must be in the queue too,
+    // or it prints without anybody having read it
+    expect(sds).toContain(TIME_WORD.e.sd)
     // and nothing already checked is in the queue
     expect(sds).not.toContain(FORM_WORD.tab.sd)
+    expect(sds).not.toContain(TIME_WORD.m.sd)
+  })
+})
+
+/**
+ * FOUR TIMES A DAY.
+ *
+ * The evening was the largest hole in what a Nuskho prescription could say: an
+ * eye drop and most six-hourly antibiotics are QID, and until this existed the
+ * doctor had to put the fourth dose in the free note, where no pictogram
+ * reaches it and the patient who cannot read gets nothing at all.
+ */
+describe('the evening dose', () => {
+  const withE = (e?: number): RxLine => ({
+    drugId: 'x', dose: { m: 1, d: 1, e, n: 1 }, meal: 'after', days: 5,
+  })
+
+  it('counts toward the course, so the chemist hands over enough', () => {
+    const snap = { brand: 'B', strength: '', generic: '', sd: '', form: 'tab' } as RxSnap
+    // three a day for five days is fifteen; four a day is twenty
+    expect(course(withE(undefined), snap).n).toBe(15)
+    expect(course(withE(1), snap).n).toBe(20)
+  })
+
+  it('treats a missing evening and a zero evening as the same thing', () => {
+    const snap = { brand: 'B', strength: '', generic: '', sd: '', form: 'tab' } as RxSnap
+    expect(course(withE(undefined), snap).n).toBe(course(withE(0), snap).n)
+  })
+})
+
+/**
+ * THE SAME MOLECULE UNDER TWO BRANDS.
+ *
+ * PANADOL 500 and CALPOL syrup share no letters and are the same paracetamol.
+ * A patient handed both takes a double dose of the commonest drug in Pakistan,
+ * and the doctor who wrote them ten seconds apart under two brand names has no
+ * way of seeing it. Only the formula column can catch this.
+ */
+describe('two brands of one molecule', () => {
+  it('finds them however each was spelled', () => {
+    const t = sameMolecule(['Paracetamol', 'Amoxicillin', 'paracetamol (acetaminophen)'])
+    expect(t.get(0)).toEqual([2])
+    expect(t.get(2)).toEqual([0])
+    expect(t.has(1)).toBe(false)
+  })
+
+  it('says nothing about a prescription with no repeats', () => {
+    expect(sameMolecule(['Paracetamol', 'Amoxicillin', 'Cetirizine']).size).toBe(0)
+  })
+
+  it('ignores a line with no formula rather than matching all of them together', () => {
+    // three medicines nobody has typed a formula for are not "the same molecule"
+    const t = sameMolecule([undefined, '', null])
+    expect(t.size).toBe(0)
+  })
+
+  it('handles three of the same, naming the other two on each', () => {
+    const t = sameMolecule(['Paracetamol', 'Paracetamol', 'Paracetamol'])
+    expect(t.get(1)).toEqual([0, 2])
+  })
+
+  it('is the AWaRe group that stays quiet for Access, which is nearly everything', () => {
+    expect(awareOf('Amoxicillin')).toBe('Access')
+    expect(awareOf('Paracetamol')).toBeUndefined()
+  })
+})
+
+/**
+ * THE THREE FIELDS THAT PRINTED WITH NOTHING BEHIND THEM.
+ *
+ * These check the RENDERER rather than the screen, because the print holder is
+ * emptied as soon as the browser's print dialog closes: a browser drive that
+ * looks for the sheet afterwards is racing an empty node. The renderer is a
+ * pure function of the visit, so it can simply be asked.
+ */
+describe('what the slip prints once somebody can set it', () => {
+  const base = (over: Partial<Visit> = {}): SlipData => ({
+    visit: { id: 'v', patientId: 'p', createdAt: 0, lines: [], tests: [], advice: [],
+             ...over } as Visit,
+    patientName: 'Test Case', patientAge: '42', patientCode: '00026',
+    drugs: {}, rxId: 'AAAAAA',
+  } as SlipData)
+
+  it('prints when to come back, and nothing at all when there is no answer', () => {
+    expect(renderSlip(base({ nextVisit: 'in 5 days' }))).toContain('in 5 days')
+    expect(renderSlip(base({ nextVisit: 'in 5 days' }))).toContain('Next visit')
+    // an empty line must print NOTHING, not an empty heading with a colon
+    expect(renderSlip(base())).not.toContain('Next visit')
+  })
+
+  it('prints man or woman beside the age, and only when it was asked', () => {
+    // read the AGE CELL out of the sheet rather than searching the whole
+    // document: a slash and an F occur all over an HTML page, and a check that
+    // passes on those is a check that passes on nothing
+    const ageCell = (html: string) => html.match(/<div class="v">42([\s\S]{0,140}?)<\/div>/)?.[1] ?? ''
+    expect(ageCell(renderSlip({ ...base(), patientSex: 'F' } as SlipData))).toContain('F')
+    expect(ageCell(renderSlip(base()))).not.toContain('F')
+    // and the cell really was found, or both assertions above are vacuous
+    expect(renderSlip(base())).toContain('<div class="v">42')
+  })
+
+  /**
+   * A closing note is the desk's own record and must never be on the patient's
+   * paper. "Left without being seen, drunk" is a thing somebody might type at
+   * eleven at night, and the slip is a document the patient carries and shows
+   * to other doctors.
+   */
+  it('never prints the note somebody typed when closing the token', () => {
+    const html = renderSlip(base({ closeNote: 'sent to Chandka, chest pain', status: 'referred' }))
+    expect(html).not.toContain('Chandka')
   })
 })

@@ -12,11 +12,12 @@
 import { profile, APP } from '../profile'
 import { paper, pageVars } from '../paper'
 import type { Drug, Visit, RxLine, RxSnap, Form, Route } from '../types'
-import { SUNRISE, SUN, MOON, TAB, HALF, CAP, SPOON, PLATE, CAL, DROP,
+import { SUNRISE, SUN, SUNSET, MOON, TAB, HALF, CAP, SPOON, PLATE, CAL, DROP,
          EYE, EAR, NOSE, TUBE, SACHET, adviceIcon } from './icons'
 import { qrSvgSafe } from './qr'
 import { course, courseUnitSd } from '../course'
-import { formSdFor, formEnFor, doseSdFor, doseEnFor1, routeSdFor, routeEnFor, countable } from '../data/forms'
+import { formSdFor, formEnFor, doseSdFor, doseEnFor1, routeSdFor, routeEnFor, countable,
+         timeSdFor, type TimeKey } from '../data/forms'
 import { filled } from '../data/vitals'
 
 // Tolerates undefined on purpose: a medicine the doctor typed himself has no
@@ -191,7 +192,13 @@ function siteLabel(m: RxSnap): string | null {
   return sd ? esc(sd) : `<span class="mlen">${esc(routeEnFor(m.route))}</span>`
 }
 
-function row(i: number, line: RxLine, m: RxSnap, compact: boolean): string {
+/**
+  * `evening` is decided ONCE for the whole prescription, not per sheet and not
+  * per row. A slip whose first sheet has three dose columns and whose second
+  * has four is a slip that looks broken, and a row that quietly drops a column
+  * the heading promised is worse than that.
+  */
+function row(i: number, line: RxLine, m: RxSnap, compact: boolean, evening: boolean): string {
   // A4 has the room, and a bigger pictogram is the whole slip for a patient who
   // reads neither language.
   const big = paper().size === 'A4'
@@ -262,17 +269,38 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean): string {
         </div>
         ${nameSdLine(m)}
       </td>
-      ${doseCell(m, line.dose.m, sz)}${doseCell(m, line.dose.d, sz)}${doseCell(m, line.dose.n, sz)}
+      ${doseCell(m, line.dose.m, sz)}${doseCell(m, line.dose.d, sz)}${
+        evening ? doseCell(m, line.dose.e ?? 0, sz) : ''}${doseCell(m, line.dose.n, sz)}
       <td class="mlcell">${mealIcon(line.meal, compact, m)}<div class="sd mlsd">${siteLabel(m) ?? MEAL_SD[line.meal]}</div></td>
       <td class="dycell"><div class="dyn">${line.days}</div>
         ${dysd}${ticks}${total}</td>
     </tr>`
 }
 
-const LEGEND: [(w: string, h: string) => string, string, string][] = [
-  [SUNRISE, 'MORNING', 'صبح'],
-  [SUN, 'MIDDAY', 'منجهند'],
-  [MOON, 'NIGHT', 'رات'],
+/**
+ * A heading keeps its second line even when the word on it is not ready.
+ *
+ * The Sindhi for a time of day only prints once a person has read it, so an
+ * unreviewed one leaves the span empty, the cell loses a line, and its
+ * pictogram floats a millimetre higher than the three beside it. On a green
+ * heading bar that reads as a mistake rather than as a word still being
+ * checked. A non-breaking space holds the line, so the row is the same shape
+ * before and after the word is ticked, and the English is in the legend where
+ * it always was.
+ */
+const timeHead = (t: TimeKey): string =>
+  `<span class="sd">${timeSdFor(t) || '&nbsp;'}</span>`
+
+/**
+  * The legend never explains a column that is not on the sheet. A picture of a
+  * setting sun under a table with no evening in it is a reader being told to
+  * look for something that is not there.
+  */
+const legendFor = (evening: boolean): [(w: string, h: string) => string, string, string][] => [
+  [SUNRISE, 'MORNING', timeSdFor('m')],
+  [SUN, 'MIDDAY', timeSdFor('d')],
+  ...(evening ? [[SUNSET, 'EVENING', timeSdFor('e')] as [(w: string, h: string) => string, string, string]] : []),
+  [MOON, 'NIGHT', timeSdFor('n')],
   [TAB, '1 TABLET', 'هڪ گوري'],
   [HALF, 'HALF', 'اڌ گوري'],
   [SPOON, '1 SPOON', 'هڪ چمچو'],
@@ -421,22 +449,42 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
    * which is the whole reason snapshots exist. Using it here means a slip can
    * be reprinted correctly years after a medicine left the catalogue.
    */
+  /**
+   * FOUR TIMES A DAY COSTS WIDTH, SO IT IS ONLY PAID WHEN IT IS USED.
+   *
+   * Morning, midday and night cover almost every prescription a general
+   * practice writes. An eye drop, amoxicillin and most six-hourly antibiotics
+   * need a fourth, and until it existed the doctor had to put it in the free
+   * note, where no pictogram reaches it and the patient who cannot read gets
+   * nothing at all.
+   *
+   * A fourth column on every slip would take 14.5 mm off the medicine name on
+   * A5 for the ninety-odd per cent that never use it. So the column appears
+   * only when a line on THIS PRESCRIPTION has an evening dose, and when it
+   * does, `.q4` narrows all four dose columns rather than robbing the name of
+   * a whole column's worth. Decided from the visit, so every sheet of one
+   * prescription has the same columns.
+   */
+  const evening = d.visit.lines.some(l => (l.dose.e || 0) > 0)
+
   const rows = lines
-    .map((l, i) => row(offset + i + 1, l, printed(l, d.drugs[l.drugId]), compact))
+    .map((l, i) => row(offset + i + 1, l, printed(l, d.drugs[l.drugId]), compact, evening))
     .join('')
 
-  const table = `<table class="rx${compact ? ' cmp' : ''}">
-    <colgroup><col class="c-no"><col class="c-nm"><col class="c-t"><col class="c-t"><col class="c-t"><col class="c-ml"><col class="c-dy"></colgroup>
+  const table = `<table class="rx${compact ? ' cmp' : ''}${evening ? ' q4' : ''}">
+    <colgroup><col class="c-no"><col class="c-nm"><col class="c-t"><col class="c-t">${
+      evening ? '<col class="c-t">' : ''}<col class="c-t"><col class="c-ml"><col class="c-dy"></colgroup>
     <thead><tr>
       <th></th><th style="text-align:left;padding-left:2.4mm">MEDICINE <span class="sd">دوا</span></th>
-      <th>${SUNRISE('4.2mm', '4.2mm')}<span class="sd">صبح</span></th>
-      <th>${SUN('4.2mm', '4.2mm')}<span class="sd">منجهند</span></th>
-      <th>${MOON('4.2mm', '4.2mm')}<span class="sd">رات</span></th>
+      <th>${SUNRISE('4.2mm', '4.2mm')}${timeHead('m')}</th>
+      <th>${SUN('4.2mm', '4.2mm')}${timeHead('d')}</th>
+      ${evening ? `<th>${SUNSET('4.2mm', '4.2mm')}${timeHead('e')}</th>` : ''}
+      <th>${MOON('4.2mm', '4.2mm')}${timeHead('n')}</th>
       <th>${PLATE('4.2mm', '4.2mm')}<span class="sd">ماني</span></th>
       <th>${CAL('4.2mm', '4.2mm')}<span class="sd">ڏينهن</span></th>
     </tr></thead><tbody>${rows}</tbody></table>`
 
-  const legend = '<div class="legend">' + LEGEND
+  const legend = '<div class="legend">' + legendFor(evening)
     .map(([ic, en, sd]) => `<div class="lg">${ic('4.6mm', '4.6mm')}<span>${en}<span class="sd">${sd}</span></span></div>`)
     .join('') + '</div>'
 

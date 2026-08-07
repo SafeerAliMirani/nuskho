@@ -471,6 +471,21 @@ async function buildRx(): Promise<WireRx> {
  */
 function shapeFor(role: Role, s: WireState): WireState {
   const money = can('money', role)
+  /**
+   * `ops` IS a money permission, and forgetting that made the clinic admin's
+   * phone useless.
+   *
+   * The building's day — tokens, printed, waiting, and the cash exactly as the
+   * desk counted it — is precisely what `ops` grants, and the same screen shows
+   * all of it on the clinic machine. On a phone every one of those numbers came
+   * through as zero, because this line asked for `money`, which a clinic admin
+   * does not hold and is not supposed to. So the one role whose entire job is
+   * the day's figures was handed a page of zeroes.
+   *
+   * The doctor's private refund NOTE stays behind `money` below. That is not an
+   * ops figure, it is a sentence he wrote about one patient.
+   */
+  const ops = can('ops', role)
   const history = can('history', role)
   const dispense = can('dispense', role)
   /**
@@ -499,8 +514,8 @@ function shapeFor(role: Role, s: WireState): WireState {
       testsPaid: can('tests', role) ? v.testsPaid : undefined,
     })),
     // The evening's cash went to every phone on the wire, pharmacy included.
-    // It is the money role's number and nobody else's.
-    sums: money ? s.sums : { total: 0, printed: 0, waiting: 0, collected: 0, toRefund: 0, due: 0 },
+    // It is the money roles' number and the building's, and nobody else's.
+    sums: money || ops ? s.sums : { total: 0, printed: 0, waiting: 0, collected: 0, toRefund: 0, due: 0 },
   }
 }
 

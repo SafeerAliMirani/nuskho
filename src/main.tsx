@@ -7,6 +7,17 @@ import './app.css'
 import { keepStorage, snapshotDaily } from './safety'
 import { freshenDemo } from './demo'
 import { initBuilding, buildingMode } from './building'
+import { adoptOldPin } from './roles'
+
+/**
+ * BEFORE ANY DOOR IS DRAWN: carry across the lock a machine already had.
+ *
+ * A clinic that updated from the single-PIN build woke up with every role
+ * opening on one tap, including the doctor's, because his PIN was still in
+ * storage under a key nothing read any more. Synchronous and first, because the
+ * front door is the very next thing this file renders.
+ */
+adoptOldPin()
 
 // Before anything else: ask the browser not to treat a clinic's records as
 // cache, then take today's local snapshot. Both are silent and both are the

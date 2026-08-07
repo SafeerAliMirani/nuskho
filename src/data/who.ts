@@ -347,6 +347,54 @@ export function whoGeneric(generic: string): WhoGeneric | undefined {
 export const awareOf = (generic: string): Aware | undefined => whoGeneric(generic)?.aware
 
 /**
+ * THE SAME MOLECULE UNDER TWO BRANDS, ON ONE PRESCRIPTION.
+ *
+ * Reason 3 at the top of this file, finally used. PANADOL 500 and CALPOL syrup
+ * look nothing alike as strings and are the same paracetamol; a patient handed
+ * both takes a double dose of the commonest drug in Pakistan and the doctor,
+ * who wrote them ten seconds apart under two brand names, has no way of seeing
+ * it on his own screen.
+ *
+ * The screen already catches the same DRUG twice, by id. It could not catch
+ * this, because only the formula column can.
+ *
+ * Two decisions worth stating.
+ *
+ * IT MATCHES ON THE WHO ROW, NOT THE TYPED STRING, when there is one. So
+ * "Paracetamol" and "paracetamol (acetaminophen)" are the same molecule, and a
+ * doctor who typed his own formula in his own spelling is compared on the
+ * normalised string, which is the best that can be done and is still right far
+ * more often than nothing.
+ *
+ * IT WARNS AND DOES NOT REFUSE. Co-prescribing one molecule in two forms is
+ * occasionally deliberate: a tablet by day and a syrup a child will actually
+ * swallow at night. A refusal would be this file overruling a doctor about his
+ * own patient on the strength of a lookup table, which is not what it is for.
+ */
+export function sameMolecule(generics: (string | null | undefined)[]): Map<number, number[]> {
+  const keyOf = (g: string | null | undefined): string => {
+    if (!g || !g.trim()) return ''
+    // resolve through the WHO row first, so two spellings of one molecule and
+    // a brand's gloss all land on the same key
+    const row = whoGeneric(g)
+    return normGeneric(row ? row.name : g)
+  }
+  const byMolecule = new Map<string, number[]>()
+  generics.forEach((g, i) => {
+    const k = keyOf(g)
+    if (!k) return
+    const at = byMolecule.get(k)
+    at ? at.push(i) : byMolecule.set(k, [i])
+  })
+  const out = new Map<number, number[]>()
+  for (const idxs of byMolecule.values()) {
+    if (idxs.length < 2) continue
+    for (const i of idxs) out.set(i, idxs.filter(x => x !== i))
+  }
+  return out
+}
+
+/**
  * Type-ahead over the formula column. Prefix first, then contains, so typing
  * "amox" offers Amoxicillin before Amoxicillin + clavulanic acid, and typing
  * "clav" still finds the combination.

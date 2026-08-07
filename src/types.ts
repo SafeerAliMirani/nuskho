@@ -67,8 +67,22 @@ export interface Drug {
   defaultDays?: number
 }
 
-/** Doses on the grid. 0 = none, 1 = one, 0.5 = half. */
-export interface Dose { m: number; d: number; n: number }
+/**
+ * Doses on the grid. 0 = none, 1 = one, 0.5 = half.
+ *
+ * `e` is the EVENING, between midday and night, and it is optional for a
+ * reason that outlives this note: every prescription written before it existed
+ * has no `e`, and a required field would have made all of them invalid on the
+ * day the app updated. Absent and zero mean the same thing everywhere, and
+ * `(l.dose.e || 0)` is the only correct way to read it.
+ *
+ * Three slots covered almost everything a general practice writes. Four is
+ * what an eye drop, amoxicillin and most six-hourly antibiotics actually need,
+ * and until this existed a doctor writing QID had to put it in the free note,
+ * where the pictograms cannot reach it and the patient who cannot read gets
+ * nothing.
+ */
+export interface Dose { m: number; d: number; e?: number; n: number }
 
 /**
  * What was actually printed for one medicine, copied onto the prescription at

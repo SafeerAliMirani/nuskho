@@ -69,10 +69,12 @@ export default function Intake({ visits, onOpen, onChange }: {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [age, setAge] = useState('')
+  const [sex, setSex] = useState<'' | 'M' | 'F'>('')
   const [city, setCity] = useState(NEAR[0])
   const [msg, setMsg] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
   const [closing, setClosing] = useState<string | null>(null)
+  const [closeNote, setCloseNote] = useState('')
 
   /**
    * WHEN A WRITE REFUSES, IT SAYS SO WHERE THE BUTTON IS.
@@ -227,18 +229,20 @@ export default function Intake({ visits, onOpen, onChange }: {
     await db.patients.add({
       id: pid, num: await nextPatientNum(), name: name.trim(),
       phone: phone.trim() || undefined, age: age.trim() || undefined,
+      sex: sex || undefined,
       city: city.trim() || undefined, createdAt: Date.now(),
     })
     await openVisitFor(pid)
-    setName(''); setPhone(''); setAge(''); setNames({}); setMsg('')
+    setName(''); setPhone(''); setAge(''); setSex(''); setNames({}); setMsg('')
     // city is NOT cleared: most of the queue comes from the same place, and
     // retyping it 60 times is exactly the kind of thing that kills adoption
   }
 
   async function close(id: string, s: VisitStatus) {
     await guard('queue', 'The token was not closed', async () => {
-      await closeVisit(id, s)
+      await closeVisit(id, s, closeNote)
       setClosing(null)
+      setCloseNote('')
       onChange()
     })
   }
@@ -340,6 +344,21 @@ export default function Intake({ visits, onOpen, onChange }: {
                    const v = e.target.value.replace(/\D/g, '').slice(0, 3)
                    if (v === '' || +v <= 120) setAge(v)
                  }} /></div>
+        {/* MAN OR WOMAN.
+            The slip has printed this beside the age since the first sheet and
+            nothing ever collected it, so the space was always empty. It is two
+            taps, it is optional like the age, and it is what the pharmacy and
+            the next doctor read first. Tapping the same one again clears it,
+            because a desk that cannot undo a wrong tap is a desk that argues
+            with a patient. */}
+        <div className="fld"><label>Man or woman — optional</label>
+          <div className="chips">
+            {([['M', 'Man'], ['F', 'Woman']] as const).map(([k, l]) => (
+              <button key={k} className={'chip' + (sex === k ? ' have' : '')}
+                      onClick={() => setSex(sex === k ? '' : k)}>{l}</button>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="fld"><label>City or village — شهر</label>
         <div className="chips">
@@ -516,6 +535,10 @@ export default function Intake({ visits, onOpen, onChange }: {
                     : (v.printedAt ? 'prescription printed' : 'with the doctor')}
                   {v.fee ? ` · ${v.fee.state === 'waived' ? 'fee waived'
                     : v.fee.state === 'due' ? `Rs ${v.fee.amount} due` : `Rs ${v.fee.amount} received`}` : ''}
+                  {/* The note somebody typed when they closed it. It was
+                      accepted by the database and shown nowhere, so the reason
+                      a token ended was written down and then lost. */}
+                  {v.closeNote ? <i className="cnote">{v.closeNote}</i> : null}
                 </small>
               </span>
               {v.urgent && v.status === 'waiting'
@@ -591,7 +614,22 @@ export default function Intake({ visits, onOpen, onChange }: {
                       {o.label} <span className="sd">{o.sd}</span>
                     </button>
                   ))}
-                  <button className="lnk" onClick={() => setClosing(null)}>keep waiting</button>
+                  {/* THE ONE LINE THAT SAYS WHY.
+                      `closeVisit` has taken a note since it was written and
+                      nothing ever passed one, so every ending in the record
+                      was a bare word: "referred", "left". At the end of the
+                      month that answers nothing. "Sent to Chandka, chest pain"
+                      is the sentence somebody actually wants six weeks later,
+                      and the desk is the only place it is known.
+
+                      Optional and typed BEFORE the ending is picked, because
+                      the ending is the thing that closes the box: asking for
+                      the note afterwards means asking a compounder to come
+                      back to a row he has finished with. */}
+                  <input className="closenote" value={closeNote} maxLength={80}
+                         placeholder="one line, if it helps: sent where, or why"
+                         onChange={e => setCloseNote(e.target.value)} />
+                  <button className="lnk" onClick={() => { setClosing(null); setCloseNote('') }}>keep waiting</button>
                 </div>
               ) : (
                 <button className="lnk qclose" onClick={() => setClosing(v.id)}>

@@ -55,6 +55,26 @@ export const DOSE_WORD: Record<Form, Word> = {
 }
 
 /**
+ * THE TIMES OF DAY, for the column headings and the legend.
+ *
+ * Morning, midday and night ship as read: they have been on every sheet since
+ * the first one and Safeer has checked them. The EVENING is new, so it obeys
+ * the rule that everything new obeys. Until a person ticks it in Setup,
+ * Review, that column heads with its pictogram and its English only, which is
+ * exactly as safe as the other three and only slightly less useful.
+ *
+ * The pictogram is not gated, and that is the point of the rule rather than an
+ * exception to it: a picture of a sun going down is not a claim in a language,
+ * and the patient who cannot read is depending on the picture anyway.
+ */
+export const TIME_WORD: Record<'m' | 'd' | 'e' | 'n', Word> = {
+  m: { en: 'morning', sd: 'صبح', ok: true },
+  d: { en: 'midday', sd: 'منجهند', ok: true },
+  e: { en: 'evening', sd: 'شام', ok: false },
+  n: { en: 'night', sd: 'رات', ok: true },
+}
+
+/**
  * WHERE IT GOES, for the cell that would otherwise say "after food".
  *
  * An eye drop taken after food is a sentence with no meaning in it, and worse,
@@ -105,6 +125,7 @@ export function pendingWords(): { key: string; en: string; sd: string; ok: boole
   for (const [f, w] of Object.entries(FORM_WORD)) push('form:' + f, w)
   for (const [f, w] of Object.entries(DOSE_WORD)) push('dose:' + f, w)
   for (const [r, w] of Object.entries(ROUTE_WORD)) push('route:' + r, w)
+  for (const [t, w] of Object.entries(TIME_WORD)) push('time:' + t, w)
   return out
 }
 
@@ -118,6 +139,12 @@ export const formEnFor = (f: Form): string => (FORM_WORD[f] ?? FORM_WORD.other).
 export const doseSdFor = (f: Form): string => sdOf('dose:' + f, DOSE_WORD[f] ?? DOSE_WORD.other)
 export const doseEnFor = (f: Form): string => (DOSE_WORD[f] ?? DOSE_WORD.other).en
 export const routeSdFor = (r: Route): string => sdOf('route:' + r, ROUTE_WORD[r] ?? ROUTE_WORD.mouth)
+
+export type TimeKey = 'm' | 'd' | 'e' | 'n'
+/** The four slots, in the order of the day and the order of the columns. */
+export const TIMES: TimeKey[] = ['m', 'd', 'e', 'n']
+export const timeSdFor = (t: TimeKey): string => sdOf('time:' + t, TIME_WORD[t])
+export const timeEnFor = (t: TimeKey): string => TIME_WORD[t].en
 
 /**
  * The English dose word, made to agree with the number beside it.

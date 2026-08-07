@@ -4,6 +4,8 @@ import { readQrPayload } from '../print/qr'
 import { IcPill, IcScan } from '../ui/art'
 import { course } from '../course'
 import { storeSeesTheDay } from '../store'
+import { whyItFailed } from '../fail'
+import { Note } from '../ui/Note'
 import type { Visit, RxLine } from '../types'
 
 /**
@@ -79,24 +81,51 @@ export default function Pharmacy({ visits, onChange }: {
     return wholeDay && (String(v.token) === needle || (!!n && n.code.includes(needle)))
   })
 
+  /**
+   * EVERY TICK AT THIS COUNTER GOES THROUGH HERE.
+   *
+   * A tick is the record that a patient was handed a medicine. It was an
+   * unguarded `await` with a redraw after it, so a database that refused left
+   * the box unticked, the screen unchanged and nothing said. The person behind
+   * the counter taps it again, decides the tablet is slow, and hands over the
+   * bag anyway, and the record says the course was never given.
+   *
+   * Which is worse here than at the door, in one specific way: the door's
+   * mistake costs money and this one is the answer to "did he get his
+   * antibiotics".
+   */
+  const [err, setErr] = useState('')
+
+  async function guard(did: string, fn: () => Promise<void>) {
+    setErr('')
+    try { await fn() } catch (e) {
+      console.error('[nuskho] ' + did, e)
+      setErr(whyItFailed(e, did))
+    }
+  }
+
   async function setGiven(v: Visit, i: number, given: number | undefined) {
-    const lines = v.lines.map((l, k) => {
-      if (k !== i) return l
-      const { given: _g, ...rest } = l
-      return given === undefined ? rest : { ...rest, given }
+    await guard('That was not ticked off', async () => {
+      const lines = v.lines.map((l, k) => {
+        if (k !== i) return l
+        const { given: _g, ...rest } = l
+        return given === undefined ? rest : { ...rest, given }
+      })
+      const all = lines.every(lineDone)
+      await db.visits.update(v.id, {
+        lines,
+        dispensedAt: all ? (v.dispensedAt ?? Date.now()) : undefined,
+      })
+      onChange()
     })
-    const all = lines.every(lineDone)
-    await db.visits.update(v.id, {
-      lines,
-      dispensedAt: all ? (v.dispensedAt ?? Date.now()) : undefined,
-    })
-    onChange()
   }
 
   async function giveAll(v: Visit) {
-    const lines = v.lines.map(l => lineDone(l) ? l : { ...l, given: course(l).n })
-    await db.visits.update(v.id, { lines, dispensedAt: Date.now() })
-    onChange()
+    await guard('The slip was not marked handed over', async () => {
+      const lines = v.lines.map(l => lineDone(l) ? l : { ...l, given: course(l).n })
+      await db.visits.update(v.id, { lines, dispensedAt: Date.now() })
+      onChange()
+    })
   }
 
   const at = (t?: number) =>
@@ -104,6 +133,10 @@ export default function Pharmacy({ visits, onChange }: {
 
   return (
     <div className="pane">
+      {/* At the top, not beside a line: this counter's rows are a list of
+          medicines and a sentence squeezed between two of them reads as part of
+          the prescription. */}
+      {err && <div className="saidno"><Note tone="stop" title="That did not go through">{err}</Note></div>}
       <h2><IcScan size={17} /> The slip's number, typed or scanned</h2>
       <div className="fld">
         <input value={q} inputMode="numeric"
@@ -185,9 +218,9 @@ export default function Pharmacy({ visits, onChange }: {
                 })}
                 <div className="row" style={{ marginTop: 10 }}>
                   {!done && <button className="btn" onClick={() => giveAll(v)}>All given · handed over</button>}
-                  {done && <button className="lnk" onClick={async () => {
+                  {done && <button className="lnk" onClick={() => guard('The slip was not reopened', async () => {
                     await db.visits.update(v.id, { dispensedAt: undefined }); onChange()
-                  }}>reopen</button>}
+                  })}>reopen</button>}
                 </div>
               </>
             )}

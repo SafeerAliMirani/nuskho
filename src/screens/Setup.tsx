@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { adminIsSet, adminUnlocked, unlockAdmin, lockAdmin, setAdminKey } from '../profile'
-import { role, can, ROLE_NAME, ROLE_SD, ROLE_WHAT, ROLES, pinSet, setRolePin, type Role } from '../roles'
+import { role, can, ROLE_NAME, ROLE_SD, ROLE_WHAT, ROLES, pinSet, setRolePin,
+         pinWasAdopted, notePinAdoption, type Role } from '../roles'
 import { downloadBackup, saveText, readBackup, readFile, restore, type RestoreReport } from '../backup'
 import { noteExported, snapshotList, snapshotText, type Snap } from '../safety'
 import { clearRecords, factoryReset, type ResetReport } from '../reset'
@@ -96,6 +97,11 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             ? 'The doctor\u2019s name, logo and the medicine review. Not his records, and not his backups.'
             : role() === 'doctor'
             ? 'The fee, paper and page size, the medicine list, the PINs, and your own backups.'
+            /* An owner who is not a doctor holds `staff` and nothing else here.
+               He used to be told this screen was about the counter's fee,
+               which is not a thing he can change and not why he is here. */
+            : can('staff')
+            ? 'Which jobs this building has. Not one prescription, and not the money.'
             : 'The fee the counter charges. Nothing else on this machine.'}
         </span>
         {open && adminIsSet()
@@ -491,6 +497,20 @@ function PinTab() {
         computer only. Nobody, including us, can look one up or reset it. Leave a box blank
         and save to remove that PIN.
       </p>
+
+      {/* A lock that changes shape without telling anybody is how a doctor ends
+          up locked out of his own evening. Before roles there was one PIN for
+          the whole app; it is the doctor's now, and this says so once. */}
+      {pinWasAdopted() && (
+        <Note tone="good" title="Your old number is now the doctor's PIN"
+              action={<button className="btn" onClick={() => { notePinAdoption(); redraw(n => n + 1) }}>
+                Understood
+              </button>}>
+          This computer had one PIN for the whole app. Nuskho has a PIN for each job now, so
+          that number has become the <b>doctor's</b>, and it still works. The other jobs open
+          with one tap until you give them their own below.
+        </Note>
+      )}
 
       {/**
         * WHOSE PIN IS WHOSE.

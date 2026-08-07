@@ -120,7 +120,7 @@ function layoutKey(d: SlipData): string {
     d.visit.lines.map(l => {
       const g = d.drugs[l.drugId]
       const m = l.snap ?? g
-      return [l.drugId, l.dose.m, l.dose.d, l.dose.n, l.meal, l.days,
+      return [l.drugId, l.dose.m, l.dose.d, l.dose.e ?? 0, l.dose.n, l.meal, l.days,
               m?.brand, m?.strength, m?.generic, m?.sd, m?.sdReviewed, m?.unitSd, m?.form]
     }),
     d.visit.diagnosis, d.visit.vitals, d.visit.tests, d.visit.advice, d.visit.nextVisit,

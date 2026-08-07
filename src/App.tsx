@@ -171,9 +171,25 @@ function Clinic() {
    * the prescription screen and every step points at a control that is not
    * there, which is the fault Safeer found.
    */
+  /**
+   * WHO MAY OPEN SETUP.
+   *
+   * It was `paper OR identity`, which is the doctor and the Nuskho role. A
+   * clinic admin who OWNS the building holds `staff` and neither of those, so
+   * the one screen his ownership exists for — deciding which jobs this building
+   * has — could not be reached from any door on any screen. He owned a clinic
+   * he could not configure.
+   *
+   * Adding `staff` opens nothing else: every tab inside is filtered by its own
+   * permission, so he arrives at the Staff tab and there is no second tab for
+   * him to find. The counter still has nothing to change and is still offered
+   * no door.
+   */
+  const maySetup = can('paper') || can('identity') || can('staff')
+
   const showing: 'queue' | 'compose' =
     !about && !(ops && can('ops')) && !(stats && can('figures'))
-    && !(setup && (can('paper') || can('identity'))) && !(pharm && can('dispense'))
+    && !(setup && maySetup) && !(pharm && can('dispense'))
     && !!visitId && can('prescribe') && roomOk(visitId)
       ? 'compose' : 'queue'
 
@@ -254,7 +270,7 @@ function Clinic() {
                       <IcQueue size={16} /> Pharmacy desk <small>printed slips, mark medicines given</small>
                     </button>
                   )}
-                  {(can('paper') || can('identity')) &&
+                  {maySetup &&
                   <button onClick={() => { setMenu(false); setStats(false); setSetup(true) }}>
                     <IcCog size={16} /> Setup <small>paper, medicines, PINs</small>
                   </button>}
@@ -302,7 +318,7 @@ function Clinic() {
 
           {/* The counter has nothing to change on this machine, so it is not
               offered a door into Setup that opens onto an empty room. */}
-          {(can('paper') || can('identity')) &&
+          {maySetup &&
             <button className="lnk paper" onClick={() => setSetup(s => !s)}>Setup</button>}
         </div>
       </header>
@@ -324,7 +340,7 @@ function Clinic() {
             <AdminDesk visits={today} /></>
         : stats && can('figures')
         ? <StatsScreen onBack={() => setStats(false)} />
-        : setup && (can('paper') || can('identity'))
+        : setup && maySetup
         ? <Setup onBack={() => setSetup(false)} />
         : pharm && can('dispense')
         ? <PharmWrap visits={today} onChange={refresh} onBack={() => setPharm(false)} showBack={can('queue')} />

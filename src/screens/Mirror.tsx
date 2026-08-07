@@ -367,17 +367,7 @@ function MDesk({ s }: { s: WireState }) {
 
   return (
     <div className="pane">
-      {s.multi && (
-        <div className="chips" style={{ marginBottom: 6 }}>
-          {s.doctors.map(d => (
-            <button key={d.id} className={'chip' + (sel?.id === d.id ? ' have' : '') + (d.sitting ? '' : ' off')}
-                    disabled={!d.sitting}
-                    onClick={() => setSelDoc(d.id)}>
-              R{d.room} {d.nameEn}{d.sitting ? ` · Rs ${d.fee}` : ' · not in'}
-            </button>
-          ))}
-        </div>
-      )}
+      {s.multi && <MRooms s={s} picked={selDoc || sel?.id} tokensTo={sel} onPick={setSelDoc} />}
 
       <h2><IcScan size={17} /> Old slip's number</h2>
       <div className="row">
@@ -437,9 +427,127 @@ function MDesk({ s }: { s: WireState }) {
             </span>
             <span className={`st s-${v.status}`}>{LABEL[v.status]}</span>
           </div>
+          <Reprint v={v} />
           <Refund v={v} onDone={() => undefined} />
         </div>
       ))}
+    </div>
+  )
+}
+
+/**
+ * THE ROOMS, ON A PHONE, WITH THE SWITCH THAT DECIDES WHERE TOKENS GO.
+ *
+ * The `setSitting` intent has existed since the wire was built and the host has
+ * always obeyed it. No screen ever sent one. So on the evening Dr Soomro does
+ * not come in, the counter clerk standing at the door with a phone had to walk
+ * to the clinic computer to say so, and until he did every token he issued
+ * could still be pointed at an empty room.
+ *
+ * The room's own strip is two controls on one card. A phone has no room for
+ * that, so the chips pick and ONE line underneath switches whichever room is
+ * picked. A not-sitting room is still tappable here, which it is not in the
+ * room: on a phone it is the only way back.
+ */
+function MRooms({ s, picked, tokensTo, onPick }: {
+  s: WireState
+  /** the chip the thumb is on. NOT the room tokens go to: see below. */
+  picked?: string
+  /** the room the next token will actually be issued for. Always a sitting one. */
+  tokensTo?: WireDoctor
+  onPick: (id: string) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [why, setWhy] = useState('')
+  /**
+   * THE PICKED ROOM IS NOT THE ROOM TOKENS GO TO, AND KEEPING THEM APART IS THE
+   * WHOLE OF THIS COMPONENT.
+   *
+   * The first version drove the switch from the token room, which is by
+   * definition a SITTING room. So the moment somebody marked Dr Soomro absent,
+   * the highlight jumped to Room 1 and the link underneath now offered to send
+   * Dr Khan home. There was no way back: the one switch that could bring
+   * Soomro in had stopped pointing at him.
+   *
+   * The chip decides what the switch acts on and nothing else. The fee and the
+   * next token still follow a sitting room, exactly as they did.
+   */
+  const on = s.doctors.find(d => d.id === picked) ?? tokensTo ?? s.doctors[0]
+
+  async function flip() {
+    if (!on || busy) return
+    setBusy(true); setWhy('')
+    const r = await intent('setSitting', { doctorId: on.id, sitting: !on.sitting })
+    setBusy(false)
+    if (r.ok === false) setWhy(String(r.why))
+  }
+
+  return (
+    <>
+      <div className="chips" style={{ marginBottom: 6 }}>
+        {s.doctors.map(d => (
+          <button key={d.id} className={'chip' + (d.id === on?.id ? ' have' : '') + (d.sitting ? '' : ' off')}
+                  onClick={() => onPick(d.id)}>
+            R{d.room} {d.nameEn}{d.sitting ? ` \u00b7 Rs ${d.fee}` : ' \u00b7 not in'}
+          </button>
+        ))}
+      </div>
+      {on && (
+        <p className="hint" style={{ marginTop: 0 }}>
+          {on.sitting
+            ? <>Tokens go to Room {on.room}. </>
+            : <>Room {on.room} is not taking tokens{tokensTo && tokensTo.id !== on.id
+                ? <>, they go to Room {tokensTo.room}</> : null}. </>}
+          <button className="lnk" disabled={busy} onClick={flip}>
+            {busy ? 'telling the clinic machine\u2026'
+              : on.sitting ? `${on.nameEn} is not in tonight` : `${on.nameEn} is sitting after all`}
+          </button>
+        </p>
+      )}
+      {why && <p className="usable bad" style={{ marginTop: 4 }}>{why}</p>}
+    </>
+  )
+}
+
+/**
+ * A SECOND COPY OF A TOKEN, FROM THE PHONE THAT ISSUED IT.
+ *
+ * The `reprint` intent has existed as long as the wire and no screen sent one.
+ * A thermal receipt is a small piece of paper handed to a person standing in a
+ * corridor, and it gets dropped, blown off a bench and handed to a child. The
+ * clerk holding the phone that printed it could not print it again without
+ * walking to the clinic computer.
+ *
+ * Never a new number: the same token, the same fee, the same room. A reprint
+ * that issued a second number would put one patient in the queue twice.
+ */
+function Reprint({ v }: { v: WireVisit }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  /**
+   * WHICH MACHINE HAS THE PRINTER.
+   *
+   * Almost always the clinic machine: the thermal roll sits on the desk beside
+   * it and a phone in a corridor has nothing attached. So this asks the HOST to
+   * print, exactly as issuing a token from this phone already does, and prints
+   * here only on the rare tablet that has its own.
+   *
+   * The first version refused to render at all unless THIS device had a
+   * printer, which hid the control on every phone in every clinic, which is
+   * every case it was built for.
+   */
+  const here = paper().token
+  return (
+    <div className="rprow">
+      <button className="lnk qclose" disabled={busy} onClick={async () => {
+        setBusy(true); setMsg('')
+        const r = await intent('reprint', { visitId: v.id, wantHostPrint: !here })
+        setBusy(false)
+        if (r.ok === false) { setMsg(String(r.why)); return }
+        if (here && r.slip) printToken(r.slip as TokenSlip)
+        setMsg(`Token ${v.token} printed again.`)
+      }}>{busy ? 'asking\u2026' : 'print the token again'}</button>
+      {msg && <span className="rpmsg">{msg}</span>}
     </div>
   )
 }
@@ -774,7 +882,7 @@ function MOps({ s }: { s: WireState }) {
     <div className="pane">
       <h2><IcChart size={17} /> Today, as the desk counted it</h2>
       <div className="daybar">
-        <span><b>{s.sums.total}</b> tokens</span>
+        <span><b>{s.sums.total}</b> token{s.sums.total === 1 ? '' : 's'}</span>
         <span><b>{s.sums.printed}</b> printed</span>
         <span><b>{s.sums.waiting}</b> waiting</span>
         <span className="money"><b>Rs {s.sums.collected}</b> in hand</span>

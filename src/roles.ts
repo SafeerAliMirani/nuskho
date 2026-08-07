@@ -269,6 +269,66 @@ export function setDoctorIdentity(id: string | null): void {
 
 const pinKey = (r: Role) => `nuskho.pin.${r}`
 
+/* --------------------------------------- the lock a machine already had
+ *
+ * BEFORE ROLES THERE WAS ONE PIN, at `nuskho.pin`, and it guarded the whole
+ * app because the whole app was one screen. Roles arrived and every PIN moved
+ * to `nuskho.pin.<role>`. Nothing carried the old one across.
+ *
+ * So a clinic that updated its copy woke up with the front door open. The
+ * doctor had set a PIN, the PIN was still sitting in storage, and every role
+ * including his own now opened with one tap. Nothing said so, because from the
+ * new build's point of view no PIN had ever been set. That is the worst kind of
+ * security failure available: a lock that reports itself locked and is not.
+ *
+ * The old PIN becomes the DOCTOR's, and only his. It guarded the
+ * prescriptions, his is the role that guards them now, and it is the person who
+ * chose it who still knows it. Copying it onto the counter and the compounder
+ * would lock two people out of a door they never had one on, at seven in the
+ * evening, with a PIN neither of them was ever told.
+ *
+ * The stored blob is `{salt, h}` with h = SHA-256(salt + "|" + pin) in both
+ * builds, so it moves across as it stands and the doctor's old number still
+ * works. It reads localStorage directly rather than importing profile.ts,
+ * because profile.ts is a bigger module and this must run before anything else
+ * touches a door.
+ */
+const OLD_PIN = 'nuskho.pin'
+const ADOPTED = 'nuskho.pin.adopted'
+
+/**
+ * True once, on the first run after an update, if an old single PIN was moved
+ * onto the doctor. The Lock tab says so, because a lock that changed shape
+ * without telling anybody is how a doctor ends up locked out of his own
+ * evening.
+ */
+export function adoptOldPin(): boolean {
+  try {
+    const old = localStorage.getItem(OLD_PIN)
+    if (!old) return false
+    // somebody has already set a real per-role PIN: this machine is past it
+    if (ROLES.some(r => localStorage.getItem(pinKey(r)))) {
+      localStorage.removeItem(OLD_PIN)
+      return false
+    }
+    JSON.parse(old)                       // refuse to move something unreadable
+    localStorage.setItem(pinKey('doctor'), old)
+    localStorage.removeItem(OLD_PIN)
+    localStorage.setItem(ADOPTED, '1')
+    return true
+  } catch { return false }
+}
+
+/** Was the doctor's PIN carried over from the old single-PIN build? */
+export const pinWasAdopted = (): boolean => {
+  try { return localStorage.getItem(ADOPTED) === '1' } catch { return false }
+}
+
+/** He has read the note about it. */
+export const notePinAdoption = (): void => {
+  try { localStorage.removeItem(ADOPTED) } catch { /* ignore */ }
+}
+
 async function digest(pin: string, salt: string): Promise<string> {
   const data = new TextEncoder().encode(salt + '|' + pin)
   const buf = await crypto.subtle.digest('SHA-256', data)

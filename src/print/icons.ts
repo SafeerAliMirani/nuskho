@@ -13,6 +13,26 @@ export const SUNRISE = (w: string, h: string) => svg(w, h,
   '<path d="M1.8 17.4h20.4" stroke-width="2.4"/>' +
   '<path d="M12 2.2v3.2M4.4 6.2l2.2 2.2M19.6 6.2l-2.2 2.2" stroke-width="2"/>')
 
+/**
+ * THE EVENING. Deliberately the same disc and the same horizon as SUNRISE,
+ * because they are a pair and a reader should see them as one, with the ONLY
+ * difference being which way the mark points: rays up for the morning, one
+ * arrow down for the evening. Two pictures that differ in a dozen small ways
+ * differ in none that survive 4 mm of thermal print.
+ *
+ * The arrowhead is a SOLID TRIANGLE, not a stroked chevron, and that was
+ * chosen by rendering four candidates at the exact 4.2 mm the heading prints
+ * at and looking at them beside the sunrise. A thin arrow became a nub. A
+ * sinking disc went light and lost its weight. The solid head is the only one
+ * whose SILHOUETTE differs from the sunrise, and a silhouette is what survives
+ * a cheap printer and a photocopy.
+ */
+export const SUNSET = (w: string, h: string) => svg(w, h,
+  '<path d="M3.6 17.4a8.4 8.4 0 0 1 16.8 0z" fill="currentColor" stroke="none"/>' +
+  '<path d="M1.8 17.4h20.4" stroke-width="2.4"/>' +
+  '<path d="M12 1.6v3.4" stroke-width="3"/>' +
+  '<path d="M6.9 4.6 12 10.2l5.1-5.6z" fill="currentColor" stroke="none"/>')
+
 export const SUN = (w: string, h: string) => svg(w, h,
   '<circle cx="12" cy="12" r="5.2" fill="currentColor" stroke="none"/>' +
   '<path d="M12 1.4v3M12 19.6v3M1.4 12h3M19.6 12h3M4.4 4.4l2.1 2.1M17.5 17.5l2.1 2.1' +

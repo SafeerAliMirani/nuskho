@@ -326,6 +326,34 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .line.bad{border-color:var(--bad);background:var(--bad-bg)}
 .badmsg{margin-top:var(--s2);font-size:var(--t-md);color:var(--bad);font-weight:700}
 .badmsg.ok{color:var(--g)}
+/* Amber, not red: the same molecule twice is worth a second look and is
+   sometimes exactly what the doctor meant. Red is for a line that would print
+   with no instruction on it, which is never what anybody meant. */
+.badmsg.warn{color:#8a5b00;font-weight:700}
+/* WHO's own stewardship label. Deliberately quiet: it is a fact printed beside
+   a formula, not advice, and it must never look like the app is arguing. */
+.awtag{display:inline-block;margin-left:var(--s2);padding:1px 6px;border-radius:4px;
+  background:var(--line-2);color:var(--ink-2);font-size:9.5px;font-weight:800;
+  letter-spacing:.5px;text-transform:uppercase;vertical-align:1px}
+
+/* The free line beside the come-back chips. Same box as every other single
+   line field, and deliberately full width: what is typed here prints on the
+   patient's slip word for word. */
+.nextvin{width:100%;margin-top:var(--s2);border:1.5px solid var(--line);border-radius:var(--r2);
+  padding:11px var(--s3);font-size:16px;font-family:inherit;background:var(--card);color:var(--ink)}
+.nextvin:focus{outline:0;border-color:var(--g)}
+/* The second copy of a token, offered on the phone that issued it. Its own thin
+   row under the queue line so it never crowds the name and the number. */
+.rprow{display:flex;align-items:baseline;gap:var(--s2);padding:0 var(--s4) var(--s2);flex-wrap:wrap}
+.rpmsg{font-size:var(--t-sm);color:var(--g)}
+/* The one line somebody typed about why a token ended. Its own line under the
+   row's summary, because it is a sentence and the rest of that line is facts. */
+.qrow .nm small .cnote{display:block;font-style:normal;color:var(--ink-2);margin-top:2px}
+/* Typed before the ending is picked, so it is above the chips it belongs to. */
+.closebox .closenote{flex:1 0 100%;border:1.5px solid var(--line);border-radius:var(--r2);
+  padding:9px var(--s3);font-size:15px;font-family:inherit;background:var(--card);color:var(--ink);
+  margin-top:var(--s2)}
+.closebox .closenote:focus{outline:0;border-color:var(--g)}
 
 .dosegrid{display:flex;gap:var(--s2);margin-top:var(--s3);flex-wrap:wrap;align-items:center}
 .dbtn{border:1.5px solid var(--line);background:var(--card);border-radius:var(--r2);
@@ -345,7 +373,13 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 
 .sticky{position:sticky;bottom:0;z-index:10;
   background:linear-gradient(180deg,rgba(244,247,246,0),var(--bg) 26%);
-  padding:var(--s4) 0 var(--s2);display:flex;gap:var(--s3)}
+  padding:var(--s4) 0 var(--s2);display:flex;gap:var(--s3);flex-wrap:wrap}
+/* Anything the bar has to SAY goes above the button on its own full line, not
+   beside it. A sentence squeezed into the gap wraps onto two lines and the
+   whole bar grows upward over the last medicine, which is the one place on
+   this screen that must stay legible while he decides to press PRINT. */
+.sticky>.nt,.sticky>.hint{flex:1 0 100%;margin:0 0 var(--s2)}
+.sticky>.btn{flex:1}
 .prev{background:var(--card);border-left:4px solid var(--g);border-radius:0 var(--r2) var(--r2) 0;
   padding:var(--s3) var(--s4);margin-bottom:var(--s4);font-size:15px;line-height:1.55;
   box-shadow:var(--sh-1)}

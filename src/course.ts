@@ -23,7 +23,9 @@ import type { RxLine, RxSnap } from './types'
  * paper.
  */
 export function course(l: RxLine, snap?: RxSnap): { n: number; unit: string } {
-  const perDay = (l.dose.m || 0) + (l.dose.d || 0) + (l.dose.n || 0)
+  // `e` is optional, because every prescription written before the evening
+  // existed has no `e` at all. Absent and zero are the same thing.
+  const perDay = (l.dose.m || 0) + (l.dose.d || 0) + (l.dose.e || 0) + (l.dose.n || 0)
   /**
    * THE FORM COMES FROM THE RESOLVED SNAPSHOT WHEN THE CALLER HAS ONE.
    *
