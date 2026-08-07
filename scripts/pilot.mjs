@@ -73,87 +73,88 @@ rmSync(join(out, 'sw.js'), { force: true })
  * a file that is at home. A solo clinic simply never double-clicks it.
  */
 const WIRE = 'tools/nuskho-wifi.cjs'
+const WIRE_EXE = 'tools/nuskho-wifi.exe'
+
+/**
+ * ONE WAY IN, FOR EVERY CLINIC, INCLUDING THE ONE-DOCTOR ONES.
+ *
+ * A browser files its records under the ADDRESS the app was opened from. We
+ * used to ship two launchers: a solo clinic opened the folder from disk, a
+ * building opened it through the wire. Two launchers, two addresses, two
+ * databases. Which meant a solo clinic that later bought a phone did not gain
+ * a feature, it lost its history, and somebody had to drive to it with a
+ * backup file. We built that trap ourselves and there was nothing on the other
+ * side of it.
+ *
+ * So now every clinic opens Nuskho the same way, through the wire, at
+ * http://localhost:8123. A doctor alone in one room never notices the
+ * difference. The evening he adds a phone, it just works, because the address
+ * never changed.
+ *
+ * The wire ships as ONE Windows file with node inside it, so nothing has to be
+ * installed on a clinic machine. Build it with `npm run wire:exe`. It is 55 MB
+ * and deliberately not committed: it is a build output, and git is not where
+ * binaries belong.
+ */
+if (!existsSync(WIRE_EXE)) {
+  console.log(`\n  ✖ ${WIRE_EXE} is missing, and every launcher depends on it.`)
+  console.log(`    Build it first:  npm run wire:exe\n`)
+  process.exit(1)
+}
+
 if (existsSync(WIRE)) {
   cpSync(WIRE, join(out, 'nuskho-wifi.cjs'))
+  cpSync(WIRE_EXE, join(out, 'nuskho-wifi.exe'))
 
   /**
-   * ONE LAUNCHER FOR A BUILDING, BECAUSE THE ADDRESS IS PART OF THE IDENTITY.
+   * THE ONE LAUNCHER. Starts the wire, waits for it, then opens the app at the
+   * wire's own address with the printing flags in its own Chrome profile.
    *
-   * A browser keeps records per address. The folder opened from disk and the
-   * same folder served over the clinic's wifi are two different addresses,
-   * so they are two different clinics with two different databases. Found by
-   * testing: the wire was started, the app opened at the wifi address, and it
-   * came up as a brand new clinic asking to be set up. Nothing was broken and
-   * everything was confusing, which is worse.
-   *
-   * So a building gets ONE thing to double-click. It starts the wire and
-   * opens the app AT THE WIRE'S OWN ADDRESS, with the printing flags, in its
-   * own Chrome profile. From then on the record machine and every phone are
-   * looking at the same address and therefore the same records.
+   * --user-data-dir forces a SEPARATE Chrome instance. Without it the new tab
+   * joins whatever Chrome is already open with somebody's Facebook in it, and
+   * --kiosk-printing is silently ignored, which means a print dialog for every
+   * patient. At 140 patients an evening that alone would end a pilot.
    */
-  writeFileSync(join(out, 'Start Nuskho building.bat'),
+  writeFileSync(join(out, 'Start Nuskho.bat'),
 `@echo off
-title Nuskho building
+title Nuskho
 cd /d "%~dp0"
 echo.
-echo   Starting the building's wire, then opening Nuskho on it.
-echo   LEAVE THIS WINDOW OPEN all evening. Closing it stops the phones.
+echo   Starting Nuskho.
+echo   A small window will open behind this one. LEAVE IT OPEN all evening.
+echo   Closing it stops the phones and closes the clinic's records.
 echo.
-start "Nuskho wire" /min cmd /c "node ""nuskho-wifi.cjs"" ""."" & pause"
-timeout /t 3 /nobreak >nul
+start "Nuskho wire" /min cmd /c "nuskho-wifi.exe ""."" & pause"
+timeout /t 4 /nobreak >nul
 start "" chrome.exe ^
- --user-data-dir="%LOCALAPPDATA%\\NuskhoBuilding" ^
+ --user-data-dir="%LOCALAPPDATA%\\NuskhoClinic" ^
  --kiosk-printing ^
  --new-window "http://localhost:8123/"
-echo   Opened. The phones use the address printed in the other window.
+echo   Opened. Phones use the address printed in the small window,
+echo   or scan the square under Setup, Wifi.
 timeout /t 6 /nobreak >nul
 exit
 `)
 
-  writeFileSync(join(out, 'Start Nuskho wifi only.bat'),
+  /** For the evening somebody closes the small window by mistake, which will
+   *  happen, and which must not mean closing and reopening the whole clinic. */
+  writeFileSync(join(out, 'If the small window was closed.bat'),
 `@echo off
 title Nuskho wifi
 echo.
-echo   The building's own wire, on its own. Leave this window open.
-echo   Use this only if the app is already open at this machine's
-echo   wifi address. Otherwise use "Start Nuskho building.bat".
+echo   Starting the wire again, on its own. Leave this window open.
+echo   Use this ONLY if Nuskho is already open on this computer and the
+echo   small window was closed by mistake. Otherwise use Start Nuskho.bat.
 echo.
 cd /d "%~dp0"
-node "nuskho-wifi.cjs" "."
+nuskho-wifi.exe "."
 pause
 `)
 }
 
-/**
- * A LAUNCHER, BECAUSE DOUBLE-CLICKING index.html GIVES A BLANK PAGE.
- *
- * Found the hard way. Chrome refuses IndexedDB to a page opened from disk
- * unless it is started with --allow-file-access-from-files — and the flag is
- * only read when Chrome STARTS. If any Chrome window is already open, the flag
- * is silently ignored, the new tab joins the running instance, and the app
- * comes up white with no error anybody can see.
- *
- * On a clinic laptop with somebody's Facebook open in another window, that is
- * every single time. It would have looked like the software was broken on the
- * first evening of the pilot.
- *
- * So the release carries its own launcher with its own Chrome profile
- * directory, which forces a separate instance and makes the flags apply
- * whatever else is running. --kiosk-printing is in there too: without it a
- * print dialog appears for every patient, and at 140 patients an evening that
- * alone would end the pilot.
- */
-writeFileSync(join(out, 'Start Nuskho.bat'),
-`@echo off
-title Nuskho
-set HERE=%~dp0
-start "" chrome.exe ^
- --user-data-dir="%LOCALAPPDATA%\\NuskhoChrome" ^
- --allow-file-access-from-files ^
- --kiosk-printing ^
- --new-window "file:///%HERE:\\=/%index.html"
-exit
-`)
+/* The old "open the folder from disk" launcher is deliberately gone. It was a
+   second address, and a second address was a second clinic. See the block
+   above the wire for why. */
 
 writeFileSync(join(out, 'WHAT-THIS-IS.txt'), `NUSKHO — sealed copy for a clinic
 
@@ -164,61 +165,58 @@ writeFileSync(join(out, 'WHAT-THIS-IS.txt'), `NUSKHO — sealed copy for a clini
 
 HOW TO USE IT
 
-  Copy this whole folder to the clinic computer, then double-click
+  Copy this whole folder to ONE computer in the clinic. That computer is where
+  the records live. Then double-click
 
       Start Nuskho.bat
 
-  DO NOT double-click index.html. It will open a WHITE PAGE with no error.
-  Chrome only allows a page opened from disk to keep records if it is STARTED
-  with --allow-file-access-from-files, and that flag is ignored if any Chrome
-  window is already open. The .bat file starts its own Chrome so the flags
-  always apply. It also switches on --kiosk-printing, without which a print
-  dialog appears for every patient.
+  Make a shortcut to it on the desktop, and let nobody open Nuskho any other
+  way. Not index.html, not a bookmark, not a second browser. Every evening,
+  that shortcut.
 
-  Make a shortcut to the .bat on the desktop and let nobody open it any other
-  way.
+  Two windows appear. The big one is Nuskho. The small one is the clinic's own
+  wifi service. LEAVE THE SMALL ONE OPEN all evening. Closing it closes the
+  clinic. If somebody closes it by mistake while Nuskho is still open, run
 
-A BUILDING WITH PHONES  —  USE THE OTHER LAUNCHER INSTEAD
+      If the small window was closed.bat
 
-  If this clinic runs phones on its own wifi, do NOT use Start Nuskho.bat on
-  the record machine. Use
+  and carry on. Nothing is lost.
 
-      Start Nuskho building.bat
+  If Windows says it protected your PC when the small window starts, that is
+  only because this file is new and not signed yet. Click More info, then
+  Run anyway. Nothing here reaches the internet.
 
-  instead, and leave the small window it opens running all evening.
+WHY ONE LAUNCHER AND NOT TWO, WHICH IS NOT OBVIOUS
 
-  WHY IT MATTERS, AND IT IS NOT OBVIOUS. A browser keeps its records under the
-  ADDRESS the app was opened from. The folder opened from disk and the same
-  folder served over the wifi are two different addresses, so they are two
-  different clinics with two separate sets of records. Set the clinic up at
-  one address and open it at the other, and it will look brand new.
+  A browser keeps its records under the ADDRESS the app was opened from. Open
+  the same folder two different ways and the browser believes it is two
+  different clinics, with two separate sets of records, and the second one
+  looks brand new.
 
-  So pick ONE way and never mix them:
+  So there is exactly one way in, for a doctor alone in one room and for a
+  hospital floor alike. A doctor alone never notices. The evening he adds a
+  phone at the door, it simply works, because the address never changed.
 
-     No phones     ->  Start Nuskho.bat, every evening.
-     With phones   ->  Start Nuskho building.bat, every evening, on the
-                       record machine. Phones open the address printed in
-                       the wire's window, or scan the square under
-                       Setup, Wifi.
+  Phones and tablets open the address printed in the small window, or scan the
+  square under Setup, Wifi. They hold nothing: everything they show comes from
+  this computer, and nothing is stored on them.
 
-  If a clinic already set up the first way now wants phones: open it the old
-  way, Setup, Backup, save the full backup, then start the building launcher
-  and restore that file at the new address. Do it before an evening, never
-  during one.
-
-  The wire needs Node installed on that one machine, and no internet at any
-  point. It keeps no records of its own; closing its window stops the phones
-  and touches nothing else.
+  IF THIS CLINIC WAS SET UP ON AN OLDER NUSKHO that opened the folder from
+  disk, its records are at the old address. Before switching: open it the old
+  way, Setup, Backup, Save the full backup. Then start this launcher and
+  restore that file. Do it before an evening, never during one.
 
 WHAT IT DOES NOT DO
 
-  It does not update itself. It does not reach the internet for anything. It
-  will still be exactly this software in six weeks, which is the point: a
-  pilot only means something if the thing being measured stops changing.
+  It does not update itself. It does not reach the internet for anything, ever,
+  and neither does the small window. It will still be exactly this software in
+  six weeks, which is the point: a pilot only means something if the thing
+  being measured stops changing.
 
-  To update a clinic, build a new folder and carry it there on purpose. Write
-  the date in the clinic log when you do, or the week-seven numbers cannot be
-  read.
+  To update a clinic, build a new folder and put it there on purpose. Only the
+  app files change; the records stay where they are, because the address does
+  not move. Write the date in the clinic log when you do, or the week-seven
+  numbers cannot be read.
 
 IF SOMETHING IS WRONG
 

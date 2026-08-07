@@ -13,3 +13,9 @@ dist-web
 
 releases/
 tsconfig.tsbuildinfo
+
+# The wire packaged as one Windows file, 55 MB, with node inside it so a clinic
+# machine needs nothing installed. It is a build output, not source: rebuild it
+# with `npm run wire:exe`. Binaries do not belong in git, and GitHub refuses
+# them past 100 MB anyway.
+tools/nuskho-wifi.exe

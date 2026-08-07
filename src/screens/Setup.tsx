@@ -363,14 +363,20 @@ function WifiTab() {
     return (
       <>
         <h3>Phones and tablets in the building</h3>
+        {/* Every clinic now opens Nuskho through the wire, solo or not, so this
+            state means the app was opened some other way. Telling that person
+            to "run the wire" would give him a SECOND address and a second,
+            empty clinic. The only safe advice is to close this and use the
+            launcher, which is where his records already are. */}
         <p className="hint">
-          This copy is not on a building wire right now, which is normal for a solo
-          clinic. To put the building on its own wifi: on the one machine that will
-          hold the records, run <code>node tools\nuskho-wifi.cjs</code> in the clinic
-          folder. It prints an address; open the app AT that address on this machine,
-          mark it as the record holder under this same tab, and every phone on the
-          clinic wifi joins by scanning the square that appears here. No internet is
-          involved at any point, and the phones hold no records, ever.
+          This copy was not opened through the clinic's own launcher, so phones cannot
+          join it. Close this window and start Nuskho again from
+          <b> Start Nuskho.bat</b> in the clinic folder. Every clinic, with phones or
+          without, opens that one way, because a browser keeps its records under the
+          address the app was opened from and a second address is a second, empty
+          clinic. Once it is open the right way, this tab shows a square for phones on
+          the clinic wifi to scan. No internet is involved at any point, and the phones
+          hold no records, ever.
         </p>
         <Note tone="safe" title="What a phone can never do">
           A phone is a door and a screen. It signs in with a role PIN checked by the
