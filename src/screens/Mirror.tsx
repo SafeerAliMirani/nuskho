@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   mirrorSubscribe, mirrorAuth, mirrorSignOut, intent, hostUp, setHostHere, hubIsLocal,
-  MIRROR_ROLES, type WireState, type WireRx, type WireSlip, type WireVisit, type WireDoctor,
+  MIRROR_ROLES, buildingRoles, type WireState, type WireRx, type WireSlip, type WireVisit,
+  type WireDoctor,
 } from '../building'
-import { ROLE_NAME, ROLE_SD, ROLE_WHAT, type Role } from '../roles'
+import { ROLE_NAME, ROLE_SD, ROLE_WHAT, can, type Role } from '../roles'
 import { roleIsOn } from '../staff'
+import { VITALS, INSTANT, type VitalDef } from '../data/vitals'
 import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
 import { readQrPayload } from '../print/qr'
@@ -129,7 +131,7 @@ export default function Mirror() {
                 : 'The clinic machine is off or out of reach. This phone keeps no records of its own, so ask inside, or use the paper pad until it is back.'}
           </p></div>
         : role === 'counter' ? <MDesk s={s} />
-        : role === 'compounder' ? <MQueue s={s} />
+        : role === 'compounder' ? <MQueue s={s} role={role} />
         : role === 'pharmacy' ? <MPharm s={s} rx={rx} />
         : <MOps s={s} />}
 
@@ -229,9 +231,14 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
       ) : (
         <>
           <div className="whos">
-            {/* Only the jobs this building has. A clinic with no pharmacy
-                should not be offering a pharmacy door on a phone. */}
-            {MIRROR_ROLES.filter(roleIsOn).map(r => {
+            {/* Only the jobs this building has, as the RECORD HOLDER reports
+                them on its heartbeat. Reading this phone's own storage meant a
+                phone that had never been used knew nothing, defaulted to the
+                doctor alone, and was offered no door at all. Until the host has
+                been heard we fall back to this phone's own idea, and then to
+                every mirror role, because a door that is disabled anyway is
+                better than an empty screen with no explanation. */}
+            {(buildingRoles() ?? MIRROR_ROLES.filter(roleIsOn)).map(r => {
               const I = ICON[r]
               const off = busy || !up
               return (
@@ -430,12 +437,67 @@ function MDesk({ s }: { s: WireState }) {
 
 /* ------------------------------------------------------- the compounder's phone */
 
-const VITAL_KEYS: [string, string][] = [['bp', 'BP'], ['temp', 'Temp °F'], ['pulse', 'Pulse'], ['weight', 'Weight kg']]
+/**
+ * WHAT THIS PHONE CAN WRITE DOWN, AND IT USED TO BE FOUR THINGS.
+ *
+ * Blood pressure, temperature, pulse and weight, hard-coded here as four
+ * strings, while the machine in the room knew five vitals and six tests. So the
+ * compounder working from a phone could not record a sugar, could not record an
+ * HbA1c, and therefore never saw the charge for either — although the tour that
+ * runs on this very phone promises "the charge appears on your queue, and you
+ * take it as the patient leaves".
+ *
+ * Both lists now come from `data/vitals.ts`, which is the one place that knows
+ * what a clinic measures. Adding a test there now reaches the phone by itself.
+ */
+/**
+ * One reading on the phone, in the same shape the room uses.
+ *
+ * A blood pressure is TWO numbers and the room has always taken it as two
+ * boxes. Rendering it as one on the phone, with the definition's own three
+ * character limit, silently cut "150/95" down to "150" — a plausible reading,
+ * the wrong reading, and nothing on screen said so. Everything else here is
+ * one box, and both come from the one definition list.
+ */
+function VBox({ d, vit, set }: {
+  d: VitalDef
+  vit: Record<string, string>
+  set: (f: (p: Record<string, string>) => Record<string, string>) => void
+}) {
+  const parts = (vit[d.key] ?? '').split('/')
+  const put = (i: number, x: string) => {
+    const a = [parts[0] ?? '', parts[1] ?? '']
+    a[i] = x.replace(/[^0-9.]/g, '').slice(0, d.max)
+    set(p => ({ ...p, [d.key]: a[1] || i === 1 ? `${a[0]}/${a[1]}` : a[0] }))
+  }
+  return (
+    <div className="fld" style={{ minWidth: 118, flex: 1 }}>
+      <label>{d.short}{d.unit ? ` ${d.unit}` : ''}</label>
+      {d.pair ? (
+        <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+          <input inputMode="numeric" maxLength={d.max} placeholder="upper"
+                 value={parts[0] ?? ''} onChange={e => put(0, e.target.value)} />
+          <span style={{ opacity: .5 }}>/</span>
+          <input inputMode="numeric" maxLength={d.max} placeholder="lower"
+                 value={parts[1] ?? ''} onChange={e => put(1, e.target.value)} />
+        </div>
+      ) : (
+        <input inputMode="decimal" maxLength={d.max} value={vit[d.key] ?? ''}
+               onChange={e => set(p => ({ ...p, [d.key]: e.target.value.slice(0, d.max) }))} />
+      )}
+    </div>
+  )
+}
 
-function MQueue({ s }: { s: WireState }) {
+function MQueue({ s, role }: { s: WireState; role: Role }) {
   const [open, setOpen] = useState<string | null>(null)
   const [vit, setVit] = useState<Record<string, string>>({})
   const [closing, setClosing] = useState<string | null>(null)
+  const [busy, setBusy] = useState('')
+
+  /** The tests are the doctor's to order and this role's to do. A counter
+   *  clerk on this screen sees the cuff and nothing else. */
+  const mayTest = can('tests', role)
 
   return (
     <div className="pane">
@@ -456,13 +518,24 @@ function MQueue({ s }: { s: WireState }) {
           {open === v.id && v.status === 'waiting' && (
             <div style={{ padding: '8px 2px' }}>
               <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                {VITAL_KEYS.map(([k, l]) => (
-                  <div className="fld" key={k} style={{ minWidth: 120, flex: 1 }}>
-                    <label>{l}</label>
-                    <input value={vit[k] ?? ''} onChange={e => setVit(p => ({ ...p, [k]: e.target.value }))} />
-                  </div>
-                ))}
+                {VITALS.map(d => <VBox key={d.key} d={d} vit={vit} set={setVit} />)}
               </div>
+
+              {/* THE TESTS THE DOCTOR ASKED FOR, DONE HERE, NOW.
+                  He does them while the patient is still sitting there, reads
+                  the number out, and the doctor writes it on the slip. Writing
+                  it here is what raises the charge below: no reading, no
+                  charge, and there is no other way to bill one. */}
+              {mayTest && (
+                <>
+                  <p className="hint" style={{ margin: '10px 0 4px' }}>
+                    Tests done here in the room, if the doctor asked
+                  </p>
+                  <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                    {INSTANT.map(d => <VBox key={d.key} d={d} vit={vit} set={setVit} />)}
+                  </div>
+                </>
+              )}
               <div className="row" style={{ marginTop: 8 }}>
                 <button className="btn ghost" onClick={async () => {
                   const clean = Object.fromEntries(Object.entries(vit).filter(([, x]) => x.trim()))
@@ -484,6 +557,21 @@ function MQueue({ s }: { s: WireState }) {
               </div>
             </div>
           )}
+          {/* Money for a test done in the room, taken at the door on the way
+              out, by the person who did it. Green, because it is coming in. */}
+          {mayTest && !v.testsPaid && (v.tests?.length ?? 0) > 0 && (
+            <div className="collect">
+              <b>Take Rs {v.tests!.reduce((n, t) => n + t.amount, 0)} for the
+                test{v.tests!.length === 1 ? '' : 's'}</b>
+              <span>{v.tests!.map(t => `${t.en} Rs ${t.amount}`).join(' · ')}</span>
+              <button className="btn" disabled={busy === v.id} onClick={async () => {
+                setBusy(v.id)
+                await intent('markTestsPaid', { visitId: v.id })
+                setBusy('')
+              }}>Received</button>
+            </div>
+          )}
+
           <Refund v={v} onDone={() => setOpen(null)} />
         </div>
       ))}

@@ -1,6 +1,6 @@
 import {
   db, uid, nextToken, nextPatientNum, findByCode, patientCode, closeVisit, markRefunded,
-  daySummary, todaysVisits,
+  daySummary, todaysVisits, markTestsPaid,
 } from './db'
 import { checkRolePin, can, type Role } from './roles'
 import { activeDoctors, isSitting, setSitting, multiRoom, doctorById, visitDoctorId } from './doctors'
@@ -9,6 +9,9 @@ import { printToken } from './print/print'
 import { paper } from './paper'
 import { onSignal, signal } from './ui/bus'
 import { storeKind, storeSeesTheDay, type Store } from './store'
+import { chargesFor, chargeTotal } from './testfees'
+import { staffRoles } from './staff'
+import { INSTANT } from './data/vitals'
 import type { FeeState, VisitStatus } from './types'
 
 /**
@@ -62,6 +65,22 @@ export type WireVisit = {
   fee?: WireFee
   hasVitals: boolean
   linesN: number
+  /**
+   * MONEY FOR A TEST DONE IN THE ROOM, AND WHY IT HAD TO CROSS THE WIRE.
+   *
+   * The compounder does the sugar, tells the doctor the number, and takes Rs
+   * 100 to Rs 300 from the patient on his way out. That is his job and his
+   * phone is where he does it, and until now the phone could neither record
+   * the reading nor see the charge. The tour running ON that phone promised
+   * both. Every evening worked from a phone, that money walked out of the door.
+   *
+   * DERIVED, never stored: the charge exists because a reading exists, so a
+   * reading deleted at the machine stops being charged for here too. Sent only
+   * to a role holding `tests`, which is the compounder and the doctor, and
+   * never to the counter or the pharmacy.
+   */
+  tests?: { key: string; en: string; amount: number }[]
+  testsPaid?: boolean
 }
 
 export type WireDoctor = {
@@ -92,6 +111,7 @@ export type WireSlip = {
 export type IntentKind =
   | 'addPatient' | 'openByCode' | 'closeVisit' | 'setVitals' | 'markRefunded'
   | 'setGiven' | 'giveAll' | 'reopen' | 'reprint' | 'setSitting' | 'openSlip'
+  | 'markTestsPaid'
 
 /** Which permission each intent needs, checked by the record holder against
  *  the ROLE the mirror signed in as. One list, same as roles.ts: nothing
@@ -100,6 +120,8 @@ const NEED: Record<IntentKind, Parameters<typeof can>[0]> = {
   addPatient: 'money', openByCode: 'money', closeVisit: 'queue', setVitals: 'queue',
   markRefunded: 'money', setGiven: 'dispense', giveAll: 'dispense', reopen: 'dispense',
   reprint: 'money', setSitting: 'queue', openSlip: 'dispense',
+  // the person who did the test is the person who collects for it
+  markTestsPaid: 'tests',
 }
 
 /** The roles a phone may hold. The doctor prescribes at the record holder's
@@ -187,6 +209,22 @@ export type AuthResult = { ok: true; role: Role } | { ok: false; why: string }
 
 let hostId = 0
 let hostSeen = 0
+/**
+ * WHICH JOBS THIS BUILDING HAS, HEARD BEFORE ANYBODY SIGNS IN.
+ *
+ * The mirror's front door only offers the jobs the building employs, and it was
+ * reading that list from the PHONE's own storage, where a phone that has never
+ * been used has nothing. The default is the doctor alone, and a doctor cannot
+ * sign in on a phone, so a brand new phone joined the wifi and was offered NO
+ * DOOR AT ALL. The first thing a clinic would ever do with a phone was the one
+ * thing that could not work.
+ *
+ * The list rides on the host's own heartbeat, which every mirror already hears
+ * without signing in. It is a list of job types in a building, so it is neither
+ * clinical nor personal, and anybody standing in the corridor can see the same
+ * thing by looking at the desks.
+ */
+let hostStaff: Role[] | null = null
 let sid = ''
 let lastAuth: { role: Role; pin: string } | null = null
 let reqN = 0
@@ -200,6 +238,10 @@ let errCb: ((why: string) => void) | null = null
 let expiredCb: (() => void) | null = null
 
 export const hostUp = () => Date.now() - hostSeen < 10000
+
+/** The doors this building actually has. Null until the host has been heard,
+ *  which is honest: a door offered before the building answers is a guess. */
+export const buildingRoles = (): Role[] | null => hostStaff
 
 export function mirrorSubscribe(cb: {
   state: (s: WireState) => void
@@ -237,6 +279,8 @@ function startMirror(): void {
       if (hostId !== m.from) resumedThisSocket = false
       hostId = m.from ?? 0
       hostSeen = Date.now()
+      if (Array.isArray(m.staff)) hostStaff = (m.staff as string[]).filter(
+        r => (MIRROR_ROLES as string[]).includes(r)) as Role[]
       if (!was && upCb) upCb(true)
       // a fresh socket after a drop: pick the old sitting back up, once
       if (sid && !resumedThisSocket) { resumedThisSocket = true; send({ t: 'resume', to: hostId, sid }) }
@@ -333,6 +377,8 @@ async function buildState(): Promise<WireState> {
       } : undefined,
       hasVitals: !!v.vitals && Object.keys(v.vitals).length > 0,
       linesN: v.lines.length,
+      tests: chargesFor(v.vitals, INSTANT).map(c => ({ key: c.key, en: c.en, amount: c.amount })),
+      testsPaid: !!v.testsPaidAt,
     })),
     doctors: activeDoctors().map(d => ({
       id: d.id, nameEn: d.nameEn, nameSd: d.nameSd, room: d.room, fee: d.fee,
@@ -397,6 +443,9 @@ function shapeFor(role: Role, s: WireState): WireState {
         : v.fee ? { ...v.fee, refundNote: money ? v.fee.refundNote : undefined } : undefined,
       hasVitals: history ? v.hasVitals : false,
       linesN: history || dispense ? v.linesN : 0,
+      // a reading is clinical and a charge for it is this role's job or not
+      tests: can('tests', role) ? v.tests : undefined,
+      testsPaid: can('tests', role) ? v.testsPaid : undefined,
     })),
     // The evening's cash went to every phone on the wire, pharmacy included.
     // It is the money role's number and nobody else's.
@@ -562,6 +611,14 @@ async function applyIntent(kind: IntentKind, p: Record<string, unknown>): Promis
     await db.visits.update(vid, { vitals: merged })
     return { ok: true }
   }
+  if (kind === 'markTestsPaid') {
+    if (!v) return { ok: false, why: 'That token is gone.' }
+    const owed = chargeTotal(chargesFor(v.vitals, INSTANT))
+    if (owed <= 0) return { ok: false, why: 'Nothing is owed for a test on this one.' }
+    if (v.testsPaidAt) return { ok: false, why: 'That was already taken.' }
+    await markTestsPaid(vid)
+    return { ok: true }
+  }
   if (kind === 'markRefunded') {
     if (!v) return { ok: false, why: 'That token is gone.' }
     // no chime: the 'refund' signal announces money OWED, and this is the
@@ -686,7 +743,9 @@ function startHost(): void {
   // "the clinic machine is off" instead of pretending. The same tick sweeps
   // sittings nobody has resumed since yesterday.
   setInterval(() => {
-    send({ t: 'host' })
+    // the heartbeat carries the building's job list so a phone that has never
+    // been used can still be offered the right doors
+    send({ t: 'host', staff: staffRoles().filter(r => MIRROR_ROLES.includes(r)) })
     const old = Date.now() - 12 * 3600 * 1000
     for (const [k, sit] of sittings) if (sit.at < old) sittings.delete(k)
   }, 4000)
