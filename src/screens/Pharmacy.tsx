@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { db, patientCode } from '../db'
 import { readQrPayload } from '../print/qr'
 import { IcPill, IcScan } from '../ui/art'
+import { course } from '../course'
+import { storeSeesTheDay } from '../store'
 import type { Visit, RxLine } from '../types'
 
 /**
@@ -18,16 +20,6 @@ import type { Visit, RxLine } from '../types'
  * same screen; nothing here will need to be unlearned.
  */
 
-/** How many units the printed course amounts to. Same arithmetic as the slip.
- *  Exported because the building host sends these same counts to a pharmacy
- *  phone, and two copies of this arithmetic would one day disagree. */
-export function course(l: RxLine): { n: number; unit: string } {
-  const perDay = (l.dose.m || 0) + (l.dose.d || 0) + (l.dose.n || 0)
-  const form = l.snap?.form ?? 'tab'
-  if (form === 'syr' || form === 'other') return { n: 0, unit: `${l.days} days` }
-  const n = Math.ceil(perDay * l.days)
-  return { n, unit: form === 'cap' ? 'capsules' : 'tablets' }
-}
 
 const lineDone = (l: RxLine) => l.given !== undefined
 
@@ -59,10 +51,32 @@ export default function Pharmacy({ visits, onChange }: {
   /** The scan box accepts what a wedge scanner types or what a thumb types. */
   const scanned = (v: string) => readQrPayload(v) ?? v.replace(/[^0-9]/g, '')
   const needle = scanned(q)
+
+  /**
+   * A SHOP RENTING SPACE IS SHOWN ONE SLIP, NEVER THE DAY. See store.ts.
+   *
+   * And it is found by the PATIENT NUMBER, which is printed large on the paper
+   * and encoded in the square beside it, never by the bare token. Tokens count
+   * from one in every room every evening, so "7" is not a way to identify a
+   * person; in a shop that serves several doctors it is barely a way to
+   * identify a slip.
+   */
+  const wholeDay = storeSeesTheDay()
+
+  /** Leading zeros are decoration on a printed number, and a scanner is exact.
+   *  Everything else must match in full: `includes` let a single digit open
+   *  somebody's prescription, because every code contains a 1 somewhere. */
+  const sameCode = (a: string, b: string) =>
+    !!a && !!b && a.replace(/^0+/, '') === b.replace(/^0+/, '')
+
   const shown = printed.filter(v => {
-    if (!needle) return true
+    if (!needle) return wholeDay
     const n = names[v.id]
-    return String(v.token) === needle || (n && n.code.includes(needle))
+    if (n && sameCode(n.code, needle)) return true
+    // The clinic's own counter, already looking at the day, may narrow it with
+    // a few digits or a token. A shop renting space is not looking at the day,
+    // so for it there is nothing to narrow and only the full number opens one.
+    return wholeDay && (String(v.token) === needle || (!!n && n.code.includes(needle)))
   })
 
   async function setGiven(v: Visit, i: number, given: number | undefined) {
@@ -102,10 +116,13 @@ export default function Pharmacy({ visits, onChange }: {
         There is no patient search here, on purpose.
       </p>
 
-      <h2 style={{ marginTop: 18 }}><IcPill size={17} /> Printed today</h2>
+      <h2 style={{ marginTop: 18 }}><IcPill size={17} />{' '}
+        {wholeDay ? 'Printed today' : 'The slip in front of you'}</h2>
       {shown.length === 0 && (
         <p className="hint">
-          {printed.length === 0
+          {!wholeDay && !needle
+            ? 'Type the patient number from the paper, or point the scanner at the square on it. This counter opens one slip at a time and is not shown the day\u2019s patients.'
+            : printed.length === 0
             ? 'Nothing printed yet. Slips appear here the moment the room prints them.'
             : 'No printed slip matches that number.'}
         </p>
@@ -113,7 +130,9 @@ export default function Pharmacy({ visits, onChange }: {
 
       {shown.map(v => {
         const n = names[v.id]
-        const isOpen = open === v.id
+        // A shop that scanned a number wants the medicines, not a row to tap.
+        // Its screen holds one slip at a time, so there is nothing to collapse.
+        const isOpen = open === v.id || (!wholeDay && shown.length === 1)
         const done = !!v.dispensedAt
         const shorts = v.lines.filter(l => lineDone(l) && (l.given ?? 0) < course(l).n).length
         return (
@@ -139,7 +158,7 @@ export default function Pharmacy({ visits, onChange }: {
                   return (
                     <div className="row" key={i}
                          style={{ alignItems: 'baseline', gap: 10, padding: '7px 0', borderTop: '1px solid #eef2f0' }}>
-                      <button className={'chip ' + (lineDone(l) ? 'on' : '')}
+                      <button className={'chip tickbtn ' + (lineDone(l) ? 'on' : '')}
                               onClick={() => setGiven(v, i, lineDone(l) ? undefined : c.n)}>
                         {lineDone(l) ? '✓' : '+'}
                       </button>

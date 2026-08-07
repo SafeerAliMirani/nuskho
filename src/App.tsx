@@ -196,8 +196,17 @@ function Clinic() {
           </div>
         </div>
         <div className="counts">
-          <span><IcQueue size={15} /> {today.length} waiting</span>
-          <span className="pr">{printed} printed</span>
+          {/* THE DAY'S SHAPE IS THE QUEUE'S, AND THE PHARMACY IS NOT THE QUEUE.
+              A medical store renting space in the building was being told how
+              many patients attended tonight and how many were prescribed for,
+              in the header, on every screen. That is the roll of who came to
+              this clinic, in miniature, and it is exactly what store.ts says
+              such a counter must never be handed. A role without the queue has
+              no use for either number. */}
+          {can('queue') && <>
+            <span><IcQueue size={15} /> {today.length} waiting</span>
+            <span className="pr">{printed} printed</span>
+          </>}
 
           {/* The role is not just a label — everything it lets you do hangs off it. */}
           <div className="menuwrap">

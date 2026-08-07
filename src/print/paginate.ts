@@ -79,7 +79,24 @@ function largestFit(d: SlipData, from: number, want: number,
   let lo = 1, hi = want - 1, best = 0
   while (lo <= hi) {
     const mid = (lo + hi) >> 1
-    if (sheetFits(d, from, mid, compact, false, sheetNo)) { best = mid; lo = mid + 1 }
+    /**
+     * THE SHEET ROLE MUST BE THE REAL ONE, AND IT WAS HARD-CODED TO FALSE.
+     *
+     * A last sheet carries the legend, the tests box, the advice box and the
+     * handwriting strip. A continuation sheet carries one thin bar. They are
+     * nowhere near the same size, which is the entire reason this module
+     * measures instead of guessing a row count.
+     *
+     * Passing `false` here said "assume a continuation sheet" for every
+     * candidate in the search. When the count it settled on happened to be all
+     * the medicines left, that sheet WAS the last one, and its trailing blocks
+     * had never been measured. They printed underneath the footer.
+     *
+     * Nothing on screen could show this: `.page` is overflow:hidden, so the
+     * fault existed only on paper, at the bottom of a prescription, on the
+     * default paper size.
+     */
+    if (sheetFits(d, from, mid, compact, from + mid === total, sheetNo)) { best = mid; lo = mid + 1 }
     else hi = mid - 1
   }
   return best

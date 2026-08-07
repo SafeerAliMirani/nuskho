@@ -1821,3 +1821,8 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .senton.done b{display:block;font-size:var(--t-md)}
 .senton.done span{display:block;margin-top:3px;line-height:1.45}
 .senton.done small{display:block;margin-top:6px;color:var(--mut);font-size:var(--t-sm);line-height:1.5}
+
+/* The pharmacy's tick. It sits in a .row, which is a flex line, so without a
+   basis of its own it grew to half the counter's screen and stopped reading as
+   a checkbox at all. */
+.chip.tickbtn{flex:0 0 auto;min-width:46px;text-align:center}

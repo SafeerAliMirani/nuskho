@@ -18,6 +18,7 @@ import { buildingMode, hostHere, setHostHere, sittingsList } from '../building'
 import { qrSvgRaw } from '../print/qr'
 import { service, setService, daysOverdue, makeCode, isoDay } from '../service'
 import { STAFF_ROLES, staffRoles, setStaffRoles, owner, setOwner, type Owner } from '../staff'
+import { storeKind, setStoreKind, type Store } from '../store'
 
 /**
  * Who may change what.
@@ -315,6 +316,7 @@ function ServiceTab() {
 function StaffTab() {
   const [on, setOn] = useState<Role[]>(() => staffRoles())
   const [own, setOwn] = useState<Owner>(() => owner())
+  const [shop, setShop] = useState<Store>(() => storeKind())
   const [saved, setSaved] = useState(false)
   const iAmNuskho = role() === 'admin'
 
@@ -354,6 +356,33 @@ function StaffTab() {
         money and machines and holds no patient record at all.
       </Note>
 
+      {/* WHOSE SHOP THE MEDICAL STORE IS, WHICH IS A DIFFERENT QUESTION FROM
+          WHETHER THERE IS ONE. Safeer: both happen, roughly equally. See
+          store.ts for why it changes what the counter is shown. */}
+      {on.includes('pharmacy') && (
+        <div className="lhbox" style={{ marginTop: 20 }}>
+          <h3>The medical store</h3>
+          <p>Is the counter yours, or a shop renting space in the building?</p>
+          <div className="chips">
+            {(['ours', 'rented'] as Store[]).map(k => (
+              <button key={k} className={'chip' + (shop === k ? ' have' : '')}
+                      onClick={() => { setShop(k); setSaved(false) }}>
+                {k === 'ours' ? 'Ours' : 'A shop renting space'}
+              </button>
+            ))}
+          </div>
+          <span className="unit">
+            <b>Ours:</b> the counter sees the evening&rsquo;s printed slips as they come, which
+            is the list your compounder would carry over on paper anyway.<br />
+            <b>A shop renting space:</b> it opens one prescription at a time, by the number
+            on the paper the patient hands over, and is never shown who came to the
+            clinic tonight. That list is the thing worth protecting: a single
+            prescription is already walking past their counter in the patient&rsquo;s hand.
+            On the wifi it is not hidden from their phone, it is never sent to it.
+          </span>
+        </div>
+      )}
+
       {/* Nuskho records who bought it, at install. It is not the clinic's to
           change: a staff member who could promote himself to owner would make
           the whole arrangement decorative. */}
@@ -391,7 +420,7 @@ function StaffTab() {
       )}
 
       <button className="btn wide" onClick={() => {
-        setStaffRoles(on); if (iAmNuskho) setOwner(own); setSaved(true)
+        setStaffRoles(on); setStoreKind(shop); if (iAmNuskho) setOwner(own); setSaved(true)
         window.dispatchEvent(new CustomEvent('nuskho:role'))
       }}>{saved ? 'Saved ✓' : 'Save'}</button>
     </>

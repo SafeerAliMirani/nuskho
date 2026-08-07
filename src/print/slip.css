@@ -98,6 +98,31 @@ td.noc{background:#0f5c4a;color:#fff;font-size:11pt;font-weight:700;text-align:c
 .dysd{font-size:8.2pt;font-weight:700;}
 .tick{margin-top:.7mm;display:flex;gap:.6mm;justify-content:center;}
 .tick i{width:2.2mm;height:2.2mm;border:.6pt solid #666;display:block;}
+/* THE TOTAL TO HAND OVER. Deliberately in the days column and deliberately
+   quieter than the day count: the patient's eye needs the big 5, the chemist's
+   eye is looking for a smaller number beside a unit and finds it in one place
+   on every row. Boxed so it cannot be misread as part of the day count. */
+.notot .tot{display:none}
+/* WHERE THIS BOX GOES WAS DECIDED BY MEASURING, TWICE.
+   Beside the medicine name looked best and cost the most: on A4 the name and
+   the Sindhi name already share that line, so the box pushed brand names onto
+   a second line and every row grew by half. It lives in the days column, in
+   the space the day boxes had, because that column is already "how much
+   altogether" and because a syrup, which has no countable total, keeps its
+   boxes. Deliberately quieter than the day count: the patient's eye needs the
+   big 5, the chemist is looking for a small number next to a unit. */
+.tot{margin-top:.5mm;background:#eef2f0;display:inline-flex;align-items:baseline;flex:0 0 auto;
+  gap:.6mm;padding:0 .8mm;line-height:1;white-space:nowrap;}
+.tot b{font-size:7.6pt;font-weight:700;}
+.tot .sd{font-size:7.4pt;font-weight:700;}
+table.rx.cmp .tot{margin-top:.3mm;padding:0 .7mm;}
+table.rx.cmp .tot b{font-size:7.2pt;}
+table.rx.cmp .tot .sd{font-size:7pt;}
+table.rx.mx .tot{margin-top:.2mm;padding:0 .6mm;}
+table.rx.mx .tot b{font-size:7pt;}
+table.rx.mx .tot .sd{font-size:6.8pt;}
+.page.a4 .tot b{font-size:10pt;}
+.page.a4 .tot .sd{font-size:9.4pt;}
 
 /* compact mode for long prescriptions */
 table.rx.cmp td{border-bottom:.6pt solid #ccc}
@@ -311,6 +336,8 @@ table.rx.mx .dysd{font-size:7.4pt}
 .page.a4 .brand{font-size:12.4pt;}
 .page.a4 .gen{font-size:7.4pt;}
 .page.a4 .nmsd{font-size:11.5pt;margin-top:0;text-align:right;white-space:nowrap;flex:0 0 auto;}
+.page.a4 .tot b{font-size:8.8pt;}
+.page.a4 .tot .sd{font-size:8.4pt;}
 .page.a4 table.rx.cmp .nmcell{padding:1mm 3mm;}
 .page.a4 table.rx.cmp .brand{font-size:11.4pt;}
 .page.a4 table.rx.cmp .gen{font-size:6.6pt;}

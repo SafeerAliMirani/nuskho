@@ -27,7 +27,24 @@ export default function Compose({ visitId, onDone, onBack }: {
 }) {
   const [visit, setVisit] = useState<Visit | null>(null)
   const [pt, setPt] = useState<Patient | null>(null)
-  const [all, setAll] = useState<Drug[]>(formulary)
+  /**
+   * THE STARTING GRID MUST BE THE ONE THIS DOCTOR WILL ACTUALLY GET.
+   *
+   * This was seeded with our sample formulary for every clinic, and then
+   * replaced a moment later by `doctorDrugs()`, which for a doctor who has been
+   * through setup returns HIS list and ours not at all. So for the first frames
+   * of every visit a set-up clinic was shown medicines that are not on its
+   * list, and a tap inside that window added a line whose drug then vanished.
+   * At print time freeze() found nothing to copy and wrote a snapshot of empty
+   * strings, and the slip came out with a numbered row, a dose, a day count and
+   * NO MEDICINE NAME.
+   *
+   * The initial value now matches what the load will return, so the grid never
+   * offers something it is about to take away. The guard below catches the case
+   * anyway, because a blank medicine on a prescription must be impossible by
+   * two routes, not one.
+   */
+  const [all, setAll] = useState<Drug[]>(() => (profile().ready ? [] : formulary))
   const [use, setUse] = useState<Record<string, number>>({})
   const [prev, setPrev] = useState<Visit | null>(null)
   const [inc, setInc] = useState<Incoming | null>(null)
@@ -306,6 +323,16 @@ export default function Compose({ visitId, onDone, onBack }: {
 
   const badIdx = visit.lines.findIndex(isEmpty)
 
+  /**
+   * A LINE WHOSE MEDICINE CANNOT BE NAMED MUST NOT REACH PAPER.
+   *
+   * Either it carries a printed snapshot with a name in it, or its drug is on
+   * the list right now. Anything else prints a row with a dose and no medicine,
+   * which is worse than not printing at all: the patient takes it to a chemist
+   * who cannot serve it, and nobody in the clinic sees what went out.
+   */
+  const namelessIdx = visit.lines.findIndex(l => !(l.snap?.brand || drugs[l.drugId]?.brand))
+
   /** Build exactly what printSlip will be given, so the warm-up and the real
    *  print agree on the layout key. */
   function slipData() {
@@ -367,6 +394,7 @@ export default function Compose({ visitId, onDone, onBack }: {
   async function print() {
     if (busy) return                                   // double-tap on a slow printer
     if (badIdx >= 0) { bump(badIdx); return }
+    if (namelessIdx >= 0) { bump(namelessIdx); return }
     setBusy(true)
     try {
       await freeze()
@@ -690,9 +718,10 @@ export default function Compose({ visitId, onDone, onBack }: {
 
         <div className="sticky">
           {err && <Note tone="stop" title="Nothing was printed">{err}</Note>}
-          <button className={`btn wide ${badIdx >= 0 ? 'warn' : ''}`} onClick={print}
+          <button className={`btn wide ${badIdx >= 0 || namelessIdx >= 0 ? 'warn' : ''}`} onClick={print}
                   disabled={busy || visit.lines.length === 0}>
             {busy ? 'Printing…'
+              : namelessIdx >= 0 ? `Line ${namelessIdx + 1} has no medicine name. Remove it and add it again`
               : badIdx >= 0 ? `${drugs[visit.lines[badIdx].drugId]?.brand} has no dose. Tap to fix`
               : `PRINT for ${pt.name}  (${visit.lines.length})`}
           </button>

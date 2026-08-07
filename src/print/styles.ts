@@ -119,8 +119,34 @@ export function applyPageGeometry(): void {
   if (m.textContent !== mcss) m.textContent = mcss
 }
 
-/** Embedded fonts change every text height. Never measure before they land. */
+/**
+ * EMBEDDED FONTS CHANGE EVERY TEXT HEIGHT. NEVER MEASURE BEFORE THEY LAND.
+ *
+ * That was the intent and this function did not achieve it. `document.fonts
+ * .ready` settles the font loads that are already PENDING, and a face is only
+ * pending once some laid-out text asks for it. The fitting pass runs before any
+ * slip markup exists, so nothing had asked for NK, `ready` resolved on the spot,
+ * and every sheet was measured in the browser's fallback font.
+ *
+ * The Sindhi lines are the tall ones on this page, so the fallback measured
+ * SHORTER than the truth. The fitter then agreed to a sheet that did not fit,
+ * and the tests box, the advice box and the handwriting strip printed
+ * underneath the footer. `.page` is overflow:hidden, so nothing on any screen
+ * ever showed it: this failed only on paper, only at the bottom, and only on a
+ * full prescription.
+ *
+ * So the faces are ASKED FOR first, with a string that actually contains the
+ * script, and only then is `ready` awaited.
+ */
 export async function fontsReady(): Promise<void> {
   ensurePrintStyles()
-  try { await (document as any).fonts?.ready } catch { /* older browser: proceed */ }
+  try {
+    const fonts = (document as unknown as { fonts?: FontFaceSet }).fonts
+    if (!fonts) return
+    await Promise.all([
+      fonts.load('400 12pt NK', 'گوري 1'),
+      fonts.load('700 12pt NK', 'گوري 1'),
+    ].map(p => p.catch(() => [])))
+    await fonts.ready
+  } catch { /* older browser: proceed, and be wrong the old way rather than fail */ }
 }

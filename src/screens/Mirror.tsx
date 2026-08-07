@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   mirrorSubscribe, mirrorAuth, mirrorSignOut, intent, hostUp, setHostHere, hubIsLocal,
-  MIRROR_ROLES, type WireState, type WireRx, type WireVisit, type WireDoctor,
+  MIRROR_ROLES, type WireState, type WireRx, type WireSlip, type WireVisit, type WireDoctor,
 } from '../building'
 import { ROLE_NAME, ROLE_SD, ROLE_WHAT, type Role } from '../roles'
 import { roleIsOn } from '../staff'
 import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
+import { readQrPayload } from '../print/qr'
 import { printToken } from '../print/print'
 import { paper } from '../paper'
 import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn } from '../ui/art'
@@ -494,6 +495,111 @@ function MQueue({ s }: { s: WireState }) {
 /* --------------------------------------------------------- the pharmacy's phone */
 
 function MPharm({ s, rx }: { s: WireState; rx: WireRx }) {
+  // A shop renting space in the building is not the clinic's counter and is
+  // not shown the clinic's day. See store.ts.
+  if (s.store === 'rented') return <MShop />
+  return <MOurCounter s={s} rx={rx} />
+}
+
+/**
+ * THE RENTED SHOP'S PHONE.
+ *
+ * It holds nothing until a patient puts his paper on the counter, and it holds
+ * one prescription at a time. The day's list is not hidden from this screen, it
+ * was never sent to this device: the record holder refuses to push it (see
+ * shapeFor in building.ts), so no bug here and no curiosity here can produce
+ * it.
+ */
+function MShop() {
+  const [q, setQ] = useState('')
+  const [slip, setSlip] = useState<WireSlip | null>(null)
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const scanned = (v: string) => readQrPayload(v) ?? v.replace(/[^0-9]/g, '')
+
+  async function look(code: string) {
+    if (!code) return
+    setBusy(true)
+    const r = await intent('openSlip', { code })
+    setBusy(false)
+    if (r.ok === false) { setSlip(null); setMsg(String(r.why ?? 'Not found.')); return }
+    setMsg(''); setSlip(r.slip as WireSlip)
+  }
+
+  /** Every tick goes to the record holder and the slip is read back, so what is
+   *  on this screen is what is in the clinic's database and never a local copy
+   *  drifting away from it. */
+  async function act(kind: 'setGiven' | 'giveAll' | 'reopen', p: Record<string, unknown>) {
+    if (!slip) return
+    setBusy(true)
+    await intent(kind, { visitId: slip.id, ...p })
+    setBusy(false)
+    await look(slip.code)
+  }
+
+  return (
+    <div className="pane">
+      <h2><IcScan size={17} /> The number on the patient's slip</h2>
+      <div className="fld">
+        <input value={q} inputMode="numeric" autoFocus
+               placeholder="scan the square, or type the number"
+               style={{ fontSize: 22, letterSpacing: 4, fontWeight: 700 }}
+               onChange={e => { const v = scanned(e.target.value); setQ(v); setMsg(''); if (v.length >= 5) look(v) }}
+               onKeyDown={e => { if (e.key === 'Enter') look(scanned(q)) }} />
+      </div>
+      {msg && <p className="hint" style={{ color: '#8a5b00' }}>{msg}</p>}
+
+      {!slip && !msg && (
+        <p className="hint">
+          One prescription at a time, the one in your hand. This shop is not shown
+          the clinic's patients and this phone is never sent them.
+        </p>
+      )}
+
+      {slip && (
+        <div className="line" style={slip.dispensedAt ? { opacity: .62 } : undefined}>
+          <div className="hd">
+            <div>
+              <b>Token {slip.token} · {slip.name}</b>
+              <small>No. {slip.code}{slip.dispensedAt ? ' · given ✓' : ` · ${slip.lines.length} medicine${slip.lines.length === 1 ? '' : 's'}`}</small>
+            </div>
+          </div>
+          {slip.lines.map((l, i) => (
+            <div className="row pline" key={i}
+                 style={{ alignItems: 'baseline', gap: 10, padding: '7px 0', borderTop: '1px solid #eef2f0' }}>
+              <button className={'chip tickbtn ' + (l.given !== undefined ? 'on' : '')} disabled={busy}
+                      onClick={() => act('setGiven', { index: i, given: l.given !== undefined ? null : l.n })}>
+                {l.given !== undefined ? '✓' : '+'}
+              </button>
+              <div style={{ flex: 1 }}>
+                <b style={{ fontSize: 14 }}>{l.brand} {l.strength}</b>
+                <small style={{ display: 'block', color: 'var(--mut)' }}>
+                  {l.n > 0 ? `${l.n} ${l.unit} · ${l.days} days` : l.unit}
+                  {l.given !== undefined && l.n > 0 && l.given < l.n ? ` · gave ${l.given}, short ${l.n - l.given}` : ''}
+                </small>
+              </div>
+            </div>
+          ))}
+          <div className="row" style={{ marginTop: 10 }}>
+            {!slip.dispensedAt
+              ? <button className="btn" disabled={busy} onClick={() => act('giveAll', {})}>All given · handed over</button>
+              : <button className="lnk" disabled={busy} onClick={() => act('reopen', {})}>reopen</button>}
+            <button className="btn ghost" onClick={() => { setSlip(null); setQ(''); setMsg('') }}>
+              Next patient
+            </button>
+          </div>
+        </div>
+      )}
+      <p className="hint">
+        A slip scanned twice says when it was given rather than raising an alarm: the person
+        asking usually lost a box, not their honesty.
+      </p>
+    </div>
+  )
+}
+
+function MOurCounter({ s, rx }: { s: WireState; rx: WireRx }) {
   const [open, setOpen] = useState<string | null>(null)
   const byId = useMemo(() => new Map(rx.map(r => [r.visitId, r.lines])), [rx])
   const printed = s.visits.filter(v => v.printedAt && v.linesN > 0)
@@ -520,7 +626,7 @@ function MPharm({ s, rx }: { s: WireState; rx: WireRx }) {
                 {lines.map((l, i) => (
                   <div className="row pline" key={i}
                        style={{ alignItems: 'baseline', gap: 10, padding: '7px 0', borderTop: '1px solid #eef2f0' }}>
-                    <button className={'chip ' + (l.given !== undefined ? 'on' : '')}
+                    <button className={'chip tickbtn ' + (l.given !== undefined ? 'on' : '')}
                             onClick={() => intent('setGiven', { visitId: v.id, index: i, given: l.given !== undefined ? null : l.n })}>
                       {l.given !== undefined ? '✓' : '+'}
                     </button>

@@ -14,6 +14,7 @@ import { paper, pageVars } from '../paper'
 import type { Drug, Visit, RxLine, RxSnap, Form } from '../types'
 import { SUNRISE, SUN, MOON, TAB, HALF, CAP, SPOON, PLATE, CAL, adviceIcon } from './icons'
 import { qrSvgSafe } from './qr'
+import { course, courseUnitSd } from '../course'
 import { filled } from '../data/vitals'
 
 // Tolerates undefined on purpose: a medicine the doctor typed himself has no
@@ -113,9 +114,47 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean): string {
   // reads neither language.
   const big = paper().size === 'A4'
   const sz = compact ? (big ? '7mm' : '5.6mm') : (big ? '9mm' : '7mm')
-  const ticks = compact
+
+  /**
+   * THE TOTAL, FOR THE MAN WHO WILL COUNT THEM OUT.
+   *
+   * Most of these slips are taken to a shop that has never heard of Nuskho and
+   * never will. The chemist there gets one thing from this project: this piece
+   * of paper. Until now it told him one in the morning, one at night, for five
+   * days, and left him to arrive at ten. He does that arithmetic all day and
+   * he is usually right, which is exactly what makes the occasional slip a
+   * problem nobody catches.
+   *
+   * So the number he actually needs is printed. Same function the pharmacy
+   * counter ticks against, so the paper and the screen cannot drift apart.
+   * Blank for a syrup, on purpose: see course.ts.
+   *
+   * WHERE IT GOES WAS MEASURED, NOT CHOSEN. Under the day count, which is the
+   * obvious place, it added a fourth line to that cell and pushed an eight
+   * medicine prescription from one A5 sheet onto two. It sits instead on the
+   * line that already carries the Sindhi medicine name, at the empty left end
+   * of it, which costs no height at all and puts the count beside the name
+   * rather than under a different number.
+   */
+  const c = course(line, m)
+  const total = c.n > 0
+    ? `<div class="tot"><b>${c.n}</b><span class="sd">${esc(courseUnitSd(line, m))}</span></div>`
+    : ''
+
+  const ticks = compact || c.n > 0
     ? ''
     : `<div class="tick">${Array.from({ length: Math.min(line.days, 7) }, () => '<i></i>').join('')}</div>`
+
+  /**
+   * IN DENSE SPACING THE WORD "DAYS" GIVES UP ITS LINE TO THE COUNT.
+   *
+   * ڏينهن is printed in this column's heading already, so repeating it on
+   * every row of a twelve medicine slip buys nothing and costs a line in the
+   * one layout that has no lines to spare. Measured: without this, twelve
+   * medicines on A4 went from one sheet to two the moment the count appeared.
+   * Comfortable spacing keeps the word, because there it is free.
+   */
+  const dysd = compact && c.n > 0 ? '' : '<div class="sd dysd">ڏينهن</div>'
   return `<tr>
       <td class="noc">${i}</td>
       <td class="nmcell">
@@ -128,7 +167,7 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean): string {
       ${doseCell(m, line.dose.m, sz)}${doseCell(m, line.dose.d, sz)}${doseCell(m, line.dose.n, sz)}
       <td class="mlcell">${mealIcon(line.meal, compact)}<div class="sd mlsd">${MEAL_SD[line.meal]}</div></td>
       <td class="dycell"><div class="dyn">${line.days}</div>
-        <div class="sd dysd">ڏينهن</div>${ticks}</td>
+        ${dysd}${ticks}${total}</td>
     </tr>`
 }
 

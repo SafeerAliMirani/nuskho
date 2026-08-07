@@ -4,10 +4,11 @@ import {
 } from './db'
 import { checkRolePin, can, type Role } from './roles'
 import { activeDoctors, isSitting, setSitting, multiRoom, doctorById, visitDoctorId } from './doctors'
-import { course } from './screens/Pharmacy'
+import { course } from './course'
 import { printToken } from './print/print'
 import { paper } from './paper'
 import { onSignal, signal } from './ui/bus'
+import { storeKind, storeSeesTheDay, type Store } from './store'
 import type { FeeState, VisitStatus } from './types'
 
 /**
@@ -71,6 +72,8 @@ export type WireState = {
   visits: WireVisit[]
   doctors: WireDoctor[]
   multi: boolean
+  /** whether the medical store is the clinic's own or a shop renting space */
+  store: Store
   sums: { total: number; printed: number; waiting: number; collected: number; toRefund: number; due: number }
 }
 
@@ -79,9 +82,16 @@ export type WireRxLine = {
 }
 export type WireRx = { visitId: string; lines: WireRxLine[] }[]
 
+/** One prescription, sent back to a rented store that asked for it by number. */
+export type WireSlip = {
+  id: string; token: number; name: string; code: string
+  printedAt?: number; dispensedAt?: number
+  lines: WireRxLine[]
+}
+
 export type IntentKind =
   | 'addPatient' | 'openByCode' | 'closeVisit' | 'setVitals' | 'markRefunded'
-  | 'setGiven' | 'giveAll' | 'reopen' | 'reprint' | 'setSitting'
+  | 'setGiven' | 'giveAll' | 'reopen' | 'reprint' | 'setSitting' | 'openSlip'
 
 /** Which permission each intent needs, checked by the record holder against
  *  the ROLE the mirror signed in as. One list, same as roles.ts: nothing
@@ -89,7 +99,7 @@ export type IntentKind =
 const NEED: Record<IntentKind, Parameters<typeof can>[0]> = {
   addPatient: 'money', openByCode: 'money', closeVisit: 'queue', setVitals: 'queue',
   markRefunded: 'money', setGiven: 'dispense', giveAll: 'dispense', reopen: 'dispense',
-  reprint: 'money', setSitting: 'queue',
+  reprint: 'money', setSitting: 'queue', openSlip: 'dispense',
 }
 
 /** The roles a phone may hold. The doctor prescribes at the record holder's
@@ -329,6 +339,7 @@ async function buildState(): Promise<WireState> {
       sitting: isSitting(d.id),
     })),
     multi: multiRoom(),
+    store: storeKind(),
     sums: {
       total: sums.total, printed: sums.printed, waiting: sums.waiting,
       collected: sums.collected, toRefund: sums.toRefund, due: sums.due,
@@ -365,15 +376,31 @@ function shapeFor(role: Role, s: WireState): WireState {
   const money = can('money', role)
   const history = can('history', role)
   const dispense = can('dispense', role)
+  /**
+   * A SHOP RENTING SPACE IS NEVER SENT THE DAY. See store.ts.
+   *
+   * Not hidden on its screen: never sent to its phone. A rented store's device
+   * asks for one slip by the number on the paper in front of it and receives
+   * exactly that. The list of who attended this clinic tonight, which is the
+   * thing actually worth protecting, does not leave this machine.
+   *
+   * Only a dispense-ONLY role is cut off. A compounder or a counter clerk who
+   * also hands medicines out still holds `queue`, and the queue is his job.
+   */
+  const shopOnly = dispense && !can('queue', role)
+  const cut = shopOnly && !storeSeesTheDay()
   return {
     ...s,
-    visits: s.visits.map(v => ({
+    visits: cut ? [] : s.visits.map(v => ({
       ...v,
       fee: dispense && !money ? undefined
         : v.fee ? { ...v.fee, refundNote: money ? v.fee.refundNote : undefined } : undefined,
       hasVitals: history ? v.hasVitals : false,
       linesN: history || dispense ? v.linesN : 0,
     })),
+    // The evening's cash went to every phone on the wire, pharmacy included.
+    // It is the money role's number and nobody else's.
+    sums: money ? s.sums : { total: 0, printed: 0, waiting: 0, collected: 0, toRefund: 0, due: 0 },
   }
 }
 
@@ -385,12 +412,17 @@ async function pushState(): Promise<void> {
     pushQueued = false
     if (!sittings.size) return
     const s = await buildState()
-    const rxHolders = [...sittings.values()].filter(x => can('dispense', x.role))
+    // A rented store is never pushed the day's medicine lines at all; it asks
+    // for one slip at a time (intent 'openSlip'). A clinic's own counter, and
+    // any role that already holds the queue, is pushed them as before.
+    const rxHolders = [...sittings.values()].filter(x =>
+      can('dispense', x.role) && (storeSeesTheDay() || can('queue', x.role)))
     const rx = rxHolders.length ? await buildRx() : null
     for (const [, sit] of sittings) {
       if (sit.fromId < 0) continue   // waiting to resume after a hub restart
       send({ t: 'state', to: sit.fromId, s: shapeFor(sit.role, s) })
-      if (rx && can('dispense', sit.role)) send({ t: 'rx', to: sit.fromId, r: rx })
+      const mayHoldTheDay = storeSeesTheDay() || can('queue', sit.role)
+      if (rx && can('dispense', sit.role) && mayHoldTheDay) send({ t: 'rx', to: sit.fromId, r: rx })
     }
   }, 120)
 }
@@ -470,6 +502,38 @@ async function applyIntent(kind: IntentKind, p: Record<string, unknown>): Promis
     }
     if (p.wantHostPrint === true && paper().token) printToken(slip)
     return { ok: true, slip }
+  }
+  /**
+   * ONE SLIP, BY THE NUMBER ON THE PAPER.
+   *
+   * How a rented medical store works: the patient puts his prescription on the
+   * counter, the shop scans the square or types the number, and gets back that
+   * prescription's lines and nothing else. There is no way to ask for the next
+   * one, the previous one, or a person.
+   */
+  if (kind === 'openSlip') {
+    const pt = await findByCode(clip(p.code, 13))
+    if (!pt) return { ok: false, why: 'That number is not on any slip from today.' }
+    const today = await todaysVisits()
+    const mine = today
+      .filter(x => x.patientId === pt.id && x.printedAt && x.lines.length > 0)
+      .sort((a, b) => (b.printedAt ?? 0) - (a.printedAt ?? 0))
+    if (!mine.length) return { ok: false, why: 'Nothing was printed for that number today.' }
+    const slip = mine[0]
+    return {
+      ok: true,
+      slip: {
+        id: slip.id, token: slip.token, name: pt.name, code: patientCode(pt.num),
+        printedAt: slip.printedAt, dispensedAt: slip.dispensedAt,
+        lines: slip.lines.map(l => {
+          const c = course(l)
+          return {
+            brand: l.snap?.brand ?? '?', strength: l.snap?.strength ?? '',
+            n: c.n, unit: c.unit, days: l.days, given: l.given,
+          }
+        }),
+      },
+    }
   }
   if (kind === 'closeVisit') {
     if (!v || v.printedAt) return { ok: false, why: 'That one cannot be closed.' }

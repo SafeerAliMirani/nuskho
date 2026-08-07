@@ -41,9 +41,16 @@ const out = document.getElementById('shots')!
   const P: Record<string, Paper> = {
     a4: {size:'A4', kind:'plain', top:0, bottom: 0, token: false, tokenWidth: 58 },
     a4lh: {size:'A4', kind:'letterhead', top:55, bottom: 25, token: false, tokenWidth: 58 },
+    a5: {size:'A5', kind:'plain', top:0, bottom: 0, token: false, tokenWidth: 58 },
   }
   setPaper(P[which] || P.a4lh)
-  const d = data(8, {dx:true, tests:2, advice:2, sent: location.search.includes('sent')})
+  // ?notot renders the sheet as it was before the chemist's total existed,
+  // so the cost of that box can be counted in medicines rather than guessed
+  if (location.search.includes('notot')) document.documentElement.classList.add('notot')
+  const q = new URLSearchParams(location.search)
+  const n = Math.max(1, Math.min(20, +(q.get('n') ?? 8) || 8))
+  const d = data(n, {dx:true, tests:+(q.get('tests') ?? 2), advice:+(q.get('advice') ?? 2),
+                     sent: q.has('sent')})
   const plan = await planSheets(d)
   out.innerHTML = renderSlip(d, plan)
   ;(window as any).__done = true
