@@ -583,6 +583,23 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .confirm{margin-top:var(--s3);padding:var(--s3);border:1.5px solid #d9a99e;border-radius:var(--r1);background:var(--card)}
 .confirm code{background:var(--line-2);padding:3px var(--s2);border-radius:5px;font-weight:700}
 
+/* LAST NIGHT'S COPY. Not in the danger zone: putting one of these back adds
+   what is missing and deletes nothing, so it must not wear the red of the two
+   buttons that erase a clinic. Its own row, because it borrowed the danger
+   zone's and inherited none of the styling that made that one readable. */
+.snaprow{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;
+  padding:var(--s3) var(--s4);margin-bottom:var(--s2);
+  border:1.5px solid var(--line);border-radius:var(--r2);background:var(--card)}
+.snaprow .sn-w{flex:1 1 240px;min-width:0}
+.snaprow .sn-w b{display:block;font-size:var(--t-md);margin-bottom:2px}
+.snaprow .sn-w span{display:block;font-size:var(--t-sm);color:var(--mut)}
+.snaprow .sn-a{flex:none;display:flex;gap:var(--s2)}
+.snaprow .sn-a .btn{white-space:nowrap}
+@media (max-width:560px){
+  .snaprow .sn-a{width:100%}
+  .snaprow .sn-a .btn{flex:1}
+}
+
 /* -------------------------------------------------------- 2. header menu */
 
 .menuwrap{position:relative;margin-left:var(--s2)}

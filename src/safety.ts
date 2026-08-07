@@ -151,6 +151,39 @@ export function noteExported(): void {
   try { localStorage.setItem(EXPORT_KEY, String(Date.now())) } catch { /* ignore */ }
 }
 
+/**
+ * THE SNAPSHOTS, WHERE A PERSON CAN REACH THEM.
+ *
+ * `snapshotDaily` has been writing a full dump into the database every day,
+ * three deep, since the pilot build. Nothing read them. `reset.ts` cleared
+ * them. So the app carried the cost of the safety net every night and could not
+ * have caught anybody with it, which is the worst of both: the reassurance
+ * without the rescue.
+ *
+ * They are for the two failures an exported file is bad at. A restore that went
+ * wrong, and a mistake somebody made this morning: in both cases last night's
+ * copy is already here, and the pen drive is at home in a drawer. They are NOT
+ * for a dead disk. Only a file that left the machine survives that, which is
+ * why the nudge to export one still exists and still nags.
+ */
+export type Snap = { at: number; kb: number }
+
+export async function snapshotList(): Promise<Snap[]> {
+  try {
+    const all = await db.table('snapshots').orderBy('at').reverse().toArray()
+    return all.map((s: { at: number; blob: string }) => ({
+      at: s.at, kb: Math.max(1, Math.round((s.blob?.length ?? 0) / 1024)),
+    }))
+  } catch { return [] }
+}
+
+export async function snapshotText(at: number): Promise<string | null> {
+  try {
+    const s = await db.table('snapshots').get(at)
+    return s?.blob ?? null
+  } catch { return null }
+}
+
 /** Days since a file actually left this machine. Null = never. */
 export function daysSinceExport(): number | null {
   try {

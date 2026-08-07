@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { adminIsSet, adminUnlocked, unlockAdmin, lockAdmin, setAdminKey } from '../profile'
 import { role, can, ROLE_NAME, ROLE_SD, ROLE_WHAT, ROLES, pinSet, setRolePin, type Role } from '../roles'
-import { downloadBackup, readBackup, readFile, restore, type RestoreReport } from '../backup'
+import { downloadBackup, saveText, readBackup, readFile, restore, type RestoreReport } from '../backup'
+import { noteExported, snapshotList, snapshotText, type Snap } from '../safety'
 import { clearRecords, factoryReset, type ResetReport } from '../reset'
 import { IdentityFields, PaperFields, TokenFields, LogoFields, FeeFields, useDraftProfile, useDraftPaper } from './setup/fields'
 import DrugsStep from './setup/DrugsStep'
@@ -933,6 +934,27 @@ function BackupTab() {
   const file = useRef<HTMLInputElement>(null)
   const [rep, setRep] = useState<RestoreReport | null>(null)
   const [err, setErr] = useState('')
+  /**
+   * What the last press of a Save button actually did.
+   *
+   * `unsure` is the one that matters. On a browser with no Save dialog this app
+   * cannot tell a completed save from a cancelled one, and it used to mark the
+   * clinic backed up either way, so a person who pressed Cancel silenced the
+   * reminder for another nine days. It asks him now instead of deciding for
+   * him.
+   */
+  const [saved, setSaved] = useState<{ name: string; unsure: boolean } | null>(null)
+
+  async function save(kind: 'setup' | 'full') {
+    setErr(''); setSaved(null)
+    try {
+      const r = await downloadBackup(kind)
+      if (!r.saved) { setErr('Nothing was saved, so this machine is still the only copy.'); return }
+      setSaved({ name: r.name, unsure: !r.sure })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'That could not be saved.')
+    }
+  }
 
   async function take(f: File) {
     setErr(''); setRep(null)
@@ -958,7 +980,7 @@ function BackupTab() {
           email or keep on a pen drive. It also carries the Nuskho lock, so the new machine is
           locked the same way, which is why the passphrase should not be a short word.
         </p>
-        <button className="btn wide" onClick={() => downloadBackup('setup')}>
+        <button className="btn wide" onClick={() => save('setup')}>
           Save the setup file
         </button>
       </div>
@@ -970,10 +992,31 @@ function BackupTab() {
           Keep it in the clinic, on a drive that does not leave the room. Do not email it,
           and do not send it to us.
         </p>
-        <button className="btn wide" onClick={() => downloadBackup('full')}>
+        <button className="btn wide" onClick={() => save('full')}>
           Save the full backup
         </button>
       </div>
+
+      {saved && (saved.unsure ? (
+        <Note tone="warn" title="Did it save?"
+              action={<>
+                <button className="btn" onClick={() => { noteExported(); setSaved(null) }}>
+                  Yes, it is on the drive
+                </button>
+                <button className="lnk" onClick={() => setSaved(null)}>No, it did not</button>
+              </>}>
+          This browser will not tell Nuskho whether <b>{saved.name}</b> reached the drive.
+          Look for the file, then answer. If Nuskho guessed for you, a Cancel would count as
+          a backup and the reminder would go quiet for another nine days.
+        </Note>
+      ) : (
+        <Note tone="good" title="Saved">
+          <b>{saved.name}</b> is on the drive. Now put that drive somewhere the clinic is not:
+          a disk that dies takes everything in the room with it.
+        </Note>
+      ))}
+
+      <Snapshots />
 
       <h3>Restore onto this machine</h3>
       <p className="hint">
@@ -998,6 +1041,110 @@ function BackupTab() {
           set every role could reach it and the Nuskho role could reach it
           always. */}
       {can('erase') && <DangerZone />}
+    </>
+  )
+}
+
+/* -------------------------------------------------------------- snapshots */
+
+/**
+ * LAST NIGHT'S COPY, WITHOUT THE PEN DRIVE.
+ *
+ * Nuskho has been taking a full snapshot into the database every day, three
+ * deep, since the pilot build. Nothing could read one. So the app paid for the
+ * safety net every night and could not have caught anybody with it, which is
+ * the worst arrangement available: the reassurance without the rescue.
+ *
+ * Two buttons, and the order is deliberate. SAVE IT TO A FILE comes first,
+ * because getting a copy off the machine is always the right first move and it
+ * changes nothing. Restore comes second and says out loud what it will and
+ * will not do.
+ */
+function Snapshots() {
+  const [list, setList] = useState<Snap[] | null>(null)
+  const [rep, setRep] = useState<RestoreReport | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(0)
+
+  useEffect(() => { snapshotList().then(setList) }, [])
+
+  const when = (t: number) => new Date(t).toLocaleString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
+
+  async function toFile(at: number) {
+    setErr(''); setBusy(at)
+    try {
+      const text = await snapshotText(at)
+      if (!text) { setErr('That snapshot is no longer on this machine.'); return }
+      const d = new Date(at)
+      const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const r = await saveText(text, `nuskho-snapshot-${stamp}.json`)
+      if (!r.saved) setErr('Nothing was saved, so this machine is still the only copy.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'That could not be saved.')
+    } finally { setBusy(0) }
+  }
+
+  async function put(at: number) {
+    setErr(''); setRep(null); setBusy(at)
+    try {
+      const text = await snapshotText(at)
+      if (!text) { setErr('That snapshot is no longer on this machine.'); return }
+      setRep(await restore(readBackup(text)))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'That snapshot could not be read.')
+    } finally { setBusy(0) }
+  }
+
+  if (!list) return null
+
+  return (
+    <>
+      <h3>Last night, and the two nights before</h3>
+      {!list.length ? (
+        <p className="hint">
+          Nuskho takes one of these a day, inside this machine, and keeps three. The first
+          appears after this machine has been open on two different days.
+        </p>
+      ) : (
+        <>
+          <p className="hint">
+            Taken automatically, kept inside this machine. They are the answer to a mistake
+            this morning or a restore that went wrong. They are <b>not</b> the answer to a
+            dead disk: only a file that has left the machine survives that.
+          </p>
+          {list.map(s => (
+            <div key={s.at} className="snaprow">
+              <div className="sn-w">
+                <b>{when(s.at)}</b>
+                <span>Everything on this machine at that moment, {s.kb} KB</span>
+              </div>
+              <div className="sn-a">
+                <button className="btn" disabled={!!busy} onClick={() => toFile(s.at)}>
+                  Save it to a file
+                </button>
+                <button className="btn ghost" disabled={!!busy} onClick={() => put(s.at)}>
+                  Put it back
+                </button>
+              </div>
+            </div>
+          ))}
+          <p className="hint">
+            Putting one back ADDS what is missing. Nothing here is overwritten and nothing is
+            deleted, so a patient added since is still a patient added since.
+          </p>
+        </>
+      )}
+      {err && <p className="usable bad">{err}</p>}
+      {rep && (
+        <div className="sumbox">
+          <div><span>Medicines added back</span><b>{rep.drugs}</b></div>
+          <div><span>Patients added back</span><b>{rep.patients}</b></div>
+          <div><span>Prescriptions added back</span><b>{rep.visits}</b></div>
+          <div><span>Already here, left alone</span><b>{rep.skipped}</b></div>
+        </div>
+      )}
     </>
   )
 }

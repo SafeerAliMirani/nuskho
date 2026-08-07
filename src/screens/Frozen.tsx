@@ -91,8 +91,12 @@ export default function Frozen({ onOpen }: { onOpen: () => void }) {
             can save all of it to a pen drive right now, whether or not you ever pay us
             another rupee. We have never held a copy of any of it and we cannot.
           </p>
+          {/* It says Saved only when a file really reached a drive. On this
+              screen above all others: the clinic is locked, the doctor is
+              already unsure whether we still have his records, and a tick he
+              did not earn is the last thing he should be shown. */}
           <button className="btn wide ghost" onClick={async () => {
-            await downloadBackup('full'); setSaved(true)
+            try { setSaved((await downloadBackup('full')).saved) } catch { setSaved(false) }
           }}>{saved ? 'Saved ✓  save again' : 'Save everything to a file'}</button>
         </div>
 

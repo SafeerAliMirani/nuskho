@@ -94,16 +94,81 @@ export class DemoRefusal extends Error {
   }
 }
 
-export async function downloadBackup(kind: 'setup' | 'full'): Promise<void> {
+/**
+ * WHAT ACTUALLY HAPPENED WHEN THE BUTTON WAS PRESSED.
+ *
+ * `saved` is whether a file reached the drive. `sure` is whether this app has
+ * any right to say so.
+ *
+ * That second field exists because of a real and quiet failure: the old code
+ * clicked a hidden link and then marked the clinic as backed up, one line
+ * later, unconditionally. A person who opened the Save dialog and pressed
+ * Cancel silenced the "no backup in 9 days" reminder for another nine days.
+ * The one machine holding every record in the practice then went a fortnight
+ * with nothing off it, while the screen said everything was fine. That is the
+ * exact shape of a bug that costs a clinic its records: not a crash, a
+ * reassurance that was not earned.
+ */
+export type SaveResult =
+  | { saved: true; sure: true; name: string }
+  | { saved: false; sure: true }
+  | { saved: true; sure: false; name: string }
+
+/**
+ * Save a backup to a file the person chooses.
+ *
+ * On the clinic's own machine — Windows, Chrome or Edge — this opens a real
+ * Save dialog, waits for it, and knows the answer. He picks the pen drive by
+ * name, and a Cancel is a Cancel.
+ *
+ * Everywhere else it falls back to the hidden link, which cannot report
+ * anything at all. In that case `sure` is false and the CALLER must ask him,
+ * because a browser that cannot tell the truth is not a licence for this app to
+ * make one up.
+ */
+export async function downloadBackup(kind: 'setup' | 'full'): Promise<SaveResult> {
   if (isDemo) throw new DemoRefusal()
   const data = await makeBackup(kind)
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const text = JSON.stringify(data, null, 2)
+  const name = backupFilename(kind)
+  return await saveText(text, name)
+}
+
+/** The same save, for any text this app produces. */
+export async function saveText(text: string, name: string): Promise<SaveResult> {
+  const picker = (window as unknown as {
+    showSaveFilePicker?: (o: unknown) => Promise<{
+      createWritable: () => Promise<{ write: (d: unknown) => Promise<void>; close: () => Promise<void> }>
+    }>
+  }).showSaveFilePicker
+
+  if (picker) {
+    try {
+      const handle = await picker({
+        suggestedName: name,
+        types: [{ description: 'Nuskho backup', accept: { 'application/json': ['.json'] } }],
+      })
+      const w = await handle.createWritable()
+      await w.write(new Blob([text], { type: 'application/json' }))
+      await w.close()
+      noteExported()
+      return { saved: true, sure: true, name }
+    } catch (e) {
+      // He pressed Cancel. Nothing was written and nothing is marked.
+      if ((e as { name?: string })?.name === 'AbortError') return { saved: false, sure: true }
+      // Anything else (a picker the browser refused to open, a drive that
+      // vanished mid-write) falls through to the link, which at least tries.
+    }
+  }
+
+  const blob = new Blob([text], { type: 'application/json' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = backupFilename(kind)
+  a.download = name
   a.click()
-  noteExported()
   setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+  // Deliberately NOT noteExported(). This path genuinely does not know.
+  return { saved: true, sure: false, name }
 }
 
 export type RestoreReport = {
