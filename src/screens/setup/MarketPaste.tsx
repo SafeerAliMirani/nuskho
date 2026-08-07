@@ -4,6 +4,7 @@ import { searchGenerics, whoGeneric, WHO_EDITION } from '../../data/who'
 import { toSindhi } from '../../data/translit'
 import { db, uid, doctorDrugs, similarDrugs } from '../../db'
 import type { Drug } from '../../types'
+import { doseSdFor, defaultRoute, FORM_LABEL } from '../../data/forms'
 
 /**
  * The shop's list, cleaned.
@@ -90,7 +91,7 @@ export default function MarketPaste() {
       brand: r.brand, strength: r.strength, generic: r.generic,
       sd: r.sd || toSindhi(r.brand), sdReviewed: false,
       form: r.form === 'other' ? 'tab' : r.form,
-      unitSd: r.form === 'cap' ? 'ڪيپسول' : r.form === 'syr' ? 'چمچو' : 'گوري',
+      unitSd: doseSdFor(r.form), route: defaultRoute(r.form),
       verified: false, pending: true, addedAt: Date.now(),
     })))
     setSaved(fresh.length)
@@ -148,7 +149,7 @@ export default function MarketPaste() {
               <div className={'drow mkt' + (r.keep ? '' : ' off')} key={i}>
                 <input type="checkbox" checked={r.keep} onChange={e => set(i, { keep: e.target.checked })} />
                 <b>{r.brand} {r.strength}</b>
-                <span className="frm">{r.form === 'syr' ? 'syrup' : r.form === 'cap' ? 'capsule' : r.form === 'tab' ? 'tablet' : 'other'}</span>
+                <span className="frm">{FORM_LABEL[r.form].toLowerCase()}</span>
 
                 {r.generic ? (
                   <span className="gen">{r.generic}

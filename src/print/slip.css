@@ -377,3 +377,17 @@ table.rx.mx .dysd{font-size:7.4pt}
 .pt .qrcell b{display:block;text-align:center;font-size:5pt;letter-spacing:.4px;
   color:#555;margin-top:.2mm;font-weight:400;text-transform:none;}
 .page.a4 .pt .qr{width:13mm;height:13mm;}
+
+/* A form word whose Sindhi nobody has read yet prints in English, in the Latin
+   face, so the line still says what is in the box. See data/forms.ts. */
+.nmen-form{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;font-size:6.6pt;
+  font-weight:400;color:#444;letter-spacing:.2px;}
+.mlen{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;font-size:5.6pt;
+  font-weight:400;color:#333;letter-spacing:.2px;}
+.page.a4 .nmen-form{font-size:7.8pt;}
+.page.a4 .mlen{font-size:6.8pt;}
+/* "ml" and any English unit inside the total box: Latin face, never the Sindhi
+   one, or the letters render as boxes. */
+.tot .mlu{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;font-size:6.8pt;
+  font-weight:700;letter-spacing:.2px;}
+.page.a4 .tot .mlu{font-size:8pt;}

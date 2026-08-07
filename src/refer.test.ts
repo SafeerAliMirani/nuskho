@@ -102,3 +102,119 @@ describe('naming the destination', () => {
     expect(destinationSd(s)).toBe('')
   })
 })
+
+/* ------------------------------------------------- forms that are not pills */
+
+import { course } from './course'
+import { FORM_WORD, DOSE_WORD, ROUTE_WORD, pendingWords } from './data/forms'
+import type { RxLine, Form, Route } from './types'
+
+const line = (form: Form, over: Partial<RxLine> = {}, route?: Route): RxLine => ({
+  drugId: 'x', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
+  snap: { brand: 'X', strength: '', generic: '', sd: '', sdReviewed: false,
+          unitSd: '', form, route },
+  ...over,
+})
+
+/**
+ * The arithmetic the chemist reads. Getting a form wrong here is a patient
+ * handed the wrong number of anything, so each shape is pinned separately
+ * rather than trusting one branch to stand for the rest.
+ */
+describe('what the chemist is told to count out', () => {
+  it('counts tablets and capsules', () => {
+    expect(course(line('tab'))).toEqual({ n: 10, unit: 'tablets' })
+    expect(course(line('cap'))).toEqual({ n: 10, unit: 'capsules' })
+  })
+
+  it('counts a syrup in millilitres, at 5 ml a spoon', () => {
+    // one spoon morning and night, five days: 2 x 5 ml x 5
+    expect(course(line('syr'))).toEqual({ n: 50, unit: 'ml' })
+  })
+
+  it('uses THIS medicine\'s spoon when it is not 5 ml', () => {
+    const l = line('syr')
+    l.snap!.mlPerDose = 2.5
+    expect(course(l)).toEqual({ n: 25, unit: 'ml' })
+  })
+
+  it('counts sachets', () => {
+    expect(course(line('sachet'))).toEqual({ n: 10, unit: 'sachets' })
+  })
+
+  /**
+   * A dropper bottle holds hundreds of drops and a tube lasts as long as it
+   * lasts. A number here would be a guess dressed as a fact.
+   */
+  it('gives no total for drops, creams or anything it does not know', () => {
+    expect(course(line('drop')).n).toBe(0)
+    expect(course(line('cream')).n).toBe(0)
+    expect(course(line('other')).n).toBe(0)
+  })
+
+  it('never counts a half tablet as a whole one', () => {
+    expect(course(line('tab', { dose: { m: 0.5, d: 0, n: 0.5 } }))).toEqual({ n: 5, unit: 'tablets' })
+  })
+})
+
+describe('a slip for something that is not a pill', () => {
+  const slipFor = (form: Form, route?: Route) => renderSlip(slip({
+    visit: visit({ lines: [line(form, {}, route)] }),
+  }))
+
+  it('shows the site where a tablet shows the plate, and never both', () => {
+    const html = slipFor('drop', 'eye')
+    expect(html).toContain('mseq')
+    // the plate is a fork and a plate and a spoon: none of it belongs beside an
+    // eye drop, and neither does the Sindhi for "after food"
+    expect(html).not.toContain('ماني کان پوءِ')
+  })
+
+  it('keeps the meal picture for a drop taken by mouth', () => {
+    expect(slipFor('drop', 'mouth')).toContain('ماني کان پوءِ')
+  })
+
+  /**
+   * The one that matters most. `other` used to fall through to a tablet, so an
+   * inhaler printed a circle with a line through it and a patient who reads
+   * only the pictures was told to swallow it.
+   */
+  it('prints NO pictogram and NO invented word for a form it does not know', () => {
+    const html = slipFor('other')
+    // دوا appears in the column heading, which is correct: the column IS
+    // medicines. What must not appear is دوا as this row's FORM, standing in
+    // for a word nobody has for an inhaler.
+    const nameCell = html.match(/<td class="nmcell">[\s\S]*?<\/td>/)?.[0] ?? ''
+    expect(nameCell).not.toContain('دوا')
+    const doses = html.match(/<td class="tcell">[\s\S]*?<\/td>/g) ?? []
+    expect(doses.length).toBeGreaterThan(0)
+    for (const cell of doses) expect(cell).not.toContain('<svg')
+  })
+
+  /** Nothing on a medical document in a language nobody here has read. */
+  it('prints the English word while the Sindhi is still unread', () => {
+    const html = slipFor('drop', 'eye')
+    expect(html).not.toContain(DOSE_WORD.drop.sd)
+    expect(html).not.toContain(ROUTE_WORD.eye.sd)
+    expect(html).toContain('drop')
+    expect(html).toContain('in both eyes')
+  })
+
+  it('still prints the four words that were checked long ago', () => {
+    expect(FORM_WORD.tab.ok).toBe(true)
+    expect(FORM_WORD.cap.ok).toBe(true)
+    expect(FORM_WORD.syr.ok).toBe(true)
+    expect(DOSE_WORD.syr.ok).toBe(true)
+    expect(slipFor('tab')).toContain('گوري')
+  })
+
+  it('offers every unread word for a person to read, once each', () => {
+    const words = pendingWords()
+    const sds = words.map(w => w.sd)
+    expect(new Set(sds).size).toBe(sds.length)
+    expect(sds).toContain(DOSE_WORD.drop.sd)
+    expect(sds).toContain(ROUTE_WORD.eye.sd)
+    // and nothing already checked is in the queue
+    expect(sds).not.toContain(FORM_WORD.tab.sd)
+  })
+})

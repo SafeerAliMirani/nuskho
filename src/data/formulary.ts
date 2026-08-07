@@ -15,6 +15,12 @@ export const formulary: Drug[] = [
   { id: 'motilium10',   brand: 'MOTILIUM',  strength: '10 mg',  generic: 'Domperidone',                   sd: 'موٽيليم', sdReviewed: false, form: 'tab', unitSd: 'گوري' },
   { id: 'ciproxin500',  brand: 'CIPROXIN',  strength: '500 mg', generic: 'Ciprofloxacin',                 sd: 'سپروڪسن', sdReviewed: false, form: 'tab', unitSd: 'گوري' },
   { id: 'calpol',       brand: 'CALPOL',    strength: 'syrup',  generic: 'Paracetamol',                   sd: 'ڪالپول', sdReviewed: false,  form: 'syr', unitSd: 'چمچو' },
+  // The starter list now carries one of each shape that is not a pill, so a
+  // doctor meets them on his first evening instead of discovering that the app
+  // has no idea what an eye drop is.
+  { id: 'ors',          brand: 'ORS',       strength: 'sachet', generic: 'Oral rehydration salts',         sd: '', sdReviewed: false, form: 'sachet', unitSd: '' },
+  { id: 'tobrexdrops',  brand: 'TOBREX',    strength: 'eye drops', generic: 'Tobramycin',                  sd: '', sdReviewed: false, form: 'drop', route: 'eye', unitSd: '' },
+  { id: 'polyfax',      brand: 'POLYFAX',   strength: 'ointment', generic: 'Polymyxin B + Bacitracin',     sd: '', sdReviewed: false, form: 'cream', route: 'skin', unitSd: '' },
 ]
 
 /**

@@ -16,6 +16,7 @@ import { signal } from '../ui/bus'
 import Bell from '../ui/Bell'
 import { warmPlan } from '../print/paginate'
 import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
+import { doseSdFor, defaultRoute } from '../data/forms'
 
 /** 0 → 1 → 2 → ½ → 0. "2 tablets" is routine for adult paracetamol; without it
  *  the doctor reaches for his pad, and after three reaches he stops opening the app. */
@@ -313,7 +314,7 @@ export default function Compose({ visitId, onDone, onBack }: {
       // NOT !!e.sd. A dictionary entry is a candidate, not a verdict: the person
       // in this clinic still has to read the word before it can print.
       sd: e.sd, sdReviewed: false, form: e.form, addedAt: Date.now(),
-      unitSd: e.form === 'cap' ? 'ڪيپسول' : e.form === 'syr' ? 'چمچو' : 'گوري',
+      unitSd: doseSdFor(e.form), route: defaultRoute(e.form),
     }
     await db.drugs.add(d)
     setAll(await doctorDrugs(formulary))

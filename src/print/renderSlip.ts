@@ -11,10 +11,12 @@
 
 import { profile, APP } from '../profile'
 import { paper, pageVars } from '../paper'
-import type { Drug, Visit, RxLine, RxSnap, Form } from '../types'
-import { SUNRISE, SUN, MOON, TAB, HALF, CAP, SPOON, PLATE, CAL, adviceIcon } from './icons'
+import type { Drug, Visit, RxLine, RxSnap, Form, Route } from '../types'
+import { SUNRISE, SUN, MOON, TAB, HALF, CAP, SPOON, PLATE, CAL, DROP,
+         EYE, EAR, NOSE, TUBE, SACHET, adviceIcon } from './icons'
 import { qrSvgSafe } from './qr'
 import { course, courseUnitSd } from '../course'
+import { formSdFor, formEnFor, doseSdFor, doseEnFor1, routeSdFor, routeEnFor, countable } from '../data/forms'
 import { filled } from '../data/vitals'
 
 // Tolerates undefined on purpose: a medicine the doctor typed himself has no
@@ -30,31 +32,85 @@ const MEAL_SD: Record<RxLine['meal'], string> = {
   any: '',
 }
 
-const formIcon = (f: Drug['form']) => (f === 'cap' ? CAP : f === 'syr' ? SPOON : TAB)
+/**
+ * The picture for one dose of this form.
+ *
+ * `other` returns null on purpose. It used to fall through to TAB, so an
+ * inhaler, a suppository and a pessary all printed a tablet. A missing picture
+ * is a gap the doctor fills in his own handwriting; a wrong picture is a
+ * patient swallowing the wrong thing.
+ */
+const formIcon = (f: Form): ((w: string, h: string) => string) | null =>
+  f === 'cap' ? CAP
+  : f === 'syr' ? SPOON
+  : f === 'drop' ? DROP
+  : f === 'cream' ? TUBE
+  : f === 'sachet' ? SACHET
+  : f === 'tab' ? TAB
+  : null
+
+/** The picture for the site, where the meal picture would say nothing. */
+const siteIcon = (r: Route): ((w: string, h: string) => string) | null =>
+  // Nothing for the skin: a cream already carries its tube in all three dose
+  // cells, and printing a fourth tube in this one says nothing new.
+  r === 'eye' ? EYE : r === 'ear' ? EAR : r === 'nose' ? NOSE : null
 
 /** One dose cell: the pictogram, then the number under it. */
 function doseCell(m: RxSnap, n: number, sz: string): string {
   if (!n) return '<td class="tcell off">&mdash;</td>'
 
-  // Syrup counts in spoons, and it counts properly. This cell used to print
+  const ic = formIcon(m.form)
+
+  /**
+   * A CREAM AND AN "OTHER" ARE NOT COUNTED, AND MUST NOT LOOK COUNTED.
+   *
+   * "1.5 creams" is not a thing anybody says, and half a circle beside an
+   * ointment is a picture of a tablet cut in two. These cells carry the
+   * pictogram and a tick, meaning "at this time of day", and nothing that
+   * looks like a quantity.
+   */
+  if (!countable(m.form)) {
+    return `<td class="tcell">${ic ? ic(sz, sz) : ''}<div class="dose">&#10003;</div></td>`
+  }
+
+  // Syrup counts in spoons, and drops count in drops. This cell used to print
   // "1 چمچو" whatever the doctor had chosen, so a child prescribed two spoons
   // at night was sent home with a slip that said one. The dose is the one
   // number on this page that has to be the number he actually tapped.
-  if (m.form === 'syr') {
-    const spoons = n === 0.5 ? '½' : String(Math.round(n))
-    const pics = Array.from({ length: Math.min(Math.max(Math.round(n), 1), 3) }, () => SPOON(sz, sz)).join('')
-    return `<td class="tcell">${pics}<div class="dose"><span class="sd">${spoons} ${esc(doseUnitSd(m))}</span></div></td>`
+  if (m.form === 'syr' || m.form === 'drop') {
+    const many = n === 0.5 ? '½' : String(Math.round(n))
+    const reps = m.form === 'drop' ? 1 : Math.min(Math.max(Math.round(n), 1), 3)
+    const pics = Array.from({ length: reps }, () => (ic ? ic(sz, sz) : '')).join('')
+    const word = doseUnitSd(m)
+    return `<td class="tcell">${pics}<div class="dose">`
+      + (word ? `<span class="sd">${many} ${esc(word)}</span>`
+         : `${many} <span class="mlen">${esc(doseEnFor1(m.form, n))}</span>`)
+      + '</div></td>'
   }
 
   if (n === 0.5)
     return `<td class="tcell">${HALF(sz, sz)}<div class="dose">½</div></td>`
-  const ic = formIcon(m.form)
-  const pics = Array.from({ length: Math.min(Math.round(n), 3) }, () => ic(sz, sz)).join('')
+  const pics = Array.from({ length: Math.min(Math.round(n), 3) }, () => (ic ? ic(sz, sz) : '')).join('')
   return `<td class="tcell">${pics}<div class="dose">${Math.round(n)}</div></td>`
 }
 
-/** Meal timing as one scene, never an arrow sequence the reader must decode. */
-function mealIcon(meal: RxLine['meal'], compact: boolean): string {
+/**
+ * Meal timing as one scene, never an arrow sequence the reader must decode.
+ *
+ * For anything that does not go in the mouth this cell carries the SITE
+ * instead. An eye drop taken after food is a sentence with no meaning in it,
+ * and a plate beside an eye drop is a picture of the wrong thing entirely.
+ */
+function mealIcon(meal: RxLine['meal'], compact: boolean, m: RxSnap): string {
+  const offMouth = !!m.route && m.route !== 'mouth'
+  const site = offMouth ? siteIcon(m.route!) : null
+  // A site with no picture of its own still must not show a plate: "after food"
+  // is as meaningless on a cream as it is on an eye drop.
+  if (offMouth && !site) return '<span class="mseq">&mdash;</span>'
+  if (site) {
+    const k = compact ? 0.72 : 0.92
+    return `<span class="mseq">${site(`${6.8 * k}mm`, `${6.8 * k}mm`)}</span>`
+  }
   if (meal === 'any') return '<span class="mseq">&mdash;</span>'
   const k = compact ? 0.58 : 0.74
   const plate = PLATE(`${6.8 * k}mm`, `${6.8 * k}mm`)
@@ -73,7 +129,7 @@ export function printed(line: RxLine, drug?: Drug): RxSnap {
   return {
     brand: drug?.brand ?? '', strength: drug?.strength ?? '', generic: drug?.generic ?? '',
     sd: drug?.sd ?? '', sdReviewed: drug?.sdReviewed, unitSd: drug?.unitSd ?? '',
-    form: drug?.form ?? 'tab',
+    form: drug?.form ?? 'tab', route: drug?.route, mlPerDose: drug?.mlPerDose,
   }
 }
 
@@ -95,19 +151,45 @@ export function printed(line: RxLine, drug?: Drug): RxSnap {
  * two forms that make up most of a prescription, and the one form it was wrong
  * for is the one children get.
  */
-const FORM_SD: Record<Form, string> = {
-  tab: 'گوري',
-  cap: 'ڪيپسول',
-  syr: 'سيرپ',
-  other: 'دوا',
-}
+/** What the bottle or the box is. Printed after the Sindhi brand name, and
+ *  only once a person has read the word: see data/forms.ts. */
+const formSd = (m: RxSnap) => formSdFor(m.form)
 
-/** What the bottle or the box is. Printed after the Sindhi brand name. */
-const formSd = (m: RxSnap) => FORM_SD[m.form] ?? FORM_SD.other
+/** The same word in English, for the line that carries no approved Sindhi. */
+const formEn = (m: RxSnap) => formEnFor(m.form)
 
 /** What the patient picks up. Printed in the morning, midday and night columns.
- *  Falls back to the form when a drug was saved before this split existed. */
-const doseUnitSd = (m: RxSnap) => m.unitSd || formSd(m)
+ *  Falls back to the form's own word when a drug was saved before this split
+ *  existed, and to nothing at all while the Sindhi is unread. */
+const doseUnitSd = (m: RxSnap) => (doseSdFor(m.form) ? (m.unitSd || doseSdFor(m.form)) : '')
+
+/**
+ * The second line of the name cell: the Sindhi brand, then what is in the box.
+ *
+ * Both halves are conditional and for the same reason. A Sindhi brand prints
+ * only once a person has read it (`sdReviewed`), and the form word prints only
+ * once a person has read THAT (data/forms.ts). When the form word has not been
+ * read the English one takes its place, in the Latin face, so the line still
+ * says what the box is instead of saying nothing.
+ */
+function nameSdLine(m: RxSnap): string {
+  const brand = m.sd && m.sdReviewed === true ? esc(m.sd) : ''
+  const sdWord = formSd(m)
+  if (sdWord) {
+    return `<div class="sd nmsd">${brand ? brand + ' — ' : ''}${esc(sdWord)}</div>`
+  }
+  const enWord = formEn(m)
+  if (!brand && !enWord) return ''
+  if (!brand) return `<div class="nmsd nmen-form">${esc(enWord)}</div>`
+  return `<div class="sd nmsd">${brand}${enWord ? ` <span class="nmen-form">— ${esc(enWord)}</span>` : ''}</div>`
+}
+
+/** The words under the site picture, in whichever script has been approved. */
+function siteLabel(m: RxSnap): string | null {
+  if (!m.route || m.route === 'mouth') return null
+  const sd = routeSdFor(m.route)
+  return sd ? esc(sd) : `<span class="mlen">${esc(routeEnFor(m.route))}</span>`
+}
 
 function row(i: number, line: RxLine, m: RxSnap, compact: boolean): string {
   // A4 has the room, and a bigger pictogram is the whole slip for a patient who
@@ -137,8 +219,13 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean): string {
    * rather than under a different number.
    */
   const c = course(line, m)
+  const unit = courseUnitSd(line, m)
   const total = c.n > 0
-    ? `<div class="tot"><b>${c.n}</b><span class="sd">${esc(courseUnitSd(line, m))}</span></div>`
+    ? `<div class="tot"><b>${c.n}</b>`
+      + (unit === 'ml' ? '<span class="mlu">ml</span>'
+         : unit ? `<span class="sd">${esc(unit)}</span>`
+         : `<span class="mlu">${esc(c.unit)}</span>`)
+      + '</div>'
     : ''
 
   const ticks = compact || c.n > 0
@@ -154,7 +241,18 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean): string {
    * medicines on A4 went from one sheet to two the moment the count appeared.
    * Comfortable spacing keeps the word, because there it is free.
    */
-  const dysd = compact && c.n > 0 ? '' : '<div class="sd dysd">ڏينهن</div>'
+  /**
+   * THE WORD "DAYS" GIVES ITS LINE TO THE COUNT, ON EVERY ROW THAT HAS ONE.
+   *
+   * ڏينهن is printed in this column's heading, beside a calendar, so repeating
+   * it under every single row buys nothing and costs the one line this cell
+   * does not have to spare. Measured: keeping both pushed six medicines on A5
+   * from one sheet onto two.
+   *
+   * A row with no countable total — a cream, an inhaler — keeps the word, so
+   * the cell is never just a bare number with nothing to say what it is.
+   */
+  const dysd = c.n > 0 ? '' : '<div class="sd dysd">ڏينهن</div>'
   return `<tr>
       <td class="noc">${i}</td>
       <td class="nmcell">
@@ -162,10 +260,10 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean): string {
           <div class="brand">${esc(m.brand)} ${esc(m.strength)}</div>
           <div class="gen">${esc(m.generic)}</div>
         </div>
-        <div class="sd nmsd">${m.sd && m.sdReviewed === true ? esc(m.sd) + ' — ' : ''}${esc(formSd(m))}</div>
+        ${nameSdLine(m)}
       </td>
       ${doseCell(m, line.dose.m, sz)}${doseCell(m, line.dose.d, sz)}${doseCell(m, line.dose.n, sz)}
-      <td class="mlcell">${mealIcon(line.meal, compact)}<div class="sd mlsd">${MEAL_SD[line.meal]}</div></td>
+      <td class="mlcell">${mealIcon(line.meal, compact, m)}<div class="sd mlsd">${siteLabel(m) ?? MEAL_SD[line.meal]}</div></td>
       <td class="dycell"><div class="dyn">${line.days}</div>
         ${dysd}${ticks}${total}</td>
     </tr>`

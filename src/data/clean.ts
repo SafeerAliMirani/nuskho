@@ -71,11 +71,26 @@ export const ISSUE_TEXT: Record<Issue, string> = {
 
 /** Form words as they are actually abbreviated on a Pakistani register. */
 const FORMS: [RegExp, Form][] = [
-  [/\b(syp|syr|syrup|susp|suspension|sus|elixir|drops?|drp|sol|solution|liquid|liq)\b/i, 'syr'],
+  /**
+   * DROPS COME FIRST, AND THEY USED TO NOT EXIST.
+   *
+   * This list had "drops" inside the syrup pattern, so every eye drop, ear drop
+   * and infant oral drop imported from a market register became a SYRUP. On
+   * paper that is a spoon pictogram and the word چمچو beside an eye drop, read
+   * by exactly the patient who cannot read the line above it. Order matters:
+   * "EYE DROPS SOLUTION" contains both words.
+   */
+  [/\b(drops?|drp|e\/d|ear\s*drops?|eye\s*drops?|nasal\s*drops?)\b/i, 'drop'],
+  [/\b(syp|syr|syrup|susp|suspension|sus|elixir|sol|solution|liquid|liq)\b/i, 'syr'],
   [/\b(cap|caps|capsule|capsules|softgel)\b/i, 'cap'],
   [/\b(tab|tabs|tablet|tablets|tabl|f\/c\s*tab|dt)\b/i, 'tab'],
   [/\b(inj|injection|amp|ampoule|vial|infusion|iv|im)\b/i, 'other'],
-  [/\b(cream|oint|ointment|gel|lotion|spray|inhaler|puff|sachet|supp|suppository|patch|pessary)\b/i, 'other'],
+  [/\b(cream|oint|ointment|gel|lotion)\b/i, 'cream'],
+  [/\b(sachet|sachets|sach|powder|granules)\b/i, 'sachet'],
+  // Named rather than swept into 'other' silently: these are real forms this
+  // app cannot picture yet, and 'other' now prints no picture at all, which is
+  // the honest answer until somebody draws one.
+  [/\b(spray|inhaler|puff|rotacap|supp|suppository|patch|pessary)\b/i, 'other'],
 ]
 
 const INJECTION = /\b(inj|injection|amp|ampoule|vial|infusion)\b/i

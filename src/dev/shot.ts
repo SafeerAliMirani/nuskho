@@ -3,6 +3,16 @@ import { setPaper, type Paper } from '../paper'
 import { renderSlip, type SlipData } from '../print/renderSlip'
 import type { Drug, RxLine, Visit } from '../types'
 
+/** brand, generic, Sindhi, dose unit, form, route */
+const FORMS_DEMO: [string,string,string,string,string,string][] = [
+  ['TOBREX eye drops','Tobramycin','ٽوبريڪس','','drop','eye'],
+  ['OTOSPORIN ear drops','Polymyxin','اوٽوسپورن','','drop','ear'],
+  ['CALPOL drops','Paracetamol','ڪالپول','','drop','mouth'],
+  ['FUCIDIN cream','Fusidic acid','فيوسڊن','','cream','skin'],
+  ['ORS sachet','Oral rehydration salts','او آر ايس','','sachet','mouth'],
+  ['VENTOLIN inhaler','Salbutamol','وينٽولن','','other','mouth'],
+]
+
 const NAMES: [string,string,string,string][] = [
   ['RISEK 20 mg','Omeprazole','رانسيڪ','ڪيپسول'],
   ['MOTILIUM 10 mg','Domperidone','موتيليم','گوري'],
@@ -49,8 +59,23 @@ const out = document.getElementById('shots')!
   if (location.search.includes('notot')) document.documentElement.classList.add('notot')
   const q = new URLSearchParams(location.search)
   const n = Math.max(1, Math.min(20, +(q.get('n') ?? 8) || 8))
-  const d = data(n, {dx:true, tests:+(q.get('tests') ?? 2), advice:+(q.get('advice') ?? 2),
-                     sent: q.has('sent')})
+  let d = data(n, {dx:true, tests:+(q.get('tests') ?? 2), advice:+(q.get('advice') ?? 2),
+                   sent: q.has('sent')})
+  /**
+   * ?forms renders one line of every shape a Larkana clinic writes, so the
+   * pictograms can be LOOKED at rather than assumed. Everything the eye can
+   * catch on this page has been caught by an eye, never by a drive.
+   */
+  if (q.has('forms')) {
+    FORMS_DEMO.forEach(([b,g,sd,u,f,r],i) => {
+      drugs['f'+i] = { id:'f'+i, brand:b.split(' ')[0], strength:b.split(' ').slice(1).join(' '),
+        generic:g, sd, sdReviewed:true, unitSd:u, form:f as Drug['form'],
+        route:r as Drug['route'] } as Drug
+    })
+    const lines: RxLine[] = FORMS_DEMO.map((_,i)=>({
+      drugId:'f'+i, dose:{m:1,d:0,n:1}, meal:'after', days:5 } as RxLine))
+    d = { ...d, visit: { ...d.visit, lines } }
+  }
   const plan = await planSheets(d)
   out.innerHTML = renderSlip(d, plan)
   ;(window as any).__done = true

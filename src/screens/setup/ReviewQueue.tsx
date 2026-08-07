@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import { db, similarDrugs, archiveDrug } from '../../db'
+import {
+  FORMS, FORM_LABEL, ROUTES, ROUTE_LABEL, routeMatters, defaultRoute, doseSdFor,
+  pendingWords, setWordOk,
+} from '../../data/forms'
 import type { Drug } from '../../types'
 import { profile } from '../../profile'
 
@@ -14,6 +18,47 @@ import { profile } from '../../profile'
  * The number at the top of this list, falling week by week, is the real answer
  * to "is the catalogue any good yet".
  */
+/**
+ * THE APP'S OWN WORDS, WAITING TO BE READ.
+ *
+ * The medicine names have had this all along: `sdReviewed`, and until it is
+ * ticked the Sindhi does not print. The app's own vocabulary had no such gate,
+ * because for a long time it was four words that had been on paper since the
+ * first sheet.
+ *
+ * Adding drops, creams and sachets added words nobody in this project has read
+ * yet, and a suggested spelling on a medical document is the one thing this
+ * app must not do. So they sit here until a person ticks them, and until then
+ * the slip prints the English word beside the pictogram, which is safe and
+ * still says what is in the box.
+ */
+function WordsToRead() {
+  const [, bump] = useState(0)
+  const words = pendingWords()
+  if (!words.length) return null
+  const left = words.filter(w => !w.ok).length
+  return (
+    <div className="lhbox" style={{ marginBottom: 18 }}>
+      <h3>Words waiting to be read {left > 0 ? `(${left})` : '\u2713'}</h3>
+      <p>
+        Nuskho suggests these for the new medicine forms. Until one is ticked it is
+        NOT printed: the slip carries the English word and the picture instead.
+        Tick it only if a Sindhi speaker has read it and it is right.
+      </p>
+      {words.map(w => (
+        <label className="check" key={w.key}>
+          <input type="checkbox" checked={w.ok}
+                 onChange={e => { setWordOk(w.key, e.target.checked); bump(n => n + 1) }} />
+          <span>
+            <b className="sd" style={{ fontSize: 19 }}>{w.sd}</b>
+            <small>{w.en}</small>
+          </span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 export default function ReviewQueue() {
   const [all, setAll] = useState<Drug[]>([])
   const [edit, setEdit] = useState<Drug | null>(null)
@@ -71,6 +116,8 @@ export default function ReviewQueue() {
         correcting them is housekeeping, and it cannot change any slip already printed.
       </p>
 
+      <WordsToRead />
+
       <div className="sumbox">
         <div><span>On his list</span><b>{live.length}</b></div>
         <div><span>Waiting for us</span><b>{pending.length}</b></div>
@@ -95,13 +142,46 @@ export default function ReviewQueue() {
                      onChange={e => setEdit({ ...edit, sd: e.target.value })} /></div>
             <div className="fld"><label>Form</label>
               <div className="chips">
-                {(['tab', 'cap', 'syr'] as const).map(f => (
+                {FORMS.map(f => (
                   <button key={f} className={'chip' + (edit.form === f ? ' have' : '')}
-                          onClick={() => setEdit({ ...edit, form: f,
-                            unitSd: f === 'cap' ? 'ڪيپسول' : f === 'syr' ? 'چمچو' : 'گوري' })}>{f}</button>
+                          onClick={() => setEdit({ ...edit, form: f, route: defaultRoute(f),
+                            unitSd: doseSdFor(f) })}>{FORM_LABEL[f]}</button>
                 ))}
               </div></div>
           </div>
+
+          {/* WHERE IT GOES, asked only where it can differ. An eye drop and a
+              drop by mouth for a baby are the same bottle and completely
+              different instructions, and the slip prints the site instead of
+              the meal picture for anything that is not swallowed. */}
+          {routeMatters(edit.form) && (
+            <div className="fld"><label>Where does it go?</label>
+              <div className="chips">
+                {ROUTES.map(r => (
+                  <button key={r} className={'chip' + ((edit.route ?? defaultRoute(edit.form)) === r ? ' have' : '')}
+                          onClick={() => setEdit({ ...edit, route: r })}>{ROUTE_LABEL[r]}</button>
+                ))}
+              </div>
+              <span className="unit">A slip for an eye or ear drop shows the site
+                where a tablet shows the plate, because "after food" says nothing
+                about an eye drop.</span>
+            </div>
+          )}
+
+          {/* Only a syrup, and only because the chemist picks a bottle by it. */}
+          {edit.form === 'syr' && (
+            <div className="fld"><label>One spoon is how many ml?</label>
+              <input inputMode="numeric" value={String(edit.mlPerDose ?? 5)}
+                     onChange={e => {
+                       const v = e.target.value.replace(/[^0-9.]/g, '').slice(0, 5)
+                       setEdit({ ...edit, mlPerDose: v === '' ? undefined : +v })
+                     }} />
+              <span className="unit">Almost always 5, the cap that comes with the
+                bottle. It never changes the dose printed on the slip. It only
+                works out the total the chemist reads, so he picks 60 ml or
+                120 ml without doing the sum.</span>
+            </div>
+          )}
           <label className="check">
             <input type="checkbox" checked={edit.sdReviewed === true}
                    onChange={e => setEdit({ ...edit, sdReviewed: e.target.checked })} />

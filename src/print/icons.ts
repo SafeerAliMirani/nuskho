@@ -81,3 +81,61 @@ export const adviceIcon: Record<string, (w: string, h: string) => string> = {
   water: WATER,
   reach: SHELF,
 }
+
+/* --------------------------------------------------- forms that are not pills
+ *
+ * Every one of these existed on prescriptions in Larkana long before Nuskho,
+ * and Nuskho printed a tablet for all of them. An eye drop with a spoon beside
+ * it is not a cosmetic fault: the patient who most needs these pictures is the
+ * one who cannot read the line above them.
+ *
+ * Same rules as the sheet above: solid fills over thin outlines, at most three
+ * elements, nothing that needs to be read at arm's length, and never a slash.
+ */
+
+/** A dropper bottle with one drop leaving it. */
+export const DROPPER = (w: string, h: string) => svg(w, h,
+  '<path d="M9 2.4h6v3.2H9z" fill="currentColor" stroke="none"/>' +
+  '<path d="M7.4 5.6h9.2v9.6a4.6 4.6 0 0 1-9.2 0z" stroke-width="1.9"/>' +
+  '<path d="M12 17.6c1.6 2 2.4 3 2.4 3.9a2.4 2.4 0 0 1-4.8 0c0-.9.8-1.9 2.4-3.9z" ' +
+  'fill="currentColor" stroke="none"/>')
+
+/** One drop, for the dose columns where a tablet would otherwise sit. */
+export const DROP = (w: string, h: string) => svg(w, h,
+  '<path d="M12 2.6c4.6 5.8 6.8 8.9 6.8 11.6a6.8 6.8 0 0 1-13.6 0c0-2.7 2.2-5.8 6.8-11.6z" ' +
+  'fill="currentColor" stroke="none"/>')
+
+/** An eye. Drawn open and plain: the site, not an expression. */
+export const EYE = (w: string, h: string) => svg(w, h,
+  '<path d="M1.6 12S5.6 5.4 12 5.4 22.4 12 22.4 12 18.4 18.6 12 18.6 1.6 12 1.6 12z" stroke-width="1.9"/>' +
+  '<circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/>')
+
+/**
+ * An ear. The first attempt read as a question mark at 6 mm, which on a
+ * prescription is worse than no picture: a reader who cannot read the line
+ * will believe the picture. This one is the outer rim as a full closed curve
+ * with the inner fold inside it, which is what an ear looks like from a metre
+ * away.
+ */
+export const EAR = (w: string, h: string) => svg(w, h,
+  '<path d="M15.6 3.4c-4 0-6.8 2.9-6.8 7v5.2c0 2.4-.6 3.6-2 4.8" stroke-width="2"/>' +
+  '<path d="M15.6 3.4c3.6 0 5.8 2.6 5.8 6.2 0 4.4-4 5.4-4 8.6a2.9 2.9 0 0 1-5.8 0" stroke-width="2"/>' +
+  '<path d="M15.4 8.2a3 3 0 0 0-3 3v3.4" stroke-width="1.8"/>')
+
+/** A nose, in profile, because face-on it reads as nothing at all. */
+export const NOSE = (w: string, h: string) => svg(w, h,
+  '<path d="M13.4 2.8v6.6c0 2.2 3.2 4.8 3.2 6.4 0 1.3-1.3 1.8-2.6 1.8" stroke-width="1.9"/>' +
+  '<path d="M7.6 16.4c0 2.4 2.4 4.2 5 4.2" stroke-width="1.9"/>' +
+  '<circle cx="10.4" cy="17.6" r="1.5" fill="currentColor" stroke="none"/>')
+
+/** A tube of cream, squeezed. */
+export const TUBE = (w: string, h: string) => svg(w, h,
+  '<path d="M9.4 7.6h5.2v13.4H9.4z" stroke-width="1.9"/>' +
+  '<path d="M9.4 4.4l2.6-1.6h.1l2.5 1.6v3.2H9.4z" fill="currentColor" stroke="none"/>' +
+  '<path d="M10.6 11.6h2.8" stroke-width="1.9"/>')
+
+/** A sachet, torn open at the top. */
+export const SACHET = (w: string, h: string) => svg(w, h,
+  '<path d="M5.4 6.6h13.2v13.8H5.4z" stroke-width="1.9"/>' +
+  '<path d="M5.4 6.6l2.6-2.4 2.6 2.4 2.8-2.4 2.6 2.4 2.6-2.4v2.4z" fill="currentColor" stroke="none"/>' +
+  '<path d="M8.6 13.4h6.8" stroke-width="1.9"/>')

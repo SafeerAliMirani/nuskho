@@ -2,7 +2,34 @@
 // The token is a plain integer field on a Visit — never an entity, never a key.
 // It resets each session and is a display label, not identity.
 
-export type Form = 'tab' | 'cap' | 'syr' | 'other'
+/**
+ * WHAT IS IN THE BOX, AND IT IS NOT ALWAYS A PILL.
+ *
+ * This was tab, cap, syr and other, and `other` printed a tablet pictogram
+ * with the word دوا beside it. So an eye drop imported from a market list came
+ * out of the printer as a spoonful of syrup — `clean.ts` mapped the word
+ * "drops" straight onto `syr` — and an inhaler came out as a tablet. The
+ * patient who most needs the pictures is the one who cannot read the line
+ * above them, so a wrong picture is not a cosmetic fault.
+ *
+ * `other` still exists and is now HONEST: no pictogram, no invented unit, and
+ * the doctor's own written note carries it. Safeer, asked which forms Larkana
+ * writes: drops by mouth, eye and ear and nose drops, cream, sachet, "also
+ * other medicines i dont know". That last one is why `other` has to degrade
+ * into silence rather than into a tablet.
+ */
+export type Form = 'tab' | 'cap' | 'syr' | 'drop' | 'cream' | 'sachet' | 'other'
+
+/**
+ * WHERE IT GOES. Only asked about the forms where it can differ.
+ *
+ * A drop by mouth for a baby and a drop into an eye are the same bottle shape
+ * and completely different instructions, and "after food" is meaningless on an
+ * eye drop. So a non-mouth route replaces the meal picture with the site: an
+ * eye, an ear, a nose. Absent means by mouth, which is every tablet, capsule,
+ * syrup and sachet ever written and so costs those nothing.
+ */
+export type Route = 'mouth' | 'eye' | 'ear' | 'nose' | 'skin'
 
 export interface Drug {
   id: string
@@ -21,8 +48,21 @@ export interface Drug {
   generic: string
   sd: string             // Sindhi name, printed small under the brand
   form: Form
+  /** where it goes. Absent means by mouth, which is nearly every medicine. */
+  route?: Route
   strength: string
-  unitSd: string         // گوري / ڪيپسول / چمچو
+  unitSd: string         // گوري / ڪيپسول / چمچو / قطرا
+  /**
+   * How many millilitres one dose is, for a syrup.
+   *
+   * A spoon in a Pakistani clinic is the 5 ml cap that comes with the bottle,
+   * and that is the default. It is here rather than assumed in the arithmetic
+   * because it is a fact about THIS medicine: a few come with a 2.5 ml or a
+   * 10 ml measure, and the chemist choosing between a 60 ml and a 120 ml bottle
+   * is entitled to the right number. It never changes the DOSE, which is still
+   * whatever the doctor tapped. It only chooses the bottle.
+   */
+  mlPerDose?: number
   /** his standing order for this drug — a default is not an error, it is how doctors work */
   defaultDays?: number
 }
@@ -48,6 +88,8 @@ export interface RxSnap {
   sdReviewed?: boolean
   unitSd: string
   form: Form
+  route?: Route
+  mlPerDose?: number
 }
 
 export interface RxLine {

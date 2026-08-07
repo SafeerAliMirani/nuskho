@@ -1,3 +1,4 @@
+import { doseSdFor } from './data/forms'
 import type { RxLine, RxSnap } from './types'
 
 /**
@@ -32,20 +33,42 @@ export function course(l: RxLine, snap?: RxSnap): { n: number; unit: string } {
    * bottle of syrup. The print row already resolves the snapshot through
    * printed(), so it passes it in and this stops guessing.
    */
-  const form = (snap ?? l.snap)?.form ?? 'tab'
+  const m = snap ?? l.snap
+  const form = m?.form ?? 'tab'
+
   /**
-   * A SYRUP HAS NO COUNTABLE TOTAL, AND SAYING ONE WOULD BE A GUESS.
+   * A SYRUP IS COUNTED IN MILLILITRES, BECAUSE THAT IS HOW BOTTLES ARE SOLD.
    *
-   * Two spoons a day for five days is ten spoons, which tells a chemist
-   * nothing: he sells a bottle, and how many bottles depends on whether it is
-   * 60 ml or 120 ml and how big the spoon is. So this returns zero and the
-   * callers print the days instead. An invented bottle count on a child's
-   * prescription is exactly the sort of confident wrong number this app must
-   * never produce.
+   * Safeer chose this over the number of spoons: one spoon twice a day for five
+   * days is 50 ml, and a chemist reading 50 ml reaches for a 60 ml bottle
+   * without doing any arithmetic at all. Ten spoons would leave him to do it.
+   *
+   * A spoon is the 5 ml cap that comes with the bottle unless this medicine
+   * says otherwise, and `mlPerDose` says otherwise for the few that do. It
+   * NEVER changes the printed dose, which is still exactly what the doctor
+   * tapped. It chooses a bottle, and being one bottle out is a walk back to the
+   * counter, not a wrong dose.
    */
-  if (form === 'syr' || form === 'other') return { n: 0, unit: `${l.days} days` }
+  if (form === 'syr') {
+    const ml = (m?.mlPerDose && m.mlPerDose > 0 ? m.mlPerDose : 5) * perDay * l.days
+    const n = Math.ceil(ml)
+    return n > 0 ? { n, unit: 'ml' } : { n: 0, unit: `${l.days} days` }
+  }
+
+  /**
+   * DROPS AND CREAMS GET NO TOTAL, ON PURPOSE.
+   *
+   * A 15 ml dropper bottle holds roughly three hundred drops, and a tube of
+   * cream lasts as long as it lasts. Every short course fits one of either, so
+   * a number here would be arithmetic nobody uses, and a bottle count would be
+   * a guess dressed up as a fact. The chemist sells one and always has.
+   */
+  if (form === 'drop' || form === 'cream' || form === 'other') {
+    return { n: 0, unit: `${l.days} days` }
+  }
+
   const n = Math.ceil(perDay * l.days)
-  return { n, unit: form === 'cap' ? 'capsules' : 'tablets' }
+  return { n, unit: form === 'cap' ? 'capsules' : form === 'sachet' ? 'sachets' : 'tablets' }
 }
 
 /**
@@ -60,5 +83,11 @@ export function course(l: RxLine, snap?: RxSnap): { n: number; unit: string } {
  */
 export const courseUnitSd = (l: RxLine, snap?: RxSnap): string => {
   const m = snap ?? l.snap
-  return m?.unitSd || (m?.form === 'cap' ? 'ڪيپسول' : 'گوري')
+  const form = m?.form ?? 'tab'
+  // A volume needs no noun: "50 ml" is complete in every language on this page,
+  // and it is what the box itself says.
+  if (form === 'syr') return 'ml'
+  const sd = doseSdFor(form)
+  if (!sd) return ''
+  return m?.unitSd || sd
 }

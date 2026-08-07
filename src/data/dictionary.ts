@@ -1,4 +1,5 @@
 import type { Form } from '../types'
+import { FORM_LABEL } from './forms'
 
 /**
  * The verified dictionary.
@@ -69,5 +70,5 @@ export function searchDictionary(q: string, limit = 8): DictEntry[] {
 /** What a row shows. The disambiguator is text, not a picture: two look-alike
  *  brands always differ visibly here, and this never goes stale. */
 export const dictLine = (e: DictEntry) =>
-  [e.brand, e.strength, e.form === 'cap' ? 'capsule' : e.form === 'syr' ? 'syrup' : 'tablet', e.generic]
+  [e.brand, e.strength, FORM_LABEL[e.form].toLowerCase(), e.generic]
     .filter(Boolean).join(' · ')

@@ -6,6 +6,7 @@ import { searchDictionary, dictLine, type DictEntry } from '../../data/dictionar
 import { whoGeneric, searchGenerics, normGeneric, WHO_EDITION } from '../../data/who'
 import { ArtNoDrugs, IcSearch } from '../../ui/art'
 import { Note, Tip } from '../../ui/Note'
+import { doseSdFor, defaultRoute } from '../../data/forms'
 import type { Drug, Form } from '../../types'
 
 /**
@@ -20,11 +21,19 @@ import type { Drug, Form } from '../../types'
  * on them. He can still add anything mid-consultation later.
  */
 
-const SYR = /\b(syr|syrup|susp|suspension|drops|solution|elixir)\b/i
+// Drops used to be inside this pattern, so a doctor typing "TOBREX eye drops"
+// got a syrup, and the slip printed him a spoon. Order matters below: a line
+// can carry both "drops" and "solution".
+const DROP_RE = /\b(drops?|drp|e\/d)\b/i
+const CREAM_RE = /\b(cream|oint|ointment|gel|lotion)\b/i
+const SACHET_RE = /\b(sachet|sachets|sach|powder|granules|ors)\b/i
+const SYR = /\b(syr|syrup|susp|suspension|solution|elixir)\b/i
 const CAP = /\b(cap|caps|capsule|capsules)\b/i
 
+/** The dose word for a form, and only when a person has read it. An unread
+ *  word is left blank and the slip prints the English one: see data/forms.ts. */
 function unitFor(f: Form): string {
-  return f === 'cap' ? 'ڪيپسول' : f === 'syr' ? 'چمچو' : 'گوري'
+  return doseSdFor(f)
 }
 
 /** One medicine per line. "BRAND 500mg" or "BRAND 500mg - Generic" or with a comma. */
@@ -43,13 +52,17 @@ export function parseList(text: string): Drug[] {
 
     // "RISEK 20mg cap" -> RISEK / 20mg / capsule, not a brand called "20mg cap".
     // The form word is a fact about the medicine, never part of its printed name.
-    const form: Form = SYR.test(lhsRaw) ? 'syr' : CAP.test(lhsRaw) ? 'cap' : 'tab'
+    const form: Form = DROP_RE.test(lhsRaw) ? 'drop'
+      : CREAM_RE.test(lhsRaw) ? 'cream'
+      : SACHET_RE.test(lhsRaw) ? 'sachet'
+      : SYR.test(lhsRaw) ? 'syr'
+      : CAP.test(lhsRaw) ? 'cap' : 'tab'
     const lhs = lhsRaw.replace(SYR, ' ').replace(CAP, ' ').replace(/\s+/g, ' ').trim()
 
     const { name, rest } = splitBrand(lhs)
     if (!name) continue
     const brand = name.toUpperCase()
-    const strength = rest || (form === 'syr' ? 'syrup' : '')
+    const strength = rest || (form === 'syr' ? 'syrup' : form === 'drop' ? 'drops' : '')
     const key = (brand + ' ' + strength).trim().toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
@@ -57,7 +70,7 @@ export function parseList(text: string): Drug[] {
       id: 'own_' + uid(),
       brand, strength, generic,
       sd: toSindhi(name), sdReviewed: false,   // never printed until a person checks it
-      form, unitSd: unitFor(form), addedAt: Date.now(),
+      form, route: defaultRoute(form), unitSd: unitFor(form), addedAt: Date.now(),
     })
   }
   return out
@@ -105,7 +118,7 @@ export default function DrugsStep() {
     await db.drugs.add({
       id: 'own_' + uid(), brand: e.brand, strength: e.strength, generic: e.generic,
       sd: e.sd || toSindhi(e.brand), sdReviewed: false, form: e.form, addedAt: Date.now(),
-      unitSd: e.form === 'cap' ? 'ڪيپسول' : e.form === 'syr' ? 'چمچو' : 'گوري',
+      unitSd: doseSdFor(e.form), route: defaultRoute(e.form),
     })
     setFind('')
     await load()
