@@ -18,7 +18,7 @@ import {
 import { buildingMode, hostHere, setHostHere, sittingsList } from '../building'
 import { qrSvgRaw } from '../print/qr'
 import { service, setService, daysOverdue, makeCode, isoDay } from '../service'
-import { STAFF_ROLES, staffRoles, setStaffRoles, owner, setOwner, type Owner } from '../staff'
+import { STAFF_ROLES, staffRoles, setStaffRoles, owner, setOwner, mayPin, type Owner } from '../staff'
 import { storeKind, setStoreKind, type Store } from '../store'
 
 /**
@@ -473,6 +473,9 @@ function PinTab() {
   const [, redraw] = useState(0)
 
   async function save(r: Role) {
+    // The check is here as well as on the control, for the same reason the
+    // router is the gate and not the menu: a hidden button is a decoration.
+    if (!mayPin(role(), r)) { setMsg('That PIN is not yours to set.'); return }
     const v = pin[r]
     if (v && v.length < 4) { setMsg('Use at least 4 digits.'); return }
     await setRolePin(r, v)
@@ -489,18 +492,47 @@ function PinTab() {
         and save to remove that PIN.
       </p>
 
-      {ROLES.map(r => (
-        <div className="pinrow" key={r}>
-          <div className="pw">
-            <b>{ROLE_NAME[r]} <span className="sd">{ROLE_SD[r]}</span></b>
-            <small>{pinSet(r) ? 'A PIN is set' : 'No PIN, opens with one tap'}</small>
+      {/**
+        * WHOSE PIN IS WHOSE.
+        *
+        * `mayPin` has said since it was written that the doctor's PIN is the
+        * doctor's, whoever owns the building. It was never called. So this tab
+        * offered every PIN to everybody: the NUSKHO role, signing in for
+        * support, could set the doctor's PIN and then walk in through the front
+        * door to the prescriptions. The website says nobody, including us, can
+        * open a doctor's screen. That was not true from this tab.
+        *
+        * A row nobody may set is SHOWN and locked rather than hidden. Hidden,
+        * the support person concludes the feature is missing and rings up.
+        * Locked and labelled, the screen states the rule, and a promise stated
+        * where somebody wanted to break it is worth more than a promise on a
+        * website.
+        */}
+      {ROLES.map(r => {
+        const mine = mayPin(role(), r)
+        return (
+          <div className={'pinrow' + (mine ? '' : ' locked')} key={r}>
+            <div className="pw">
+              <b>{ROLE_NAME[r]} <span className="sd">{ROLE_SD[r]}</span></b>
+              <small>{!mine ? 'His own, and only his'
+                : pinSet(r) ? 'A PIN is set' : 'No PIN, opens with one tap'}</small>
+            </div>
+            {mine ? (
+              <>
+                <input type="password" inputMode="numeric" maxLength={8} placeholder="4+ digits"
+                       value={pin[r]}
+                       onChange={e => { setPin(p => ({ ...p, [r]: e.target.value.replace(/\D/g, '') })); setMsg('') }} />
+                <button className="btn ghost" onClick={() => save(r)}>Save</button>
+              </>
+            ) : (
+              <span className="pinlock">
+                {pinSet(r) ? 'A PIN is set' : 'No PIN yet'}. Only the doctor can change it,
+                at this machine.
+              </span>
+            )}
           </div>
-          <input type="password" inputMode="numeric" maxLength={8} placeholder="4+ digits"
-                 value={pin[r]}
-                 onChange={e => { setPin(p => ({ ...p, [r]: e.target.value.replace(/\D/g, '') })); setMsg('') }} />
-          <button className="btn ghost" onClick={() => save(r)}>Save</button>
-        </div>
-      ))}
+        )
+      })}
       {msg && <p className="usable">{msg}</p>}
 
       <p className="hint">

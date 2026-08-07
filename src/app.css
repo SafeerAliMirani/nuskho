@@ -906,6 +906,14 @@ body{
 .pinrow{display:grid;grid-template-columns:1fr 150px auto;gap:var(--s3);align-items:center;
   padding:var(--s3) 0;border-bottom:1px solid var(--line-2)}
 .pinrow:last-of-type{border-bottom:0}
+/* A PIN this person may not set. Shown and locked rather than hidden, so the
+   screen states the rule at the moment somebody wanted to break it. */
+.pinrow.locked{grid-template-columns:1fr auto}
+.pinrow .pinlock{font-size:var(--t-sm);color:var(--mut);max-width:280px;text-align:right;line-height:1.5}
+@media (max-width:560px){
+  .pinrow.locked{grid-template-columns:1fr}
+  .pinrow .pinlock{text-align:left}
+}
 .pinrow .pw b{display:block;font-size:15px}
 .pinrow .pw .sd{font-family:'NK',serif;font-weight:400;color:var(--mut);margin-left:6px}
 .pinrow .pw small{color:var(--mut);font-size:var(--t-sm)}

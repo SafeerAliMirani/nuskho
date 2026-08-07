@@ -89,7 +89,10 @@ export function backupFilename(kind: 'setup' | 'full', p = profile()): string {
  */
 export class DemoRefusal extends Error {
   constructor() {
-    super('This is a practice copy. It cannot save records to a file — set up the clinic first.')
+    // Said to a person now, not only thrown: the Backup screen used to swallow
+    // this and leave the button looking like it had worked. So it obeys the
+    // same rule as everything else Nuskho says out loud, and carries no dash.
+    super('This is a practice copy, so it cannot save records to a file. Set the clinic up first.')
     this.name = 'DemoRefusal'
   }
 }
