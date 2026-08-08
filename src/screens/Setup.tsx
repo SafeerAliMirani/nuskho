@@ -19,7 +19,7 @@ import {
 import { buildingMode, hostHere, setHostHere, sittingsList } from '../building'
 import { qrSvgRaw } from '../print/qr'
 import { service, setService, daysOverdue, makeCode, isoDay } from '../service'
-import { STAFF_ROLES, staffRoles, setStaffRoles, owner, setOwner, mayPin, type Owner } from '../staff'
+import { STAFF_ROLES, staffRoles, setStaffRoles, owner, setOwner, mayPin, mayStaff, type Owner } from '../staff'
 import { storeKind, setStoreKind, type Store } from '../store'
 
 /**
@@ -326,9 +326,13 @@ function StaffTab() {
   const [shop, setShop] = useState<Store>(() => storeKind())
   const [saved, setSaved] = useState(false)
   const iAmNuskho = role() === 'admin'
+  /** Nuskho, or whoever owns this building. Nobody else. */
+  const mine = mayStaff(role())
 
+  /** The check is here as well as on the control, for the same reason the
+   *  router is the gate and not the menu: a disabled box is a courtesy. */
   const toggle = (r: Role) => {
-    if (r === 'doctor') return
+    if (r === 'doctor' || !mine) return
     setOn(p => p.includes(r) ? p.filter(x => x !== r) : [...p, r])
     setSaved(false)
   }
@@ -342,11 +346,31 @@ function StaffTab() {
         off and opens Nuskho with one tap.
       </p>
 
+      {/**
+        * WHOSE DECISION THIS IS.
+        *
+        * `mayStaff` in staff.ts has said since it was written that only the
+        * OWNER or Nuskho decides which jobs a building has, and it was never
+        * called. This tab is reached on `can('staff')`, which the doctor, the
+        * clinic admin and Nuskho all hold, so in a building the doctor owns his
+        * clinic admin could switch the counter or the pharmacy off. That is an
+        * employer's decision, and Safeer's words are the rule: "if the app is
+        * directly purchased by doctor then doctor can assign roles and if the
+        * app is purchased by admin then he can."
+        *
+        * The owner picker below was already locked to us, so nobody could ever
+        * promote himself, which is the sharper half. This is the other half.
+        *
+        * Shown and locked, not hidden, for the same reason the doctor's PIN row
+        * is: hidden, somebody concludes the feature is missing and rings up.
+        * Locked and labelled, the screen states whose decision it is at the
+        * moment somebody went looking for it.
+        */}
       {STAFF_ROLES.map(r => {
         const isOn = on.includes(r)
         return (
-          <label className={'check' + (r === 'doctor' ? ' fixed' : '')} key={r}>
-            <input type="checkbox" checked={isOn} disabled={r === 'doctor'}
+          <label className={'check' + (r === 'doctor' || !mine ? ' fixed' : '')} key={r}>
+            <input type="checkbox" checked={isOn} disabled={r === 'doctor' || !mine}
                    onChange={() => toggle(r)} />
             <span><b>{ROLE_NAME[r]} <span className="sd">{ROLE_SD[r]}</span></b>
               <small>{ROLE_WHAT[r]}{r === 'doctor' ? '. Always on: somebody has to be able to open the clinic.' : ''}</small></span>
@@ -420,13 +444,30 @@ function StaffTab() {
           </span>
         </div>
       ) : (
+        /**
+         * This sentence was already here, and it was already right. It just was
+         * not TRUE: the list above it stayed editable by anybody who reached
+         * this tab, which in a doctor-owned building includes the clinic admin.
+         * `mayStaff` said otherwise and was never called. The boxes are locked
+         * for whoever this sentence is about now, so the screen and the code
+         * finally agree.
+         */
         <p className="hint" style={{ marginTop: 16 }}>
-          This clinic is owned by the <b>{ROLE_NAME[own]}</b>, so that is who may change
-          this list. Ring us if that is wrong.
+          {mine
+            ? <>This clinic is owned by the <b>{ROLE_NAME[own]}</b>, which is you, so this
+                list is yours to change. Ring us if that is wrong.</>
+            : <>This clinic is owned by the <b>{ROLE_NAME[own]}</b>, so that is who may change
+                this list. You can see it here. Ring us if that is wrong.</>}
         </p>
       )}
 
-      <button className="btn wide" onClick={() => {
+      {/* The gate is on the save as well as on the boxes. A disabled checkbox
+          is a courtesy; this is the rule. */}
+      {/* Its own class. Setup renders a second, global Save on every tab for the
+          profile and paper drafts, and a check that grabs "the last wide Save"
+          finds that one and reports this rule unenforced when it is enforced. */}
+      <button className="btn wide staffsave" disabled={!mine} onClick={() => {
+        if (!mine) return
         setStaffRoles(on); setStoreKind(shop); if (iAmNuskho) setOwner(own); setSaved(true)
         window.dispatchEvent(new CustomEvent('nuskho:role'))
       }}>{saved ? 'Saved ✓' : 'Save'}</button>

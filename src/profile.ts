@@ -127,42 +127,28 @@ export function profileComplete(p = profile()): boolean {
 }
 
 /* --------------------------------------------------------------------------
-   Screen lock.
+   THE SCREEN LOCK USED TO LIVE HERE. It does not any more.
 
-   A PIN, held on the device, checked against a hash. NOT an account: it must
-   work with the router unplugged, because an evening without internet is a
-   normal evening here and it cannot be an evening without prescriptions.
+   Before roles there was one PIN for the whole app, at `nuskho.pin`, with
+   `pinIsSet`, `setPin` and `checkPin` beside it. Roles gave every job its own
+   PIN in `roles.ts` and nothing here was ever removed, so three authentication
+   functions sat in this file reading a key no door consulted. `checkPin`
+   returned TRUE for any input on a machine that had moved on, which is
+   correct-looking, plausible, and would open anything the next person wired it
+   to.
 
-   What it defends against is the real risk — a laptop left open on a desk in a
-   room full of strangers, with every patient's history one tap away.
+   Dead authentication is worse than missing authentication: it looks like a
+   lock. The real one is `checkRolePin` in roles.ts, and `adoptOldPin()` there
+   carries an old machine's number onto the doctor at startup, which is the only
+   reason `nuskho.pin` is ever read now.
+
+   The hashing stayed, because the ADMIN passphrase below still uses it.
    -------------------------------------------------------------------------- */
-const PIN_KEY = 'nuskho.pin'
 
 async function hash(pin: string, salt: string): Promise<string> {
   const data = new TextEncoder().encode(salt + '|' + pin)
   const buf = await crypto.subtle.digest('SHA-256', data)
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-export function pinIsSet(): boolean {
-  try { return !!localStorage.getItem(PIN_KEY) } catch { return false }
-}
-
-export async function setPin(pin: string): Promise<void> {
-  if (!pin) { try { localStorage.removeItem(PIN_KEY) } catch { /* ignore */ } return }
-  const salt = [...crypto.getRandomValues(new Uint8Array(8))]
-    .map(b => b.toString(16).padStart(2, '0')).join('')
-  const h = await hash(pin, salt)
-  try { localStorage.setItem(PIN_KEY, JSON.stringify({ salt, h })) } catch { /* ignore */ }
-}
-
-export async function checkPin(pin: string): Promise<boolean> {
-  try {
-    const raw = localStorage.getItem(PIN_KEY)
-    if (!raw) return true
-    const { salt, h } = JSON.parse(raw)
-    return (await hash(pin, salt)) === h
-  } catch { return true }   // a broken lock must never lock the doctor out
 }
 
 /* --------------------------------------------------------------------------

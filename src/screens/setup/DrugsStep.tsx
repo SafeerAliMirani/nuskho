@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { db, uid, doctorDrugs, archiveDrug, similarDrugs } from '../../db'
+import { db, uid, doctorDrugs, archiveDrug, unarchiveDrug, similarDrugs } from '../../db'
 import { formulary } from '../../data/formulary'
 import { toSindhi, splitBrand } from '../../data/translit'
 import { searchDictionary, dictLine, type DictEntry } from '../../data/dictionary'
@@ -145,6 +145,35 @@ export default function DrugsStep() {
     await load()
   }
 
+  /**
+   * RETIRE WAS A ONE-WAY DOOR, AND IT SHOULD NEVER HAVE BEEN.
+   *
+   * `doctorDrugs()` filters archived medicines out of the picker — correctly,
+   * that is the whole point of retiring one — and this list is built from it.
+   * So a mis-tap on the button one line below took a medicine off every screen
+   * in the app, with nothing anywhere showing what had gone.
+   *
+   * `unarchiveDrug` has existed as long as `archiveDrug` and had no caller. The
+   * DOCTORS list, in this same Setup screen, has always offered retire and
+   * bring back side by side. This list offered half of it.
+   *
+   * Nothing was ever lost: the row stays in the database and every slip already
+   * printed carries its own frozen copy of the medicine, which is what
+   * snapshots are for. What was lost was the doctor's ability to correct
+   * himself, and it belongs HERE rather than in the review queue, because the
+   * review queue is behind the Nuskho passphrase and the doctor who pressed
+   * retire cannot open it.
+   */
+  const [gone, setGone] = useState<Drug[]>([])
+  const loadGone = async () => setGone((await db.drugs.toArray()).filter(d => d.archived))
+  useEffect(() => { loadGone() }, [mine])
+
+  async function bringBack(id: string) {
+    await unarchiveDrug(id)
+    await load()
+    await loadGone()
+  }
+
   /** Attach a medicine to a formula from the WHO list. */
   async function setGeneric(id: string, name: string) {
     await db.drugs.update(id, { generic: name })
@@ -262,6 +291,29 @@ export default function DrugsStep() {
           )
         })}
       </div>
+
+      {/* Hidden on every evening nothing is retired, because a permanent empty
+          heading in a settings screen is a thing people learn to scroll past,
+          and this one needs reading on the evening it has something in it. */}
+      {gone.length > 0 && (
+        <div className="lhbox" style={{ marginTop: 18 }}>
+          <h3>Retired — {gone.length}</h3>
+          <p>
+            Off the picker and off every screen, and still on this machine. Prescriptions
+            already printed are untouched: each one carries its own copy of the medicine
+            exactly as it was that evening.
+          </p>
+          {gone.map(d => (
+            <div className="drow2" key={d.id}>
+              <div>
+                <b>{d.brand} {d.strength}</b>
+                <span>{d.generic || 'no formula'}{d.sd ? ` \u00b7 ${d.sd}` : ''}</span>
+              </div>
+              <button className="btn ghost" onClick={() => bringBack(d.id)}>Bring it back</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Tip tone="info">
         <b>Access</b>, <b>Watch</b> and <b>Reserve</b> are WHO's own antibiotic groups, from the
