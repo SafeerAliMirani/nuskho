@@ -131,14 +131,35 @@ export type SaveResult =
  */
 export async function downloadBackup(kind: 'setup' | 'full'): Promise<SaveResult> {
   if (isDemo) throw new DemoRefusal()
-  const data = await makeBackup(kind)
-  const text = JSON.stringify(data, null, 2)
   const name = backupFilename(kind)
-  return await saveText(text, name)
+  /**
+   * THE DIALOG IS ASKED FOR FIRST, AND THE RECORDS ARE GATHERED AFTERWARDS.
+   *
+   * A browser will only open a Save dialog while it can still see the click
+   * that asked for one, and it stops seeing it a few seconds later. This used
+   * to read the entire database before asking, which is fine in a clinic three
+   * weeks old and is not fine in one with a year of patients in it: by the time
+   * the dialog was asked for, the click had expired, Chrome refused, and the
+   * code fell through to the hidden link. The file then went quietly to
+   * Downloads instead of the pen drive he was holding, and the screen could
+   * only say it did not know where it had gone.
+   *
+   * The clinic that most needs its backup to reach the pen drive is the one
+   * with the most records in it, so the order mattered exactly backwards.
+   */
+  const w = await openSave(name)
+  const text = JSON.stringify(await makeBackup(kind), null, 2)
+  return await w(text)
 }
 
-/** The same save, for any text this app produces. */
-export async function saveText(text: string, name: string): Promise<SaveResult> {
+/**
+ * Ask for the Save dialog now, and come back with something that writes.
+ *
+ * Split out of `saveText` so a caller with a lot of data to gather can ask
+ * while the click is still fresh, and gather afterwards. A caller with the text
+ * already in hand does not need to care and uses `saveText`.
+ */
+async function openSave(name: string): Promise<(text: string) => Promise<SaveResult>> {
   const picker = (window as unknown as {
     showSaveFilePicker?: (o: unknown) => Promise<{
       createWritable: () => Promise<{ write: (d: unknown) => Promise<void>; close: () => Promise<void> }>
@@ -151,27 +172,37 @@ export async function saveText(text: string, name: string): Promise<SaveResult> 
         suggestedName: name,
         types: [{ description: 'Nuskho backup', accept: { 'application/json': ['.json'] } }],
       })
-      const w = await handle.createWritable()
-      await w.write(new Blob([text], { type: 'application/json' }))
-      await w.close()
-      noteExported()
-      return { saved: true, sure: true, name }
+      return async (text: string) => {
+        const w = await handle.createWritable()
+        await w.write(new Blob([text], { type: 'application/json' }))
+        await w.close()
+        noteExported()
+        return { saved: true, sure: true, name }
+      }
     } catch (e) {
-      // He pressed Cancel. Nothing was written and nothing is marked.
-      if ((e as { name?: string })?.name === 'AbortError') return { saved: false, sure: true }
-      // Anything else (a picker the browser refused to open, a drive that
-      // vanished mid-write) falls through to the link, which at least tries.
+      // He pressed Cancel. Nothing was written and nothing is marked, and the
+      // answer must not be the link: that would save a file he just refused.
+      if ((e as { name?: string })?.name === 'AbortError') return async () => ({ saved: false, sure: true })
+      // Anything else (a picker the browser would not open, a drive that
+      // vanished) falls through to the link, which at least tries.
     }
   }
 
-  const blob = new Blob([text], { type: 'application/json' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = name
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000)
-  // Deliberately NOT noteExported(). This path genuinely does not know.
-  return { saved: true, sure: false, name }
+  return async (text: string) => {
+    const blob = new Blob([text], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = name
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+    // Deliberately NOT noteExported(). This path genuinely does not know.
+    return { saved: true, sure: false, name }
+  }
+}
+
+/** The same save, for any text this app produces. */
+export async function saveText(text: string, name: string): Promise<SaveResult> {
+  return (await openSave(name))(text)
 }
 
 export type RestoreReport = {

@@ -16,6 +16,8 @@ import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn } from 
 import { APP } from '../profile'
 import Broke from '../ui/Broke'
 import Toasts from '../ui/Toasts'
+import { whyItFailed } from '../fail'
+import { Note } from '../ui/Note'
 import type { TokenSlip } from '../print/token'
 
 /**
@@ -151,6 +153,9 @@ export default function Mirror() {
 
 /* ------------------------------------------------------------------- the door */
 
+/** An empty list is not an answer, it is the absence of one. */
+const mine = (rs: Role[]): Role[] => (rs.length ? rs : MIRROR_ROLES)
+
 function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
   const [want, setWant] = useState<Role | null>(null)
   const [pin, setPin] = useState('')
@@ -246,8 +251,16 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
                 doctor alone, and was offered no door at all. Until the host has
                 been heard we fall back to this phone's own idea, and then to
                 every mirror role, because a door that is disabled anyway is
-                better than an empty screen with no explanation. */}
-            {(buildingRoles() ?? MIRROR_ROLES.filter(roleIsOn)).map(r => {
+                better than an empty screen with no explanation.
+
+                THE THIRD FALLBACK WAS WRITTEN DOWN HERE AND NOT WRITTEN IN
+                CODE. A phone out of its box has an empty staff list, so it
+                answers "doctor", and a doctor is not a mirror role. The filter
+                below therefore came back empty and the installer got the exact
+                screen this paragraph promised he would not: a heading, a
+                sentence, and nothing under it. He rings up, and the first
+                minute of the wire is a phone call. */}
+            {(buildingRoles() ?? mine(MIRROR_ROLES.filter(roleIsOn))).map(r => {
               const I = ICON[r]
               const off = busy || !up
               return (
@@ -611,6 +624,49 @@ function MQueue({ s, role }: { s: WireState; role: Role }) {
   const [vit, setVit] = useState<Record<string, string>>({})
   const [closing, setClosing] = useState<string | null>(null)
   const [busy, setBusy] = useState('')
+  /** What the clinic machine refused, or never heard, in words for the person
+   *  holding the phone. Cleared the moment he tries again. */
+  const [err, setErr] = useState('')
+
+  /**
+   * NOTHING ON THIS PANEL CLOSES UNTIL THE CLINIC MACHINE HAS SAID YES.
+   *
+   * A phone on a clinic's wifi loses the wire in the corridor, by the X-ray
+   * door, in the middle of a busy evening. `intent` does not throw when that
+   * happens: it waits eight seconds for an answer that never comes and then
+   * hands back a no, exactly as it does when the record holder refuses the
+   * write. A handler that never reads that answer cannot tell a blood pressure
+   * that reached the records from one that died in a phone in a corridor, and
+   * this panel used to shut on both. The compounder went back to the queue
+   * certain the reading was in the system, and the doctor called the patient in
+   * to a slip with nothing on it.
+   *
+   * `done` runs on a yes and on nothing else. On a no the typed readings stay
+   * in their boxes, because the alternative is asking a man to put the cuff
+   * back on somebody who has already rolled his sleeve down and gone to sit
+   * outside.
+   */
+  async function ask(
+    key: string, did: string, kind: 'setVitals' | 'closeVisit',
+    p: Record<string, unknown>, done: () => void,
+  ): Promise<void> {
+    if (busy === key) return
+    setBusy(key); setErr('')
+    try {
+      const r = await intent(kind, p)
+      if (r.ok === false) { setErr(whyItFailed(r.why, did)); return }
+      done()
+    } catch (e) {
+      // The wire answers rather than throwing, so this is for the day somebody
+      // changes that. The console keeps the real thing for whoever is looking.
+      console.error('[nuskho] ' + did, e)
+      setErr(whyItFailed(e, did))
+    } finally {
+      // Whatever the answer was. A button that never comes back is the same
+      // evening lost by a slower route.
+      setBusy('')
+    }
+  }
 
   /** The tests are the doctor's to order and this role's to do. A counter
    *  clerk on this screen sees the cuff and nothing else. */
@@ -622,7 +678,7 @@ function MQueue({ s, role }: { s: WireState; role: Role }) {
       {[...s.visits].sort(byUrgent).map(v => (
         <div key={v.id} className="qwrap">
           <button className={'qrow' + (v.urgent && v.status === 'waiting' ? ' urgent' : '') + (v.status === 'done' ? ' done' : '')}
-                  onClick={() => { setOpen(open === v.id ? null : v.id); setVit({}); setClosing(null) }}>
+                  onClick={() => { setOpen(open === v.id ? null : v.id); setVit({}); setClosing(null); setErr('') }}>
             <span className="tk">{v.token}</span>
             <span className="nm">{v.name}
               <small>{roomTag(s, v)}{v.hasVitals ? 'vitals taken · ' : ''}{feeLine(v)}</small>
@@ -654,24 +710,35 @@ function MQueue({ s, role }: { s: WireState; role: Role }) {
                 </>
               )}
               <div className="row" style={{ marginTop: 8 }}>
-                <button className="btn ghost" onClick={async () => {
+                <button className="btn ghost" disabled={busy === 'vitals:' + v.id} onClick={() => {
                   const clean = Object.fromEntries(Object.entries(vit).filter(([, x]) => x.trim()))
-                  await intent('setVitals', { visitId: v.id, vitals: clean })
-                  setOpen(null)
+                  ask('vitals:' + v.id, 'The vitals were not saved', 'setVitals',
+                      { visitId: v.id, vitals: clean }, () => setOpen(null))
                 }}>Save vitals · ready for the room</button>
                 {closing === v.id ? (
                   <div className="chips">
                     {([['seen', 'Seen, no medicine'], ['referred', 'Sent on'], ['left', 'Left'], ['cancelled', 'Cancelled']] as const)
                       .map(([st, l]) => (
-                        <button key={st} className="chip" onClick={async () => {
-                          await intent('closeVisit', { visitId: v.id, status: st }); setOpen(null)
-                        }}>{l}</button>
+                        // An ending is a record too, and one that did not land
+                        // leaves a patient sitting in the queue all evening
+                        // while the phone that closed him says he has gone.
+                        <button key={st} className="chip" disabled={busy === 'close:' + v.id}
+                                onClick={() => ask('close:' + v.id, 'The token was not closed', 'closeVisit',
+                                                   { visitId: v.id, status: st }, () => setOpen(null))}>{l}</button>
                       ))}
                   </div>
                 ) : (
                   <button className="lnk" onClick={() => setClosing(v.id)}>close without prescription</button>
                 )}
               </div>
+              {/* Beside the button that was pressed, not at the top of a queue
+                  the thumb has already scrolled past. This is the last thing he
+                  reads before he walks away from the patient. */}
+              {err && (
+                <div className="saidno" style={{ marginTop: 8 }}>
+                  <Note tone="stop" title="That did not go through">{err}</Note>
+                </div>
+              )}
             </div>
           )}
           {/* Money for a test done in the room, taken at the door on the way

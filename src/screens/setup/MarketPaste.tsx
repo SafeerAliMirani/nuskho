@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { cleanList, tally, isClean, ISSUE_TEXT, type CleanRow } from '../../data/clean'
-import { searchGenerics, whoGeneric, WHO_EDITION } from '../../data/who'
+import { PK_GENERICS, searchPkGenerics, pkClassOf } from '../../data/pk'
 import { toSindhi } from '../../data/translit'
 import { db, uid, doctorDrugs, similarDrugs } from '../../db'
 import type { Drug } from '../../types'
@@ -34,6 +34,12 @@ TOTAL                        1,962.00`
 
 type Row = CleanRow & { keep: boolean; sd: string }
 
+/** One molecule, one key, so a shop's spelling and ours settle into one word. */
+const gkey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/** The shelf's own spelling of a formula, for the formulas the shelf has. */
+const SHELF_SPELLING = new Map(PK_GENERICS.map(g => [gkey(g), g]))
+
 export default function MarketPaste() {
   const [text, setText] = useState('')
   const [rows, setRows] = useState<Row[] | null>(null)
@@ -65,9 +71,8 @@ export default function MarketPaste() {
   /** Picking the formula fills the Sindhi guess too, since the two are one
    *  decision: what molecule is this, and what do we call it in Sindhi. */
   function pickGeneric(i: number, name: string) {
-    const g = whoGeneric(name)
     setRows(rs => rs && rs.map((r, k) => k === i
-      ? { ...r, generic: g?.name ?? name, sd: r.sd || toSindhi(r.brand) }
+      ? { ...r, generic: SHELF_SPELLING.get(gkey(name)) ?? name, sd: r.sd || toSindhi(r.brand) }
       : r))
     setGFix(null)
   }
@@ -134,9 +139,11 @@ export default function MarketPaste() {
             <div><span>Set aside</span><b>{t.total - t.clean}</b></div>
           </div>
           <p className="hint">
-            Untick anything wrong, then give each row its formula from the WHO list
-            ({WHO_EDITION}). The formula is what carries the Sindhi, so a row without one
-            can never print a Sindhi name.
+            Untick anything wrong, then give each row its formula off the shelf. A Sindhi
+            brand word is optional and nothing here claims one: the Sindhi that reaches the
+            paper is the form and the timing, and those are a closed set somebody has already
+            read. Anything typed in the Sindhi box waits for the Review tab before it prints,
+            the same as every other Sindhi word in the app.
           </p>
         </>
       )}
@@ -152,11 +159,7 @@ export default function MarketPaste() {
                 <span className="frm">{FORM_LABEL[r.form].toLowerCase()}</span>
 
                 {r.generic ? (
-                  <span className="gen">{r.generic}
-                    {whoGeneric(r.generic)?.aware &&
-                      <b className={'aware ' + whoGeneric(r.generic)!.aware!.toLowerCase()}>
-                        {whoGeneric(r.generic)!.aware}</b>}
-                  </span>
+                  <span className="gen">{r.generic}</span>
                 ) : gFix === i ? (
                   <Pick start={r.brand} onPick={n => pickGeneric(i, n)} onClose={() => setGFix(null)} />
                 ) : (
@@ -210,7 +213,7 @@ export default function MarketPaste() {
 function Pick({ start, onPick, onClose }:
   { start: string; onPick: (n: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
-  const hits = searchGenerics(q)
+  const hits = searchPkGenerics(q)
   return (
     <span className="gpick">
       <input autoFocus value={q} placeholder={`formula for ${start}`}
@@ -219,10 +222,9 @@ function Pick({ start, onPick, onClose }:
       {hits.length > 0 && (
         <span className="gopts">
           {hits.map(g => (
-            <button key={g.name} className="gopt" onClick={() => onPick(g.name)}>
-              {g.name}
-              {g.aware && <b className={'aware ' + g.aware.toLowerCase()}>{g.aware}</b>}
-              <small>{g.cls}{g.oral ? ' · ' + g.oral : ''}</small>
+            <button key={g} className="gopt" onClick={() => onPick(g)}>
+              {g}
+              {pkClassOf(g) && <small>{pkClassOf(g)}</small>}
             </button>
           ))}
         </span>
@@ -231,7 +233,7 @@ function Pick({ start, onPick, onClose }:
         <span className="gopts">
           <button className="gopt" onClick={() => onPick(q.trim())}>
             Keep “{q.trim()}” as typed
-            <small>not on the WHO list. Fine, it just gets no formula checks.</small>
+            <small>not on our shelf. Fine, a shop stocks things we have not listed.</small>
           </button>
         </span>
       )}

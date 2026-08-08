@@ -3,7 +3,7 @@ import { db, uid, doctorDrugs, archiveDrug, unarchiveDrug, similarDrugs } from '
 import { formulary } from '../../data/formulary'
 import { toSindhi, splitBrand } from '../../data/translit'
 import { searchDictionary, dictLine, type DictEntry } from '../../data/dictionary'
-import { whoGeneric, searchGenerics, normGeneric, WHO_EDITION } from '../../data/who'
+import { PK_GENERICS, searchPkGenerics, pkClassOf } from '../../data/pk'
 import { ArtNoDrugs, IcSearch } from '../../ui/art'
 import { Note, Tip } from '../../ui/Note'
 import { doseSdFor, defaultRoute } from '../../data/forms'
@@ -36,6 +36,14 @@ function unitFor(f: Form): string {
   return doseSdFor(f)
 }
 
+/** One molecule, one key. A chemist reads "Amoxicillin + Clavulanic acid" and
+ *  "amoxicillin+clavulanic acid" off the same box, so every check below that
+ *  compares one formula against another has to read them the same way too. */
+const gkey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/** The shelf's own spelling of a formula, for the formulas the shelf has. */
+const SHELF_SPELLING = new Map(PK_GENERICS.map(g => [gkey(g), g]))
+
 /** One medicine per line. "BRAND 500mg" or "BRAND 500mg - Generic" or with a comma. */
 export function parseList(text: string): Drug[] {
   const out: Drug[] = []
@@ -45,10 +53,11 @@ export function parseList(text: string): Drug[] {
     if (!line) continue
     const [lhsRaw, ...restParts] = line.split(/\s+[-—–|,]\s+|\t/)
     const typed = restParts.join(' ').trim()
-    // If what he typed is a formula WHO names, store WHO's spelling of it. This
-    // is the only place spelling is unified, and it is worth doing here: two
-    // spellings of one molecule are two molecules to every later check.
-    const generic = whoGeneric(typed)?.name ?? typed
+    // If what he typed is a formula the shelf carries, store the shelf's
+    // spelling of it. This is the only place spelling is unified, and it is
+    // worth doing here: two spellings of one molecule are two molecules to
+    // every later check.
+    const generic = SHELF_SPELLING.get(gkey(typed)) ?? typed
 
     // "RISEK 20mg cap" -> RISEK / 20mg / capsule, not a brand called "20mg cap".
     // The form word is a fact about the medicine, never part of its printed name.
@@ -174,7 +183,7 @@ export default function DrugsStep() {
     await loadGone()
   }
 
-  /** Attach a medicine to a formula from the WHO list. */
+  /** Attach a medicine to a formula. */
   async function setGeneric(id: string, name: string) {
     await db.drugs.update(id, { generic: name })
     setGFix(null)
@@ -189,8 +198,8 @@ export default function DrugsStep() {
    */
   const formulaCount = new Map<string, number>()
   for (const d of mine) {
-    const g = whoGeneric(d.generic)
-    if (g) formulaCount.set(g.name, (formulaCount.get(g.name) ?? 0) + 1)
+    const k = gkey(d.generic)
+    if (k) formulaCount.set(k, (formulaCount.get(k) ?? 0) + 1)
   }
 
   return (
@@ -259,23 +268,19 @@ export default function DrugsStep() {
       )}
       <div className="druglist">
         {mine.map(d => {
-          const g = whoGeneric(d.generic)
-          const shared = g ? (formulaCount.get(g.name) ?? 0) : 0
+          const shared = formulaCount.get(gkey(d.generic)) ?? 0
           return (
           <div className="drow" key={d.id}>
             <b>{d.brand} {d.strength}</b>
-            {g ? (
-              <span className="gen" title={`WHO Model List of Essential Medicines, ${WHO_EDITION}. ${g.oral || 'not an oral medicine'}`}>
-                {g.name}
-                {g.aware && <b className={'aware ' + g.aware.toLowerCase()}>{g.aware}</b>}
+            {d.generic ? (
+              <span className="gen">
+                {d.generic}
                 {shared > 1 && <i className="warnpill">same formula as {shared - 1} other</i>}
               </span>
             ) : gFix === d.id ? (
               <GenericPick start={d.generic} onPick={n => setGeneric(d.id, n)} onClose={() => setGFix(null)} />
             ) : (
-              <button className="lnk gen off" onClick={() => setGFix(d.id)}>
-                {d.generic ? `${d.generic} — not on the WHO list, check it` : 'which formula?'}
-              </button>
+              <button className="lnk gen off" onClick={() => setGFix(d.id)}>which formula?</button>
             )}
             {d.sdReviewed
               ? <span className="sd ok" title="Confirmed. This prints on the slip.">{d.sd} ✓</span>
@@ -316,26 +321,30 @@ export default function DrugsStep() {
       )}
 
       <Tip tone="info">
-        <b>Access</b>, <b>Watch</b> and <b>Reserve</b> are WHO's own antibiotic groups, from the
-        Model List of Essential Medicines ({WHO_EDITION}). Watch and Reserve are the two to
-        think twice about. The list names no brands, so nothing is ever prescribed from it.
+        The search box at the top reaches a shelf of Pakistani brands, the ones printed on the
+        boxes in the chemist's shop across the road. Nothing on it is on his list until he taps
+        it, and what lands is a copy: our shelf can never reach back later and change a medicine
+        he has already prescribed.
       </Tip>
     </>
   )
 }
 
 /**
- * Picking the formula off a closed list rather than typing it.
+ * Picking the formula off the shelf rather than typing it.
  *
  * Free text here was quietly costing us everything downstream: "Amoxicillin+Clav",
  * "Co-amoxiclav" and "amoxycillin + clavulanic acid" are three molecules to a
- * computer and one to a chemist. A closed list ends that permanently, and it is
- * closed by WHO rather than by us.
+ * computer and one to a chemist. Offering him the spelling the shelf already
+ * uses ends that for every formula he meets on an ordinary evening.
+ *
+ * It stays a list of suggestions and never a gate. He knows medicines that are
+ * not on our shelf, and a box he cannot get past is a box he stops using.
  */
 function GenericPick({ start, onPick, onClose }:
   { start: string; onPick: (name: string) => void; onClose: () => void }) {
   const [q, setQ] = useState(start)
-  const hits = searchGenerics(q)
+  const hits = searchPkGenerics(q)
   return (
     <span className="gpick">
       <input autoFocus value={q} placeholder="formula — type three letters"
@@ -344,10 +353,9 @@ function GenericPick({ start, onPick, onClose }:
       {hits.length > 0 && (
         <span className="gopts">
           {hits.map(g => (
-            <button key={g.name} className="gopt" onClick={() => onPick(g.name)}>
-              {g.name}
-              {g.aware && <b className={'aware ' + g.aware.toLowerCase()}>{g.aware}</b>}
-              <small>{g.cls}{g.oral ? ' · ' + g.oral : ''}</small>
+            <button key={g} className="gopt" onClick={() => onPick(g)}>
+              {g}
+              {pkClassOf(g) && <small>{pkClassOf(g)}</small>}
             </button>
           ))}
         </span>
@@ -356,7 +364,7 @@ function GenericPick({ start, onPick, onClose }:
         <span className="gopts">
           <button className="gopt" onClick={() => onPick(q.trim())}>
             Keep “{q.trim()}” as typed
-            <small>not on the WHO list. It still works, it just gets no formula checks.</small>
+            <small>not on our shelf. It works the same, and the same formula check still sees it.</small>
           </button>
         </span>
       )}
@@ -365,6 +373,5 @@ function GenericPick({ start, onPick, onClose }:
   )
 }
 
-/** Exported so ReviewQueue can offer the same closed list. */
+/** Exported so ReviewQueue can offer the same list. */
 export { GenericPick }
-export const isWhoFormula = (s: string) => !!normGeneric(s) && !!whoGeneric(s)

@@ -146,7 +146,20 @@ function Clinic() {
   if (dead && !unlocked) return <Frozen onOpen={() => setUnlocked(true)} />
 
   if (welcome) return <Welcome onDone={() => { setWelcome(false); setLocked(true); refresh() }} />
-  if (locked) return <Lock onOpen={() => { setLocked(false); if (!tourSeen(role())) setTour(true) }} />
+  /**
+   * A TOUR BELONGS TO THE PERSON WHO OPENED IT, AND IT USED TO OUTLIVE HIM.
+   *
+   * This only ever turned the tour ON. Nuskho signs in on the clinic machine to
+   * add a doctor, his own tour opens because he has never seen it, he does the
+   * job and signs out without closing it. The doctor signs back in, the tour is
+   * still open, and because the card reads its words from whoever is signed in
+   * NOW, it shows him the doctor's tour, which he saw weeks ago and dismissed.
+   * It also sits over the role chip, so his first tap does nothing at all.
+   *
+   * Signing in settles it either way: open if this role has not seen it, shut
+   * if he has, and never anybody else's left standing on his screen.
+   */
+  if (locked) return <Lock onOpen={() => { setLocked(false); setTour(!tourSeen(role())) }} />
 
   const printed = today.filter(v => v.printedAt).length
 

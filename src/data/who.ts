@@ -1,48 +1,48 @@
 /**
- * The WHO Model List of Essential Medicines, 24th list (2025), as a spine.
+ * A TABLE OF MOLECULE NAMES. NOT A MEDICINE LIST, AND NOT ON ANY SCREEN.
  *
- * WHY THIS FILE EXISTS AND WHAT IT IS NOT
+ * WHAT THIS FILE USED TO BE, AND WHY IT STOPPED.
  *
- * It is NOT a medicine catalogue and it can never become one. There is not a
- * single brand name in it, because WHO does not name brands. No doctor in
- * Larkana writes "amoxicillin + clavulanic acid" on a slip; he writes AUGMENTIN
- * 625. So nothing here is prescribable and nothing here appears in the doctor's
- * picker. Adding it to the picker would be the same mistake as importing a
- * national register: rows nobody checked, one tap from a printed slip.
+ * It was the WHO Model List of Essential Medicines, 24th list, and it was the
+ * formula column the doctor was shown: he picked a molecule from it, a medicine
+ * whose molecule was not in it was labelled "not on the WHO list, check it",
+ * and the stronger antibiotics carried WHO's own AWaRe group on the
+ * prescription screen.
  *
- * What it IS, is the FORMULA COLUMN. Every brand on earth is one of these few
- * hundred molecules wearing a different name. That gives us four things a brand
- * list cannot:
+ * Every part of that was a mistake in a clinic in Larkana, and the owner said
+ * so in one sentence: we do not need WHO, we need the Pakistani medicines list
+ * so the doctor can choose a medicine and put it on the prescription.
  *
- *  1. The generic field stops being free text. The doctor picks the formula
- *     from a closed list instead of typing "amoxicillin+clav" one night and
- *     "Co-amoxiclav" the next, and the two never merge.
+ * He is right, and the reason is worth writing down so nobody argues it back in.
+ * WHO does not name brands, on purpose, because its list exists to tell a
+ * national programme what it must be able to buy. A doctor does not prescribe
+ * from it. He writes AUGMENTIN 625, and the chemist across the road reads
+ * AUGMENTIN 625 off a box. So the app was offering him a column he does not
+ * think in, scolding him about perfectly ordinary Pakistani formulas that WHO
+ * had no reason to name, and printing a stewardship label from Geneva beside
+ * medicines he had already decided on. The shelf is pk.ts now. The setup
+ * screens and the prescription screen do not import this file at all.
  *
- *  2. Sindhi becomes FINITE. Brands are endless; formulas are not. Pirah
- *     reviews one Sindhi name for paracetamol, and PANADOL, CALPOL, FEVRIL and
- *     every future brand of it inherit a checked word. This is the whole
- *     argument for the file. Six hundred rows, reviewed once, forever.
+ * WHAT IT STILL DOES, WHICH IS ONE SMALL THING AND A REAL ONE.
  *
- *  3. Duplicate detection gets a second axis. PANADOL 500 and CALPOL syrup look
- *     nothing alike as strings and are the same molecule. Only the formula
- *     column can warn a doctor he has written paracetamol twice.
+ * `sameMolecule` catches a doctor writing the same medicine twice under two
+ * brand names on one prescription, which no spelling check can find, and which
+ * is a real way a patient gets a double dose of paracetamol. Two brands agree
+ * only if their formulas agree, and a formula typed by hand agrees with itself
+ * spelled four ways: "Co-amoxiclav", "amoxicillin+clav", "Amoxicillin +
+ * Clavulanic acid". The rows below are what lets those three land on one key.
  *
- *  4. Antibiotics carry their WHO AWaRe group. That is published stewardship
- *     guidance, it is free, and it is the one thing in this file that is
- *     clinical rather than clerical.
+ * It degrades honestly without a match: an unknown formula falls back to its
+ * own normalised spelling, so two brands of it are still caught. That is why
+ * this file being incomplete has never been a blocker and is not one now.
  *
- * PROVENANCE. Transcribed from the published 24th list. WHO publishes the EML
- * to be copied and adapted by national programmes; that is its stated purpose.
- * The `sd` column is OURS and starts empty — WHO has no Sindhi, and the rule
- * that no unreviewed Sindhi is ever printed applies here exactly as everywhere
- * else.
+ * NOTHING HERE IS SHOWN TO ANYBODY, NOTHING HERE IS PRESCRIBABLE, AND THE `sd`
+ * COLUMN IS DEAD. Sindhi for medicines is settled in pk.ts: no brand name
+ * claims one, and the Sindhi that reaches paper is the form and timing
+ * vocabulary in forms.ts, which is a closed set that has been read.
  *
- * INCOMPLETE, ON PURPOSE AND ADMITTED. The sections below are the ones an
- * outpatient clinic in Larkana reaches for. Roughly a third of the full list is
- * oncology, anaesthesia, dialysis and ward medicine that no GP prescribes, and
- * a handful of sections have not been transcribed yet. A missing formula is
- * never a blocker: the doctor types his own and it goes to the review queue,
- * the same path everything else takes.
+ * PROVENANCE, unchanged. Transcribed from the published 24th list, which WHO
+ * publishes to be copied and adapted by national programmes.
  */
 
 export type Aware = 'Access' | 'Watch' | 'Reserve'

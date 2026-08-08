@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { freezeFacts, tryCode, candidateDays } from '../service'
 import { downloadBackup } from '../backup'
+import { whyItFailed } from '../fail'
+import { Note } from '../ui/Note'
 import { Mark } from '../ui/art'
 import { APP } from '../profile'
 
@@ -30,6 +32,14 @@ export default function Frozen({ onOpen }: { onOpen: () => void }) {
   const [bad, setBad] = useState(false)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  /**
+   * What the last press of the save button really did, said out loud.
+   *
+   * A silent failure here is the worst one in the app. He is locked out, he
+   * already half suspects we are holding his patients, and a button that does
+   * nothing and says nothing confirms it. Whatever happened, he is told.
+   */
+  const [said, setSaid] = useState<{ text: string; bad: boolean } | null>(null)
 
   function unlock() {
     setBusy(true)
@@ -37,6 +47,38 @@ export default function Frozen({ onOpen }: { onOpen: () => void }) {
     setBusy(false)
     if (day) { onOpen(); return }
     setBad(true)
+  }
+
+  async function saveOut() {
+    setSaid(null)
+    try {
+      const r = await downloadBackup('full')
+      /**
+       * `saved` says a file was written. `sure` says this app has any right to
+       * repeat it: on a browser with no Save dialog the hidden link cannot tell
+       * a finished save from a Cancel, and it reports `saved` either way. Only
+       * both together have earned the tick, so both are read.
+       */
+      setSaved(r.saved && r.sure)
+      if (!r.saved) {
+        setSaid({
+          bad: true,
+          text: 'Nothing was saved, so every patient is still only on this computer. '
+            + 'Press it again and choose the pen drive.',
+        })
+      } else if (!r.sure) {
+        setSaid({
+          bad: false,
+          text: `This browser will not tell Nuskho whether ${r.name} reached the drive. `
+            + 'Look for the file on the pen drive before this computer is switched off, '
+            + 'and press this again if it is not there.',
+        })
+      }
+    } catch (e) {
+      console.error('[nuskho] the frozen screen could not save the backup', e)
+      setSaved(false)
+      setSaid({ bad: true, text: whyItFailed(e, 'Nothing was saved') })
+    }
   }
 
   const wa = `https://wa.me/${f.contact.replace(/\D/g, '').replace(/^0/, '92')}`
@@ -95,9 +137,16 @@ export default function Frozen({ onOpen }: { onOpen: () => void }) {
               screen above all others: the clinic is locked, the doctor is
               already unsure whether we still have his records, and a tick he
               did not earn is the last thing he should be shown. */}
-          <button className="btn wide ghost" onClick={async () => {
-            try { setSaved((await downloadBackup('full')).saved) } catch { setSaved(false) }
-          }}>{saved ? 'Saved ✓  save again' : 'Save everything to a file'}</button>
+          <button className="btn wide ghost" onClick={saveOut}>
+            {saved ? 'Saved ✓  save again' : 'Save everything to a file'}
+          </button>
+          {said && (
+            said.bad
+              ? <div className="saidno">
+                  <Note tone="stop" title="Nothing has left this computer">{said.text}</Note>
+                </div>
+              : <Note tone="warn" title="Did it save?">{said.text}</Note>
+          )}
         </div>
 
         <p className="hint frz-foot">

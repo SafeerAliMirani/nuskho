@@ -6,6 +6,8 @@ import {
 } from '../../data/forms'
 import type { Drug } from '../../types'
 import { profile } from '../../profile'
+import { whyItFailed } from '../../fail'
+import { Note } from '../../ui/Note'
 
 /**
  * What we do on a clinic visit instead of standing in front of the doctor.
@@ -63,6 +65,9 @@ export default function ReviewQueue() {
   const [all, setAll] = useState<Drug[]>([])
   const [edit, setEdit] = useState<Drug | null>(null)
   const [out, setOut] = useState('')
+  /** Why the last Save did not happen. Nothing here is urgent, but a correction
+   *  that was never written is one we will make again next visit. */
+  const [err, setErr] = useState('')
 
   const load = async () => setAll(await db.drugs.toArray())
   useEffect(() => { load() }, [])
@@ -101,10 +106,48 @@ export default function ReviewQueue() {
     await db.drugs.update(d.id, { verified: true, pending: false })
     await load()
   }
+  /**
+   * ONLY THE BOXES ON THIS SCREEN, AND NOTHING ELSE ON THE ROW.
+   *
+   * `edit` is a copy of the medicine taken when the box was opened, and the
+   * whole copy used to be written back. We sit with this queue for half an hour
+   * at a time, and the clinic does not stop while we do: the doctor in the
+   * other window sets his standing five days for this medicine, or somebody
+   * retires a duplicate from the Medicines tab. Save a corrected spelling after
+   * that and his default days and the retirement are quietly back where they
+   * were half an hour ago, with nothing on any screen to say a word about it.
+   *
+   * So this sends the fields this box actually offers a person, the way every
+   * other write in the app already does it, and leaves the rest of the row
+   * exactly as the clinic last left it.
+   */
   async function saveEdit() {
     if (!edit) return
-    // an edit is a change to the catalogue, so it needs looking at again
-    await db.drugs.update(edit.id, { ...edit, verified: false })
+    setErr('')
+    try {
+      await db.drugs.update(edit.id, {
+        brand: edit.brand,
+        strength: edit.strength,
+        generic: edit.generic,
+        sd: edit.sd,
+        sdReviewed: edit.sdReviewed,
+        // the form chips set the site and the dose word along with the form,
+        // so those three move together or the slip reads "spoon" for a cream
+        form: edit.form,
+        route: edit.route,
+        unitSd: edit.unitSd,
+        mlPerDose: edit.mlPerDose,
+        // an edit is a change to the catalogue, so it needs looking at again
+        verified: false,
+      })
+    } catch (e) {
+      console.error('[nuskho] the medicine edit was not saved', e)
+      // The box stays open with the typing still in it. Closing it on a failure
+      // looks exactly like a save that worked, which is the lie this whole
+      // screen exists to correct in the catalogue.
+      setErr(whyItFailed(e, 'That medicine was not saved'))
+      return
+    }
     setEdit(null)
     await load()
   }
@@ -188,8 +231,9 @@ export default function ReviewQueue() {
             <span>The Sindhi name above is correct.
               <small>Until this is ticked the Sindhi name is not printed at all.</small></span>
           </label>
+          {err && <div className="saidno"><Note tone="stop" title="That did not go through">{err}</Note></div>}
           <div className="wiznav">
-            <button className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
+            <button className="btn ghost" onClick={() => { setEdit(null); setErr('') }}>Cancel</button>
             <button className="btn wide" onClick={saveEdit}>Save</button>
           </div>
         </div>
@@ -205,7 +249,7 @@ export default function ReviewQueue() {
               <span>{d.generic || <i>no generic</i>}</span>
               <span className="sd">{d.sdReviewed === true ? d.sd : <i className="unv">{d.sd} — unchecked</i>}</span>
               {near.length > 0 && <span className="warnpill">like {near[0].brand} {near[0].strength}</span>}
-              <button className="lnk" onClick={() => setEdit(d)}>edit</button>
+              <button className="lnk" onClick={() => { setEdit(d); setErr('') }}>edit</button>
               <button className="lnk" onClick={() => promote(d)}>promote</button>
               <button className="lnk" onClick={() => archiveDrug(d.id).then(load)}>retire</button>
             </div>

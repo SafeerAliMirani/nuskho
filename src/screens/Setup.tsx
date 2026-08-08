@@ -3,6 +3,7 @@ import { adminIsSet, adminUnlocked, unlockAdmin, lockAdmin, setAdminKey } from '
 import { role, can, ROLE_NAME, ROLE_SD, ROLE_WHAT, ROLES, pinSet, setRolePin,
          pinWasAdopted, notePinAdoption, type Role } from '../roles'
 import { downloadBackup, saveText, readBackup, readFile, restore, type RestoreReport } from '../backup'
+import { whyItFailed } from '../fail'
 import { noteExported, snapshotList, snapshotText, type Snap } from '../safety'
 import { clearRecords, factoryReset, type ResetReport } from '../reset'
 import { IdentityFields, PaperFields, TokenFields, LogoFields, FeeFields, useDraftProfile, useDraftPaper } from './setup/fields'
@@ -97,11 +98,16 @@ export default function Setup({ onBack }: { onBack: () => void }) {
             ? 'The doctor\u2019s name, logo and the medicine review. Not his records, and not his backups.'
             : role() === 'doctor'
             ? 'The fee, paper and page size, the medicine list, the PINs, and your own backups.'
-            /* An owner who is not a doctor holds `staff` and nothing else here.
-               He used to be told this screen was about the counter's fee,
-               which is not a thing he can change and not why he is here. */
+            /* An owner who is not a doctor holds `staff`, and `lock` as well
+               when the building is his: which jobs there are, and the PINs of
+               the people he employs. He used to be told this screen was about
+               the counter's fee, which is not a thing he can change and not why
+               he is here. A clinic admin somebody else employs sees the same
+               list and may only look, so the PINs are not named to him. */
             : can('staff')
-            ? 'Which jobs this building has. Not one prescription, and not the money.'
+            ? can('lock')
+              ? 'Which jobs this building has, and the PINs of the people you employ. Not one prescription, and not the money.'
+              : 'Which jobs this building has. Not one prescription, and not the money.'
             : 'The fee the counter charges. Nothing else on this machine.'}
         </span>
         {open && adminIsSet()
@@ -517,16 +523,35 @@ function AdminGate({ onOpen }: { onOpen: () => void }) {
 function PinTab() {
   const [pin, setPin] = useState<Record<Role, string>>({ counter: '', compounder: '', doctor: '', pharmacy: '', clinicadmin: '', admin: '' })
   const [msg, setMsg] = useState('')
+  /** Whether that last line is a refusal. A PIN that did not save has to look
+   *  different from one that did, at a glance, from across the room. */
+  const [bad, setBad] = useState(false)
   const [, redraw] = useState(0)
 
   async function save(r: Role) {
     // The check is here as well as on the control, for the same reason the
     // router is the gate and not the menu: a hidden button is a decoration.
-    if (!mayPin(role(), r)) { setMsg('That PIN is not yours to set.'); return }
+    if (!mayPin(role(), r)) { setBad(true); setMsg('That PIN is not yours to set.'); return }
     const v = pin[r]
-    if (v && v.length < 4) { setMsg('Use at least 4 digits.'); return }
-    await setRolePin(r, v)
+    if (v && v.length < 4) { setBad(true); setMsg('Use at least 4 digits.'); return }
+    /**
+     * IT SAYS SAVED ONLY IF IT WAS SAVED.
+     *
+     * This said "PIN saved." either way, over a setRolePin that swallowed its
+     * own failure, so a full disk produced a doctor who thought his screen was
+     * locked and a machine that opened with one tap. The box keeps his digits
+     * on a failure, because the next thing he will do is press it again.
+     */
+    try {
+      await setRolePin(r, v)
+    } catch (e) {
+      console.error('[nuskho] the PIN was not saved', e)
+      setBad(true)
+      setMsg(whyItFailed(e, 'The PIN was not saved'))
+      return
+    }
     setPin(p => ({ ...p, [r]: '' }))
+    setBad(false)
     setMsg(v ? `${ROLE_NAME[r]} PIN saved.` : `${ROLE_NAME[r]} PIN removed.`)
     redraw(n => n + 1)
   }
@@ -582,7 +607,10 @@ function PinTab() {
               <>
                 <input type="password" inputMode="numeric" maxLength={8} placeholder="4+ digits"
                        value={pin[r]}
-                       onChange={e => { setPin(p => ({ ...p, [r]: e.target.value.replace(/\D/g, '') })); setMsg('') }} />
+                       onChange={e => {
+                         setPin(p => ({ ...p, [r]: e.target.value.replace(/\D/g, '') }))
+                         setMsg(''); setBad(false)
+                       }} />
                 <button className="btn ghost" onClick={() => save(r)}>Save</button>
               </>
             ) : (
@@ -594,7 +622,7 @@ function PinTab() {
           </div>
         )
       })}
-      {msg && <p className="usable">{msg}</p>}
+      {msg && <p className={'usable' + (bad ? ' bad' : '')}>{msg}</p>}
 
       <p className="hint">
         <b>There is no way to recover a forgotten PIN.</b> If the doctor's PIN is lost, his

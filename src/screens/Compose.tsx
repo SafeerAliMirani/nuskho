@@ -19,7 +19,8 @@ import { tourFor, tourSeen } from '../tour'
 import { role } from '../roles'
 import { warmPlan } from '../print/paginate'
 import { notePrinted, printerLikelyCold } from '../safety'
-import { awareOf, sameMolecule } from '../data/who'
+import { whyItFailed } from '../fail'
+import { sameMolecule } from '../data/who'
 import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
 import { doseSdFor, defaultRoute, TIMES, timeEnFor } from '../data/forms'
 
@@ -71,6 +72,10 @@ export default function Compose({ visitId, onDone, onBack }: {
   const [nearMiss, setNearMiss] = useState<{ text: string; near: Drug[] } | null>(null)
   const [repeatMsg, setRepeatMsg] = useState('')
   const [err, setErr] = useState('')
+  /** A write that the disk refused. Separate from `err`, which is the printer:
+   *  they are different problems with different next actions, and a doctor who
+   *  is told "check the paper" when the disk is full does the wrong thing. */
+  const [saveErr, setSaveErr] = useState('')
   const [sets, setSets] = useState<RxSet[]>([])
   const [naming, setNaming] = useState('')
   /**
@@ -225,20 +230,54 @@ export default function Compose({ visitId, onDone, onBack }: {
    */
   const MINE = ['lines', 'diagnosis', 'tests', 'advice', 'nextVisit'] as const
 
-  async function apply(fn: (v: Visit) => Visit) {
-    const next = fn(cur.current!)
+  /**
+   * AND WHEN THE WRITE REFUSES, THE SCREEN MUST STOP LOOKING RIGHT.
+   *
+   * The screen was moved first and the record written second, with no catch.
+   * That order is correct: a dose chip that waits for a disk before it lights
+   * up feels broken, and the doctor taps it again. But on a refusal the two
+   * never came back together. The chip stayed lit, the record still said twice
+   * a day, and the only person who could have noticed had been shown the
+   * opposite. He then prints, and `freeze()` copies what is on the screen onto
+   * paper while the stored visit says something else, so the slip in the
+   * patient's hand and the record of what was prescribed disagree for ever.
+   *
+   * So a refusal puts the screen back to what is actually stored and says so.
+   * Losing the tap is annoying. Keeping it is a lie with a patient attached.
+   *
+   * It answers false rather than throwing, because most callers are a tap on a
+   * chip with nothing waiting on the result, and a throw there becomes the
+   * anonymous "something went wrong" band on top of the sentence written here.
+   * One clear message beats two. The callers that must not carry on regardless,
+   * printing above all, read the answer.
+   */
+  async function apply(fn: (v: Visit) => Visit): Promise<boolean> {
+    const before = cur.current!
+    const next = fn(before)
     cur.current = next
     setVisit(next)
-    await db.transaction('rw', db.visits, async () => {
-      const live = await db.visits.get(next.id)
-      if (!live) return
-      const patch: Partial<Visit> = {}
-      for (const k of MINE) (patch as Record<string, unknown>)[k] = (next as unknown as Record<string, unknown>)[k]
-      await db.visits.update(next.id, patch)
-      // keep our copy honest about the fields the counter owns
-      cur.current = { ...live, ...patch }
-      setVisit(cur.current)
-    })
+    try {
+      await db.transaction('rw', db.visits, async () => {
+        const live = await db.visits.get(next.id)
+        if (!live) return
+        const patch: Partial<Visit> = {}
+        for (const k of MINE) (patch as Record<string, unknown>)[k] = (next as unknown as Record<string, unknown>)[k]
+        await db.visits.update(next.id, patch)
+        // keep our copy honest about the fields the counter owns
+        cur.current = { ...live, ...patch }
+        setVisit(cur.current)
+      })
+      setSaveErr('')
+      return true
+    } catch (e) {
+      console.error('[nuskho] the prescription was not saved', e)
+      // back to the last thing that is really on the disk, so what he is
+      // looking at and what would print are the same thing again
+      cur.current = before
+      setVisit(before)
+      setSaveErr(whyItFailed(e, 'That change was not saved'))
+      return false
+    }
   }
 
   /**
@@ -368,7 +407,11 @@ export default function Compose({ visitId, onDone, onBack }: {
       // NOT !!e.sd. A dictionary entry is a candidate, not a verdict: the person
       // in this clinic still has to read the word before it can print.
       sd: e.sd, sdReviewed: false, form: e.form, addedAt: Date.now(),
-      unitSd: doseSdFor(e.form), route: defaultRoute(e.form),
+      // The shelf knows an eye drop from an ear drop and from the amoxicillin
+      // drops a baby swallows. `defaultRoute` cannot: it answers "by mouth" for
+      // every drop there is, and a mouth on an eye drop prints the plate and
+      // pill picture that means after food. Ask the row first.
+      unitSd: doseSdFor(e.form), route: e.route ?? defaultRoute(e.form),
     }
     await db.drugs.add(d)
     setAll(await doctorDrugs(formulary))
@@ -420,11 +463,25 @@ export default function Compose({ visitId, onDone, onBack }: {
    *
    * From this moment the slip no longer depends on the medicine list. Correct a
    * spelling, merge a duplicate or retire a medicine later and the paper in the
-   * patient's hand still says exactly what it said — which is the only honest
+   * patient's hand still says exactly what it said, which is the only honest
    * answer to "what did you prescribe this patient in March".
+   *
+   * IT MUST COPY EVERY FIELD THE PRINTER READS, AND IT DID NOT.
+   *
+   * `route` and `mlPerDose` were missing from this list while `printed()`, the
+   * fallback used for a line with no snap, supplied both. So the harness was
+   * measuring the path nobody prints on. On the path everybody prints on, an
+   * eye drop lost the fact that it goes in the eye and printed the plate and
+   * pill picture that means "after food", and a syrup that comes with a 2.5 ml
+   * measure was costed as if it came with a 5 ml one, so the chemist was told
+   * to hand over the wrong bottle.
+   *
+   * A field this loop forgets is a field the patient never gets back, because
+   * from here the medicine list is not consulted again. When a field is added
+   * to RxSnap it belongs here the same day.
    */
-  async function freeze() {
-    await apply(v => ({
+  async function freeze(): Promise<boolean> {
+    return apply(v => ({
       ...v,
       lines: v.lines.map(l => {
         const g = drugs[l.drugId]
@@ -433,7 +490,7 @@ export default function Compose({ visitId, onDone, onBack }: {
           snap: {
             brand: g?.brand ?? '', strength: g?.strength ?? '', generic: g?.generic ?? '',
             sd: g?.sd ?? '', sdReviewed: g?.sdReviewed === true, unitSd: g?.unitSd ?? '',
-            form: g?.form ?? 'tab',
+            form: g?.form ?? 'tab', route: g?.route, mlPerDose: g?.mlPerDose,
           },
         }
       }),
@@ -458,7 +515,10 @@ export default function Compose({ visitId, onDone, onBack }: {
     if (namelessIdx >= 0) { bump(namelessIdx); return }
     setBusy(true)
     try {
-      await freeze()
+      // Nothing goes on paper that is not on the disk first. If the freeze was
+      // refused, the patient would walk out holding a prescription this clinic
+      // has no record of, and apply() has already put the reason on the screen.
+      if (!(await freeze())) return
       await printSlip(slipData())
       // status and printedAt are written HERE and only here, as their own
       // targeted patch: they are not in MINE, so no other tap on this screen
@@ -527,6 +587,15 @@ export default function Compose({ visitId, onDone, onBack }: {
         {multiRoom() && doctorById(visit.doctorId) &&
           <> · Room {doctorById(visit.doctorId)!.room} · {doctorById(visit.doctorId)!.nameEn}</>}
       </span></div>
+
+      {/* Above everything, and not down by the PRINT button, because it is true
+          of the whole screen: what he is looking at came back from the disk and
+          the tap he just made is not in it. */}
+      {saveErr && (
+        <div className="saidno">
+          <Note tone="stop" title="That did not save">{saveErr}</Note>
+        </div>
+      )}
 
       {/* THE OTHER DOCTOR'S RECORD, AND IT STAYS HIS.
           Everything in this card is read from the sending consultation live and
@@ -627,20 +696,18 @@ export default function Compose({ visitId, onDone, onBack }: {
                  ref={el => { rows.current[i] = el }}>
               <div className="hd">
                 <div><b>{i + 1}. {d.brand} {d.strength}</b>
-                  <small>{d.generic || (d.pending ? 'typed in, tidy this up tonight' : '')}
-                    {/* WHO's own stewardship label, and only for the two groups
-                        that mean anything: nearly every antibiotic a GP writes
-                        is Access, so tagging those would be noise on every
-                        line. It is a published fact stated flatly, never an
-                        instruction: this app does not tell a doctor what to
-                        prescribe. */}
-                    {(() => {
-                      const a = d.generic ? awareOf(d.generic) : undefined
-                      return a && a !== 'Access'
-                        ? <span className="awtag" title={`WHO AWaRe group: ${a}`}>WHO {a}</span>
-                        : null
-                    })()}
-                  </small></div>
+                  {/* THE WHO LABEL THAT USED TO SIT HERE IS GONE.
+                      It printed "WHO Watch" beside the stronger antibiotics,
+                      taken from the AWaRe list, and it was a true published
+                      fact. It was also the only thing on this screen that was
+                      about WHO rather than about the patient in the chair, and
+                      a doctor in Larkana does not choose between two
+                      antibiotics because a body in Geneva put one of them in a
+                      different column. The warning that earns its place is the
+                      one right below, which says he has written the same
+                      molecule twice tonight, and that is his own prescription
+                      talking back to him. */}
+                  <small>{d.generic || (d.pending ? 'typed in, tidy this up tonight' : '')}</small></div>
                 <button className="x" onClick={() => apply(v => ({ ...v, lines: v.lines.filter((_, k) => k !== i) }))}>×</button>
               </div>
               {/* FOUR SLOTS, IN THE ORDER OF THE DAY.
@@ -733,6 +800,22 @@ export default function Compose({ visitId, onDone, onBack }: {
               {on ? '✓' : '+'} {d.brand}{d.strength ? ' ' + d.strength : ''}</button>
           })}
         </div>
+
+        {/* AN EMPTY SHELF USED TO BE AN EMPTY SCREEN.
+            Our eleven sample medicines are shown until setup is finished and
+            then they go, which is right: they are ours, not his, and leaving
+            them in means "AUGMENTIN 625 mg" and his own "AUGMENTIN 625mg" both
+            sitting in the picker as separate medicines. But nothing said so.
+            A doctor who finished setup on Tuesday opened his first patient on
+            Wednesday, saw white space where the medicines had been, and had no
+            reason to think the box above him now reaches 249 Pakistani brands.
+            One sentence, only on the evening it is true. */}
+        {!q.trim() && ordered.length === 0 && (
+          <p className="hint" style={{ marginTop: 2 }}>
+            Nothing on your own list yet. Type two letters above to find a medicine:
+            the common Pakistani brands are there, and the first one you tap becomes yours.
+          </p>
+        )}
 
         {/* Type-to-find, and the only place the dictionary appears. Every row
             shows brand, strength, form and generic, because that is what
@@ -899,16 +982,29 @@ function SendOnBar({ visit, locked, onChange }: {
   const s = visit.sentOn
   const target = rooms.find(d => d.id === to)
 
+  /**
+   * `sendOn` answers {ok, why} for everything it can foresee, and the code
+   * below reads it. What it did not do is come back at all when the write under
+   * it refused: no catch, and `setBusy(false)` on the line after the await, so
+   * the Send button read "Sending…" and stayed dead until the page was
+   * reloaded. The patient is standing there being sent to another room.
+   */
   async function go() {
     if (busy) return
     setBusy(true)
-    const r = await sendOn(visit.id, {
-      toDoctorId: to || undefined, toPlace: to ? undefined : place, note, charge,
-    })
-    setBusy(false)
-    if (!r.ok) { setErr(r.why); return }
-    setErr(''); setOpen(false); setNote(''); setPlace('')
-    await onChange()
+    try {
+      const r = await sendOn(visit.id, {
+        toDoctorId: to || undefined, toPlace: to ? undefined : place, note, charge,
+      })
+      if (!r.ok) { setErr(r.why); return }
+      setErr(''); setOpen(false); setNote(''); setPlace('')
+      await onChange()
+    } catch (e) {
+      console.error('[nuskho] send on failed', e)
+      setErr(whyItFailed(e, 'He was not sent on'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (s) {
@@ -1008,23 +1104,47 @@ function FeeBar({ visit, onChange }: { visit: Visit; onChange: () => Promise<voi
   const [open, setOpen] = useState(false)
   const [amt, setAmt] = useState('')
   const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   const f = visit.fee
 
   if (!f) {
     return <div className="feebar plain">No fee was recorded at the counter for this token.</div>
   }
 
+  /**
+   * MONEY, SO IT MAY NOT BE QUIET ABOUT FAILING.
+   *
+   * This wrote the discount and then told the counter to hand cash back, with
+   * no guard of any kind. Two ways it went wrong. Pressed twice on a slow disk
+   * it sent two refund messages for one discount, and the compounder, who sees
+   * a message and not a ledger, hands the money over twice. And if the write
+   * refused, the box closed, the doctor believed he had given the discount, and
+   * the patient paid the full fee at a desk that had heard nothing.
+   *
+   * The bell only rings after the record says the discount is real, because the
+   * message is a nudge toward something written down, never the thing itself.
+   */
   async function give(newAmount: number) {
-    await grantDiscount(visit.id, newAmount, note)
-    // The patient is about to walk the few steps back to the desk. Tell the
-    // desk now rather than letting the compounder discover it when he looks.
-    const back = (visit.fee?.amount ?? 0) - newAmount
-    if (back > 0) {
-      const pt = await db.patients.get(visit.patientId)
-      signal({ kind: 'refund', token: visit.token, name: pt?.name ?? '', amount: back })
+    if (busy) return
+    setBusy(true)
+    try {
+      await grantDiscount(visit.id, newAmount, note)
+      // The patient is about to walk the few steps back to the desk. Tell the
+      // desk now rather than letting the compounder discover it when he looks.
+      const back = (visit.fee?.amount ?? 0) - newAmount
+      if (back > 0) {
+        const pt = await db.patients.get(visit.patientId)
+        signal({ kind: 'refund', token: visit.token, name: pt?.name ?? '', amount: back })
+      }
+      setErr(''); setOpen(false); setNote(''); setAmt('')
+      await onChange()
+    } catch (e) {
+      console.error('[nuskho] the discount was not saved', e)
+      setErr(whyItFailed(e, 'The discount was not saved, and the counter has not been told'))
+    } finally {
+      setBusy(false)
     }
-    setOpen(false); setNote(''); setAmt('')
-    await onChange()
   }
 
   if (f.refund) {
@@ -1033,7 +1153,8 @@ function FeeBar({ visit, onChange }: { visit: Visit; onChange: () => Promise<voi
         <b>{f.refundedAt
           ? `Rs ${f.refund} was given back at the counter`
           : `Send him to the counter for Rs ${f.refund}`}</b>
-        {!f.refundedAt && <button className="lnk" onClick={() => give(f.amount)}>cancel that</button>}
+        {!f.refundedAt && <button className="lnk" onClick={() => give(f.amount)} disabled={busy}>cancel that</button>}
+        {err && <div className="saidno"><Note tone="stop" title="Nothing changed">{err}</Note></div>}
       </div>
     )
   }
@@ -1041,12 +1162,13 @@ function FeeBar({ visit, onChange }: { visit: Visit; onChange: () => Promise<voi
   return (
     <div className="feebar">
       <label>Rs {f.amount} taken at the counter{f.state === 'due' ? ', not actually paid yet' : ''}</label>
+      {err && <div className="saidno"><Note tone="stop" title="Nothing changed">{err}</Note></div>}
       {!open ? (
         <div className="row">
-          <button className="btn ghost" onClick={() => setOpen(true)} disabled={!f.amount}>
+          <button className="btn ghost" onClick={() => setOpen(true)} disabled={!f.amount || busy}>
             Charge him less
           </button>
-          <button className="btn ghost" onClick={() => give(0)} disabled={!f.amount}>
+          <button className="btn ghost" onClick={() => give(0)} disabled={!f.amount || busy}>
             Free, give it all back
           </button>
         </div>
@@ -1055,7 +1177,7 @@ function FeeBar({ visit, onChange }: { visit: Visit; onChange: () => Promise<voi
           <div className="row">
             <div className="fld"><input value={amt} inputMode="numeric" placeholder="he should pay"
                    onChange={e => setAmt(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))} /></div>
-            <button className="btn" disabled={amt === '' || +amt > f.amount}
+            <button className="btn" disabled={amt === '' || +amt > f.amount || busy}
                     onClick={() => give(+amt)}>Give back Rs {Math.max(0, f.amount - (+amt || 0))}</button>
             <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
           </div>

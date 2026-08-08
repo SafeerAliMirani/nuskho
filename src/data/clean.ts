@@ -1,5 +1,18 @@
 import type { Form } from '../types'
-import { whoGeneric } from './who'
+import { PK_GENERICS } from './pk'
+
+/**
+ * THE FORMULA THIS FILE RECOGNISES IS THE ONE ON OUR OWN SHELF.
+ *
+ * It used to ask the WHO essential medicines list. A shop's register is full of
+ * ordinary Pakistani formulas WHO never had a reason to name, and every one of
+ * those arrived here with an empty generic and had to be picked by hand, so the
+ * screen kept asking a doctor to supply a formula that was sitting in our own
+ * data all along. pk.ts is what these brands are actually made of.
+ */
+const gkey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+const SHELF = new Map(PK_GENERICS.map(g => [gkey(g), g]))
+const shelfGeneric = (s: string): string | undefined => SHELF.get(gkey(s))
 
 /**
  * Turning a medical store's own paperwork into catalogue rows.
@@ -165,7 +178,8 @@ export function cleanLine(raw: string): CleanRow | null {
   const dash = s.split(/\s+[-—–|]\s+|\t\s*/)
   if (dash.length > 1) {
     const tail = tidy(dash.slice(1).join(' '))
-    if (whoGeneric(tail)) { generic = whoGeneric(tail)!.name; s = dash[0] }
+    const hit = shelfGeneric(tail)
+    if (hit) { generic = hit; s = dash[0] }
   }
 
   for (const m of s.match(PRICE) ?? []) dropped.push(tidy(m))
@@ -197,8 +211,8 @@ export function cleanLine(raw: string): CleanRow | null {
 
   // the shop's own word for the medicine is often the formula itself
   if (!generic) {
-    const g = whoGeneric(brand)
-    if (g) generic = g.name
+    const g = shelfGeneric(brand)
+    if (g) generic = g
   }
 
   const issues: Issue[] = []

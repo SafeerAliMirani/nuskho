@@ -145,6 +145,11 @@ const GRANTS: Record<Role, Can[]> = {
   pharmacy: ['dispense'],
   // Operations, never the clinical record. Money totals the desk collected,
   // the day's shape, backup age, the machines. Not one prescription.
+  //
+  // `lock` is not in this list and is not missing from it either: it is added
+  // below, in can(), and only to a clinic admin who OWNS the building. A clinic
+  // admin employed by a doctor has no business in the doctor's locks. See the
+  // note on can() for why the power exists at all and where it stops.
   clinicadmin: ['ops', 'staff'],
   // Deliberately no 'queue', 'prescribe', 'history', 'figures', 'money',
   // 'backup' or 'erase'. If a permission here would let us read or copy a
@@ -170,9 +175,9 @@ const GRANTS: Record<Role, Can[]> = {
  * until now he could not see it in his own building.
  *
  * AN OWNER WHO IS NOT A DOCTOR GAINS NOTHING CLINICAL BY OWNING. He is still
- * `clinicadmin`: ops and staff, and `ops` contains no prescription. There is no
- * branch anywhere that could give him one, which is why the promise on the
- * website survives this change.
+ * `clinicadmin`: ops, staff, and the PINs of the people he employs. None of the
+ * three contains a prescription. There is no branch anywhere that could give
+ * him one, which is why the promise on the website survives this change.
  */
 export type Owner = 'doctor' | 'clinicadmin'
 
@@ -181,10 +186,42 @@ export const ownerRole = (): Owner => {
   catch { return 'doctor' }
 }
 
+/**
+ * WHAT OWNING THE BUILDING ADDS, WHICH IS TWO LINES AND NEVER A THIRD.
+ *
+ * A DOCTOR who owns it gets `ops`: his building's day, its money by room, its
+ * backup age, its machines.
+ *
+ * AN OWNER WHO IS NOT A DOCTOR gets `lock`, so he can set and change the PINs
+ * of the people he employs. The Staff tab has told whoever installs the machine
+ * that he can do this since it was written, and staff.ts's mayPin was written
+ * to allow exactly it. The grants table simply never said so, so the screen
+ * made a promise the app then refused, and the day a counter clerk walked out
+ * the owner could not change the number she knew. Between a screen that says
+ * the true thing and a table that quietly refuses, the table was the one that
+ * was wrong.
+ *
+ * WHERE IT STOPS, because this is a permission and somebody will check.
+ *
+ *   THE DOCTOR'S OWN PIN IS NOT IN IT. mayPin refuses it to him whoever owns
+ *   the building, on the control and again inside the save, and that is the PIN
+ *   that guards the prescriptions. This line does not weaken that one.
+ *
+ *   `lock` OPENS ONE TAB, and the only other things on it are the chime switch
+ *   and our own passphrase box, which will not change a passphrase without
+ *   being given the current one. On a machine where we never set one, nothing
+ *   is locked from anybody anyway: the front door hands the Nuskho role to
+ *   whoever taps it. So this adds no road to the doctor's name, his degrees or
+ *   his registration number that was not already open on that machine, and none
+ *   at all on a machine we handed over properly.
+ *
+ *   IT IS OWNERSHIP, NOT THE ROLE. A clinic admin employed by a doctor gets
+ *   nothing here, which is why it is a branch and not a line in GRANTS.
+ */
 export const can = (what: Can, who: Role = role()): boolean => {
   if (GRANTS[who].includes(what)) return true
-  // The one thing ownership adds, and it adds it in exactly one direction.
   if (what === 'ops' && who === 'doctor' && ownerRole() === 'doctor') return true
+  if (what === 'lock' && who === 'clinicadmin' && ownerRole() === 'clinicadmin') return true
   return false
 }
 
@@ -339,12 +376,27 @@ export function pinSet(r: Role): boolean {
   try { return !!localStorage.getItem(pinKey(r)) } catch { return false }
 }
 
+/**
+ * A PIN THAT WAS NOT WRITTEN DOWN MUST NOT BE REPORTED AS SET.
+ *
+ * Both lines below used to sit inside `catch { }`, the way signIn's write does.
+ * There, memory really is enough: losing it costs one sitting. Here it costs a
+ * door. A disk with nothing left on it, or a browser with storage switched off,
+ * refused the write and this function returned as though it had worked, so the
+ * Lock tab said "Doctor PIN saved." He then leaves the machine on the desk at
+ * the end of the evening believing his screen is shut, and it opens with one
+ * tap for whoever walks past it, all night.
+ *
+ * A door he believes is locked is worse than one he knows is open, so this now
+ * throws, and the screen that pressed the button says what happened. Removing a
+ * PIN throws for the same reason in the other direction: he must not be told a
+ * lock has gone when it is still there.
+ */
 export async function setRolePin(r: Role, pin: string): Promise<void> {
-  if (!pin) { try { localStorage.removeItem(pinKey(r)) } catch { /* ignore */ } return }
+  if (!pin) { localStorage.removeItem(pinKey(r)); return }
   const salt = [...crypto.getRandomValues(new Uint8Array(8))]
     .map(b => b.toString(16).padStart(2, '0')).join('')
-  try { localStorage.setItem(pinKey(r), JSON.stringify({ salt, h: await digest(pin, salt) })) }
-  catch { /* ignore */ }
+  localStorage.setItem(pinKey(r), JSON.stringify({ salt, h: await digest(pin, salt) }))
 }
 
 /** A lock that cannot be read is a lock that opens. An evening must never end

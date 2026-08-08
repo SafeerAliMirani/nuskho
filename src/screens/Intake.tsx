@@ -248,6 +248,41 @@ export default function Intake({ visits, onOpen, onChange }: {
   }
 
   /**
+   * THE DOOR AND THE ROOM WRITE TO THE SAME ROW.
+   *
+   * The cuff goes on at the door while a sugar is being run in the room, so a
+   * reading can land on this row between the desk last reading it and the
+   * compounder finishing a pulse. Writing the map back whole, as the desk last
+   * saw it, threw that reading away: it never reached the slip, and the money
+   * owed for the test never appeared at this counter either, because the charge
+   * is worked out from the reading. So it merges against the row as it stands
+   * now, the way the room and the phones on the wire already do. A box the
+   * compounder empties is still a deletion he meant, and it is honoured.
+   *
+   * And it goes through `guard` like every other write here. Before, a refusal
+   * was swallowed whole: the reading vanished without a word, and a blood
+   * pressure the compounder is certain he took is not there when the doctor
+   * opens the room.
+   */
+  async function saveVitals(v: Visit, nv: Record<string, string>) {
+    await guard('queue', 'The reading was not saved', async () => {
+      await db.transaction('rw', db.visits, async () => {
+        const live = await db.visits.get(v.id)
+        if (!live) return
+        const merged: Record<string, string> = { ...(live.vitals ?? {}) }
+        const before = v.vitals ?? {}
+        for (const k of new Set([...Object.keys(nv), ...Object.keys(before)])) {
+          const s = (nv[k] ?? '').trim()
+          if (s) merged[k] = s
+          else if (before[k] !== undefined && !nv[k]) delete merged[k]
+        }
+        await db.visits.update(v.id, { vitals: merged })
+      })
+      onChange()
+    })
+  }
+
+  /**
    * Who may open a row into the prescription screen. The compounder serves
    * every room; a signed-in doctor opens his own. The router in App.tsx
    * enforces the same rule, so this is the courtesy and that is the gate.
@@ -551,7 +586,7 @@ export default function Intake({ visits, onOpen, onChange }: {
                 not in the room. Only what he fills is printed. */}
             {v.status === 'waiting' && (
               <Vitals which="vital" value={v.vitals ?? {}}
-                      onChange={async nv => { await db.visits.update(v.id, { vitals: nv }); onChange() }} />
+                      onChange={nv => saveVitals(v, nv)} />
             )}
 
             {/* Reprint. Thermal rolls jam, run out, and get torn across the

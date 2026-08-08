@@ -137,11 +137,31 @@ function mealIcon(meal: RxLine['meal'], compact: boolean, m: RxSnap): string {
 
 /**
  * What to print for this line. Once a prescription has been printed it carries
- * its own copy, and that copy wins for ever — correcting a spelling in the
+ * its own copy, and that copy wins for ever: correcting a spelling in the
  * medicine list must never change a slip already in a patient's hand.
+ *
+ * THE ONE EXCEPTION, AND WHY IT IS NOT A HOLE IN THAT RULE.
+ *
+ * Every slip frozen before August 2026 carries no `route` and no `mlPerDose`,
+ * because the freezing loop forgot to copy them. A missing route there does not
+ * mean "the doctor said by mouth". It means nobody wrote the field down. So for
+ * those two fields only, and only when the snap is silent, the medicine is
+ * asked. Otherwise a reprint of an eye drop from last March comes out with the
+ * plate and pill picture that means "after food", which is not what that paper
+ * said and not what the patient was told.
+ *
+ * Everything a person reads on the slip, the brand, the strength, the Sindhi,
+ * the unit, still comes from the snap alone and can never be rewritten.
  */
 export function printed(line: RxLine, drug?: Drug): RxSnap {
-  if (line.snap) return line.snap
+  if (line.snap) {
+    if (!drug) return line.snap
+    return {
+      ...line.snap,
+      route: line.snap.route ?? drug.route,
+      mlPerDose: line.snap.mlPerDose ?? drug.mlPerDose,
+    }
+  }
   return {
     brand: drug?.brand ?? '', strength: drug?.strength ?? '', generic: drug?.generic ?? '',
     sd: drug?.sd ?? '', sdReviewed: drug?.sdReviewed, unitSd: drug?.unitSd ?? '',

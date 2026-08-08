@@ -107,8 +107,8 @@ describe('naming the destination', () => {
 
 import { course } from './course'
 import { FORM_WORD, DOSE_WORD, ROUTE_WORD, TIME_WORD, pendingWords, wordOk } from './data/forms'
-import { sameMolecule, awareOf } from './data/who'
-import type { RxLine, RxSnap, Form, Route } from './types'
+import { sameMolecule } from './data/who'
+import type { RxLine, RxSnap, Form, Route, Drug } from './types'
 
 const line = (form: Form, over: Partial<RxLine> = {}, route?: Route): RxLine => ({
   drugId: 'x', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
@@ -317,9 +317,14 @@ describe('two brands of one molecule', () => {
     expect(t.get(1)).toEqual([0, 2])
   })
 
-  it('is the AWaRe group that stays quiet for Access, which is nearly everything', () => {
-    expect(awareOf('Amoxicillin')).toBe('Access')
-    expect(awareOf('Paracetamol')).toBeUndefined()
+  /**
+   * The check has to survive a formula the molecule table has never heard of,
+   * because the shelf is Pakistani and the table is not. Two brands of the same
+   * thing must still be caught on their spelling alone.
+   */
+  it('catches two brands of a formula no table knows, on the spelling alone', () => {
+    const t = sameMolecule(['Acefylline + Diphenhydramine', 'acefylline+diphenhydramine'])
+    expect(t.get(0)).toEqual([1])
   })
 })
 
@@ -400,5 +405,110 @@ describe('a form that is not counted still says what to do', () => {
     const c = cell('other')
     expect(c).toContain('&#10003;')
     expect(c).not.toContain('دوا')
+  })
+})
+
+/**
+ * THE PATH EVERY PRINTED SLIP ACTUALLY TAKES, WHICH NOTHING WAS TESTING.
+ *
+ * A line is frozen at print time: `freeze()` copies the medicine onto the
+ * prescription so that correcting a spelling next month cannot change a paper
+ * already in a patient's hand. From that moment `printed()` returns the frozen
+ * copy and never looks at the medicine list again.
+ *
+ * `freeze()` was not copying `route` or `mlPerDose`. `printed()`'s other
+ * branch, the one for a line with NO snap, supplied both. Every check in this
+ * file and the whole `?forms` screenshot harness built lines with no snap, so
+ * they all measured the branch nobody prints on, and they all passed.
+ *
+ * What was really coming out of the printer: an eye drop with the plate and
+ * pill picture that means "after food", and a syrup that comes with a 2.5 ml
+ * measure costed as a 5 ml one, so the chemist was sent for the wrong bottle.
+ *
+ * So these ask about a FROZEN line, and the last one asks the source itself,
+ * because the next field added to RxSnap will be forgotten in exactly the same
+ * place unless something notices.
+ */
+describe('a line that has already been frozen onto the paper', () => {
+  const frozen = (snap: Partial<RxSnap>, drug?: Partial<Drug>): string => renderSlip(slip({
+    visit: visit({ lines: [{
+      drugId: 'd1', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
+      snap: { brand: 'TOBREX', strength: '', generic: 'Tobramycin', sd: '',
+              sdReviewed: false, unitSd: '', form: 'drop', ...snap },
+    }] }),
+    drugs: drug ? { d1: { id: 'd1', brand: 'TOBREX', generic: 'Tobramycin', sd: '',
+                          form: 'drop', strength: '', unitSd: '', ...drug } as Drug } : {},
+  }))
+
+  it('sends a frozen eye drop to the eye, not to a plate of food', () => {
+    const html = frozen({ route: 'eye' })
+    expect(html).not.toContain('ماني کان پوءِ')
+  })
+
+  it('still says after food for a frozen drop that is swallowed', () => {
+    expect(frozen({ route: 'mouth' })).toContain('ماني کان پوءِ')
+  })
+
+  /**
+   * Every slip printed before this was fixed carries a snap with no route in
+   * it. That silence is not the doctor saying "by mouth", it is a field nobody
+   * wrote down, so a reprint asks the medicine. The brand, the strength and the
+   * Sindhi still come from the snap alone and can never be rewritten.
+   */
+  it('heals an old slip that was frozen before the route was ever recorded', () => {
+    const html = frozen({}, { route: 'eye' })
+    expect(html).not.toContain('ماني کان پوءِ')
+  })
+
+  it('does not let the medicine list rewrite a word on an old slip', () => {
+    const html = frozen({ brand: 'TOBREX', sd: '' },
+                        { brand: 'RENAMED LATER', sd: 'ٽوبريڪس', sdReviewed: true })
+    expect(html).toContain('TOBREX')
+    expect(html).not.toContain('RENAMED LATER')
+    expect(html).not.toContain('ٽوبريڪس')
+  })
+
+  it('counts a frozen syrup by ITS spoon, not by a five millilitre one', () => {
+    const html = renderSlip(slip({ visit: visit({ lines: [{
+      drugId: 'd1', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
+      snap: { brand: 'CALPOL', strength: '', generic: 'Paracetamol', sd: '',
+              sdReviewed: false, unitSd: '', form: 'syr', mlPerDose: 2.5 },
+    }] }) }))
+    expect(html).toContain('<b>25</b><span class="mlu">ml</span>')
+    expect(html).not.toContain('<b>50</b>')
+  })
+
+  /**
+   * THE ONE THAT STOPS IT HAPPENING AGAIN.
+   *
+   * Two places build an RxSnap: the freezing loop in Compose, and the fallback
+   * inside printed() for a line that has not been frozen yet. They must build
+   * the same shape. When they drift, the fallback is the one every test and
+   * every screenshot exercises, so the drift is invisible until a patient is
+   * holding the wrong picture. This reads both literals and compares them.
+   */
+  it('freezes every field that the unfrozen path supplies', async () => {
+    const fs = await import('node:fs/promises')
+    const keysIn = (src: string, after: string): string[] => {
+      const at = src.indexOf(after)
+      expect(at, `could not find ${after}`).toBeGreaterThan(-1)
+      const open = src.indexOf('{', src.indexOf('snap', at) >= 0 ? src.indexOf('{', at) : at)
+      let depth = 0, end = open
+      for (let i = open; i < src.length; i++) {
+        if (src[i] === '{') depth++
+        else if (src[i] === '}' && --depth === 0) { end = i; break }
+      }
+      return [...src.slice(open, end).matchAll(/(\w+)\s*:/g)].map(m => m[1]).sort()
+    }
+    const compose = await fs.readFile(new URL('./screens/Compose.tsx', import.meta.url), 'utf8')
+    const render = await fs.readFile(new URL('./print/renderSlip.ts', import.meta.url), 'utf8')
+
+    const frozenKeys = keysIn(compose, 'return l.snap ? l : {')
+    const fallbackKeys = keysIn(render, 'export function printed(')
+
+    for (const k of fallbackKeys) {
+      expect(frozenKeys, `freeze() in Compose.tsx does not copy "${k}", so it never reaches paper`)
+        .toContain(k)
+    }
   })
 })
