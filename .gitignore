@@ -19,3 +19,6 @@ tsconfig.tsbuildinfo
 # with `npm run wire:exe`. Binaries do not belong in git, and GitHub refuses
 # them past 100 MB anyway.
 tools/nuskho-wifi.exe
+
+# wrangler local simulation state, never shipped
+.wrangler/
