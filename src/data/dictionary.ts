@@ -1,6 +1,7 @@
 import type { Form, Route } from '../types'
 import { FORM_LABEL } from './forms'
-import { PK_MEDS } from './pk'
+import { PK_MEDS, type PkMed } from './pk'
+import { PK2_MEDS } from './pk2'
 
 /**
  * The shelf a doctor reaches into.
@@ -21,20 +22,27 @@ import { PK_MEDS } from './pk'
  * be is a rule about how many rows there may be. Eight rows was not caution, it
  * was a doctor typing every medicine by hand at nine at night, which is where
  * wrong spellings actually come from. See pk.ts: 249 Pakistani brands, each
- * claiming only what is printed on the box, and claiming no Sindhi at all. The
- * Sindhi that reaches paper is the form and timing vocabulary, which is a
- * closed set and has been read. So the shelf got two hundred rows longer
- * without a single unreviewed Sindhi word getting nearer to a patient.
+ * claiming only what is printed on the box.
  *
- * A Sindhi name can still be added to any row, one at a time, through the same
- * gate as everything else. `sd` is what a person wrote and `verified` is who.
+ * THE SHELF SHIPPED WITH NO SINDHI AT ALL, and it worked, because the Sindhi
+ * that reaches paper is the form and timing vocabulary, which is a closed set
+ * and has been read. Every row carries a suggested Sindhi brand name now, and
+ * NOTHING about the rule changed: a suggestion arrives on the doctor's list
+ * unreviewed, the same as a name he types himself, and the slip prints the
+ * Latin brand off the box until somebody in that clinic reads it and ticks it.
+ *
+ * So the shelf got two hundred rows longer and then got a Sindhi column, and
+ * not one unreviewed Sindhi word got nearer to a patient than it was on day
+ * one. `sd` is a candidate and `sdReviewed`, on the doctor's own copy, is the
+ * verdict. Those two being different fields is the whole safeguard.
  */
 export interface DictEntry {
   brand: string
   strength: string
   form: Form
   generic: string
-  /** read and confirmed by someone who reads Sindhi. Blank means not yet done. */
+  /** SUGGESTED Sindhi for the brand. A candidate, never a verdict: what makes
+   *  it printable is `sdReviewed` on the doctor's own copy, set by a person. */
   sd: string
   /** who checked it and when, so a wrong entry can be traced back to a person */
   verified: string
@@ -51,17 +59,43 @@ export interface DictEntry {
 /**
  * THE SHELF ITSELF.
  *
- * Built from pk.ts rather than typed out again here, because a medicine list
- * kept in two files is a medicine list that disagrees with itself. Every `sd`
- * is empty on purpose: see the long note at the top of pk.ts.
+ * Built from pk.ts and pk2.ts rather than typed out again here, because a
+ * medicine list kept in two files is a medicine list that disagrees with
+ * itself. pk.ts is the 249 rows a person curated by hand; pk2.ts is the 5,331
+ * generated from the 11 Aug harvest (see its header). Same rules, one shelf:
+ * the hand-curated rows sit first so PANADOL outranks a harvest row when both
+ * match, and a brand can only be in one of the two files, which pk2's own
+ * test enforces.
  */
-export const dictionary: DictEntry[] = PK_MEDS.map(m => ({
+const row = (m: PkMed, verified: string): DictEntry => ({
   brand: m.brand, strength: m.strength, form: m.form, generic: m.generic,
-  sd: '', verified: 'pk-2026-08', route: m.route, cls: m.cls, maker: m.maker,
+  // A SUGGESTION AND NOT A VERDICT, which is what this field has always been.
+  // takeFromDictionary copies it onto his medicine with sdReviewed false, so
+  // the slip prints the Latin brand off the box until somebody in that clinic
+  // reads the Sindhi and ticks it. See the note on `sd` in pk.ts for where
+  // these came from and why that matters.
+  sd: m.sd, verified, route: m.route, cls: m.cls, maker: m.maker,
   check: m.check,
-}))
+})
+
+export const dictionary: DictEntry[] = [
+  ...PK_MEDS.map(m => row(m, 'pk-2026-08')),
+  // The slug names the harvest file the row came out of, so a wrong entry can
+  // be traced to the page and the pass that read it, not just to "the import".
+  ...PK2_MEDS.map(m => row(m, 'difs-2026-08-' + ((m as PkMed & { src?: string }).src ?? ''))),
+]
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/**
+ * The searchable keys, computed once. With 249 rows it was fine to normalise
+ * inside the filter; with five and a half thousand, every keystroke was
+ * re-lowercasing sixteen thousand strings on a clinic machine that may be a
+ * decade old. Same behaviour, measured once instead of per keypress.
+ */
+const KEYS = dictionary.map(e => ({
+  e, b: norm(e.brand), g: norm(e.generic), c: norm(e.cls ?? ''),
+}))
 
 /**
  * Prefix match on the brand or the generic. Deliberately not fuzzy: a fuzzy
@@ -75,12 +109,15 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 export function searchDictionary(q: string, limit = 10): DictEntry[] {
   const k = norm(q)
   if (k.length < 2) return []
-  const hit = (e: DictEntry) => norm(e.brand).startsWith(k) || norm(e.generic).startsWith(k)
-  const loose = (e: DictEntry) => norm(e.brand).includes(k) || norm(e.generic).includes(k)
-  const kind = (e: DictEntry) => norm(e.cls ?? '').startsWith(k)
-  const first = dictionary.filter(hit)
-  const rest = dictionary.filter(e => !hit(e) && loose(e))
-  const byKind = dictionary.filter(e => !hit(e) && !loose(e) && kind(e))
+  const first: DictEntry[] = [], rest: DictEntry[] = [], byKind: DictEntry[] = []
+  for (const { e, b, g, c } of KEYS) {
+    if (b.startsWith(k) || g.startsWith(k)) first.push(e)
+    else if (b.includes(k) || g.includes(k)) rest.push(e)
+    else if (c.startsWith(k)) byKind.push(e)
+    // Nothing early-exits on limit here on purpose: prefix hits found late in
+    // the list must still outrank loose hits found early, so all three tiers
+    // fill before the cut.
+  }
   return [...first, ...rest, ...byKind].slice(0, limit)
 }
 

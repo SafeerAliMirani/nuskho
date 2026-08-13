@@ -132,7 +132,9 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
           <small>
             {store ? `${store.usedMb} MB used of ${store.quotaMb} MB. ` : ''}
             {store && !store.persisted
-              ? 'Chrome may treat the practice as cache. Open the app once as the doctor and accept the storage prompt.'
+              ? (typeof navigator.storage?.persist === 'function'
+                  ? 'The browser may treat the practice as cache. Open the app once as the doctor and accept the storage prompt.'
+                  : 'Safari clears a site left unopened for 7 days and offers no way to prevent it. Open Nuskho daily and export weekly.')
               : 'Checked at every start.'}
           </small>
         </div></div>

@@ -27,6 +27,12 @@ import type { Drug, Form } from '../../types'
 const DROP_RE = /\b(drops?|drp|e\/d)\b/i
 const CREAM_RE = /\b(cream|oint|ointment|gel|lotion)\b/i
 const SACHET_RE = /\b(sachet|sachets|sach|powder|granules|ors)\b/i
+// A pessary is missing from these on purpose: it would take the suppository's
+// picture and then inherit the suppository's default site, which is the back
+// passage. See the note in data/clean.ts.
+const INHALER_RE = /\b(inhaler|puffs?|evohaler|rotacap|rotahaler|mdi|turbuhaler)\b/i
+const SUPP_RE = /\b(supp|suppository|suppositories)\b/i
+const PATCH_RE = /\b(patch|patches|transdermal|tts)\b/i
 const SYR = /\b(syr|syrup|susp|suspension|solution|elixir)\b/i
 const CAP = /\b(cap|caps|capsule|capsules)\b/i
 
@@ -64,6 +70,9 @@ export function parseList(text: string): Drug[] {
     const form: Form = DROP_RE.test(lhsRaw) ? 'drop'
       : CREAM_RE.test(lhsRaw) ? 'cream'
       : SACHET_RE.test(lhsRaw) ? 'sachet'
+      : INHALER_RE.test(lhsRaw) ? 'inhaler'
+      : SUPP_RE.test(lhsRaw) ? 'supp'
+      : PATCH_RE.test(lhsRaw) ? 'patch'
       : SYR.test(lhsRaw) ? 'syr'
       : CAP.test(lhsRaw) ? 'cap' : 'tab'
     const lhs = lhsRaw.replace(SYR, ' ').replace(CAP, ' ').replace(/\s+/g, ' ').trim()
@@ -374,4 +383,5 @@ function GenericPick({ start, onPick, onClose }:
 }
 
 /** Exported so ReviewQueue can offer the same list. */
-export { GenericPick }
+// GenericPick is used above in this file and nowhere else; the export was
+// removed on 12 Aug 2026 so the next dead-export sweep does not trip on it.

@@ -46,7 +46,3 @@ export function setStoreKind(s: Store): void {
 /** May this counter be shown the whole day's printed slips at once? */
 export const storeSeesTheDay = (): boolean => storeKind() === 'ours'
 
-export const STORE_WHAT: Record<Store, string> = {
-  ours: 'Ours. The clinic runs this counter.',
-  rented: 'A shop renting space. It serves other doctors’ patients too.',
-}

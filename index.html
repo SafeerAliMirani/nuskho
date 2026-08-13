@@ -6,6 +6,10 @@
     <title>Nuskho</title>
     <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <!-- iOS does not accept SVG for a Home Screen icon; without this PNG the
+       tile is a blurry screenshot of the page, on the one action the whole
+       PWA setup exists to serve -->
+  <link rel="apple-touch-icon" href="./icon-180.png">
   <meta name="theme-color" content="#0f5c4a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,6 +18,15 @@
     <div id="root"></div>
     <!-- the printed slip is rendered here, outside React, and nowhere else -->
     <div id="print-root"></div>
+    <script nomodule>
+      // An engine that cannot run ES modules cannot parse the app at all, so
+      // the React error screen can never mount. Without this line those
+      // phones show pure white and the clinic concludes Nuskho is broken.
+      document.getElementById('root').innerHTML =
+        '<div style="font-family:sans-serif;padding:40px 24px;max-width:520px;margin:0 auto">' +
+        '<h2>This browser is too old for Nuskho</h2>' +
+        '<p>Open it in Chrome, Edge, or a newer iPhone or iPad (iOS 14 or later).</p></div>';
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

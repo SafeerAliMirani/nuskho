@@ -1,4 +1,30 @@
 /**
+ * THE SINDHI IN THIS FILE WAS CHECKED ON 8 AUG 2026.
+ *
+ * Every Sindhi string that Nuskho prints was pulled out into one worksheet and
+ * read by a Sindhi speaker on Safeer's side. Most of it came back fine. What
+ * was wrong is corrected here, and the corrections are worth knowing because
+ * they are all the same kind of mistake and the next person will make it too:
+ *
+ *   URDU WEARING SINDHI CLOTHES. خون for blood where a Sindhi speaker says رت.
+ *   ڪمر for the back where he says پٺي. Both were perfectly correct words that
+ *   nobody in Larkana would have used, which on this document is the same as
+ *   being wrong.
+ *
+ *   GENDER. A ٽيسٽ is feminine in Sindhi, so it takes جي and not جو. Three of
+ *   the six lab tests had it the other way round.
+ *
+ *   AND ONE THAT WAS NOT A NUANCE AT ALL. Constipation was listed as قبضو,
+ *   which is not constipation. It means an illegal occupation of land. It is
+ *   corrected to قبضي. It was on the doctor's screen and never on paper, which
+ *   is the only reason it was not worse.
+ *
+ * The rule this file now inherits: a Sindhi string added here is a claim in a
+ * language, and it does not become true by being typed carefully. It needs a
+ * speaker.
+ */
+
+/**
  * WHAT THIS DOCTOR ACTUALLY DIAGNOSES.
  *
  * There were eight diagnoses hard-coded in the app: Fever, Chest infection,
@@ -89,14 +115,14 @@ export const SPECIALTIES: Specialty[] = [
       ['Eczema', 'ايگزيما'],
       ['Fungal infection', 'ڦڦوندي جي انفيڪشن'],
       ['Scabies', 'کجلي'],
-      ['Acne', 'ڦِڪا'],
+      ['Acne', 'منهن جا داڻا'],
       ['Psoriasis', 'سوريائسس'],
       ['Allergy', 'الرجي'],
       ['Hair fall', 'وارن جو ڪرڻ'],
       ['Vitiligo', 'ڦُلبهري'],
       ['Boils', 'ڦرڙيون'],
       ['Warts', 'مَسا'],
-      ['Dandruff', 'سِڪَر'],
+      ['Dandruff', 'سِڪري'],
       ['Melasma', 'منهن جا داغ'],
     ],
   },
@@ -137,7 +163,7 @@ export const SPECIALTIES: Specialty[] = [
       ['Hepatitis C', 'يرقان سي'],
       ['Fatty liver', 'جگر تي چرٻي'],
       ['Irritable bowel', 'آنڊن جي خرابي'],
-      ['Constipation', 'قبضو'],
+      ['Constipation', 'قبضي'],
       ['Piles', 'بواسير'],
       ['Diarrhoea', 'دست'],
       ['Worms', 'پيٽ جا ڪينئان'],
@@ -161,7 +187,7 @@ export const SPECIALTIES: Specialty[] = [
   {
     id: 'ortho', name: 'Bone specialist', sd: 'هڏن جو ڊاڪٽر',
     dx: [
-      ['Back pain', 'ڪمر جو سور'],
+      ['Back pain', 'پٺيءَ جو سور'],
       ['Knee pain', 'گوڏي جو سور'],
       ['Arthritis', 'جوڙن جو سور'],
       ['Fracture', 'هڏي ڀڄڻ'],
@@ -176,13 +202,13 @@ export const SPECIALTIES: Specialty[] = [
   {
     id: 'eye', name: 'Eye specialist', sd: 'اکين جو ڊاڪٽر',
     dx: [
-      ['Conjunctivitis', 'اکين جي سوز'],
+      ['Conjunctivitis', 'اکيون اچڻ'],
       ['Cataract', 'اڇو موتيو'],
       ['Glaucoma', 'ڪارو موتيو'],
       ['Refractive error', 'نظر جي ڪمزوري'],
       ['Dry eye', 'اکين جي سُڪَ'],
       ['Diabetic retinopathy', 'شگر سبب اکين جو اثر'],
-      ['Stye', 'ڦَرُڙي'],
+      ['Stye', 'ڳنڍي'],
       ['Allergy', 'الرجي'],
     ],
   },

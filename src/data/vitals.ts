@@ -1,4 +1,30 @@
 /**
+ * THE SINDHI IN THIS FILE WAS CHECKED ON 8 AUG 2026.
+ *
+ * Every Sindhi string that Nuskho prints was pulled out into one worksheet and
+ * read by a Sindhi speaker on Safeer's side. Most of it came back fine. What
+ * was wrong is corrected here, and the corrections are worth knowing because
+ * they are all the same kind of mistake and the next person will make it too:
+ *
+ *   URDU WEARING SINDHI CLOTHES. خون for blood where a Sindhi speaker says رت.
+ *   ڪمر for the back where he says پٺي. Both were perfectly correct words that
+ *   nobody in Larkana would have used, which on this document is the same as
+ *   being wrong.
+ *
+ *   GENDER. A ٽيسٽ is feminine in Sindhi, so it takes جي and not جو. Three of
+ *   the six lab tests had it the other way round.
+ *
+ *   AND ONE THAT WAS NOT A NUANCE AT ALL. Constipation was listed as قبضو,
+ *   which is not constipation. It means an illegal occupation of land. It is
+ *   corrected to قبضي. It was on the doctor's screen and never on paper, which
+ *   is the only reason it was not worse.
+ *
+ * The rule this file now inherits: a Sindhi string added here is a claim in a
+ * language, and it does not become true by being typed carefully. It needs a
+ * speaker.
+ */
+
+/**
  * THE NUMBERS TAKEN BEFORE AND DURING THE CONSULTATION.
  *
  * This is the workflow that already exists in every clinic in Larkana and that
@@ -83,7 +109,7 @@ export const VITALS: VitalDef[] = [
  */
 export const INSTANT: VitalDef[] = [
   { key: 'rbs', short: 'Sugar R', en: 'Random sugar', sd: 'شگر', unit: 'mg/dL', kind: 'test', max: 3, lo: 70, hi: 140 },
-  { key: 'fbs', short: 'Sugar F', en: 'Fasting sugar', sd: 'شگر خالي', unit: 'mg/dL', kind: 'test', max: 3, lo: 70, hi: 100 },
+  { key: 'fbs', short: 'Sugar F', en: 'Fasting sugar', sd: 'خالي پيٽ شگر', unit: 'mg/dL', kind: 'test', max: 3, lo: 70, hi: 100 },
   { key: 'hba1c', short: 'HbA1c', en: 'HbA1c', sd: 'ايڇ بي اي', unit: '%', kind: 'test', max: 4, lo: 4, hi: 5.7 },
   { key: 'hb', short: 'Hb', en: 'Haemoglobin', sd: 'هيموگلوبن', unit: 'g/dL', kind: 'test', max: 4, lo: 11, hi: 16 },
   { key: 'chol', short: 'Chol', en: 'Cholesterol', sd: 'ڪوليسٽرول', unit: 'mg/dL', kind: 'test', max: 3, lo: 125, hi: 200 },

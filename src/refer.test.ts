@@ -106,7 +106,8 @@ describe('naming the destination', () => {
 /* ------------------------------------------------- forms that are not pills */
 
 import { course } from './course'
-import { FORM_WORD, DOSE_WORD, ROUTE_WORD, TIME_WORD, pendingWords, wordOk } from './data/forms'
+import { FORM_WORD, DOSE_WORD, ROUTE_WORD, TIME_WORD, pendingWords, wordOk,
+         routesFor, routeMatters, defaultRoute, sideMatters } from './data/forms'
 import { sameMolecule } from './data/who'
 import type { RxLine, RxSnap, Form, Route, Drug } from './types'
 
@@ -173,6 +174,153 @@ describe('a slip for something that is not a pill', () => {
 
   it('keeps the meal picture for a drop taken by mouth', () => {
     expect(slipFor('drop', 'mouth')).toContain('ماني کان پوءِ')
+  })
+
+  /**
+   * ONE RED EYE USED TO GET A PRESCRIPTION FOR TWO.
+   *
+   * `ROUTE_WORD.eye` says "in both eyes" and it was the only thing an eye drop
+   * could say, so a doctor treating one eye printed a paper telling the patient
+   * to medicate the healthy one for a week.
+   */
+  describe('which eye, which ear', () => {
+    const sided = (route: Route, side?: 'R' | 'L') => renderSlip(slip({
+      visit: visit({ lines: [{ ...line('drop', {}, route), side }] }),
+    }))
+
+    it('says the side instead of "both" once the doctor has said which', () => {
+      // Safeer read these on 8 Aug, so the Sindhi is what reaches the paper.
+      expect(sided('eye', 'R')).toContain('ساڄي اک ۾')
+      expect(sided('eye', 'L')).toContain('کاٻي اک ۾')
+      expect(sided('ear', 'R')).toContain('ساڄي ڪن ۾')
+      expect(sided('ear', 'L')).toContain('کاٻي ڪن ۾')
+    })
+
+    it('never says both eyes and one eye on the same line', () => {
+      const html = sided('eye', 'R')
+      expect(html).not.toContain('ٻنهي اکين')
+      expect(html).not.toContain('in both eyes')
+    })
+
+    it('still says both when the doctor has not said otherwise', () => {
+      expect(sided('eye')).toContain('ٻنهي اکين ۾')
+    })
+
+    /**
+     * The half of it a patient who reads nothing can still act on. Left
+     * against right needs the word; one against two is a picture.
+     */
+    it('draws one eye for one eye and two for both', () => {
+      const eyes = (html: string) =>
+        (html.match(/<span class="mseq">([\s\S]*?)<\/span>/)?.[1].match(/<svg/g) ?? []).length
+      expect(eyes(sided('eye', 'R'))).toBe(1)
+      expect(eyes(sided('eye'))).toBe(2)
+    })
+
+    // A tablet has no side, and offering one would be a control that prints nothing
+    it('has no side for anything there are not two of', () => {
+      expect(sideMatters('mouth')).toBe(false)
+      expect(sideMatters('skin')).toBe(false)
+      expect(sideMatters('nose')).toBe(false)
+      expect(sideMatters('eye')).toBe(true)
+      expect(sideMatters('ear')).toBe(true)
+    })
+  })
+
+  /**
+   * THE THREE THAT USED TO PRINT NOTHING.
+   *
+   * `other` fell through to no picture and a bare tick, which was the honest
+   * answer while nobody had drawn one and stopped being honest the day
+   * somebody did. The inhaler is the one that matters most: it is the
+   * commonest of these in a Pakistani clinic and the only medicine on the slip
+   * a patient has to be taught to use, so a blank beside it was the worst
+   * blank on the page.
+   */
+  it('draws a different picture for the inhaler, the suppository and the patch', () => {
+    const pics = (['inhaler', 'supp', 'patch', 'other'] as Form[])
+      .map(f => (slipFor(f).match(/<svg[\s\S]*?<\/svg>/g) ?? []).join('|'))
+    // each of the three is drawn, and `other` is still deliberately not
+    for (const p of pics.slice(0, 3)) expect(p.length).toBeGreaterThan(0)
+    // and no two of them are the same drawing, which is the whole point
+    const bodies = pics.slice(0, 3).map(p => p.replace(/[\d.]+mm/g, ''))
+    expect(new Set(bodies).size).toBe(3)
+  })
+
+  /**
+   * A suppository swallowed is the harm this row exists to prevent, and the
+   * plate and pill picture means exactly "swallow this after food".
+   */
+  it('never shows food beside a suppository, a patch or an inhaler', () => {
+    for (const f of ['inhaler', 'supp', 'patch'] as Form[]) {
+      const html = slipFor(f, undefined)
+      expect(html, f).not.toContain('ماني کان پوءِ')
+      expect(html, f).not.toContain('ماني کان اڳ')
+    }
+  })
+
+  /**
+   * Safeer's decision, 8 Aug: the slip says where it must NOT go and nothing
+   * about where it does. It kills the hazard, which is a parent giving a
+   * melting suppository by mouth, and it keeps an anatomical word off a paper
+   * that gets read aloud by family in a public bazaar.
+   */
+  it('says only NOT by mouth, and never names the site', () => {
+    const rectal = slipFor('supp', 'rectal')
+    const vaginal = slipFor('supp', 'vaginal')
+    expect(rectal).toContain('وات ۾ نه')
+    expect(vaginal).toContain('وات ۾ نه')
+    // the two are deliberately indistinguishable ON PAPER. The doctor still
+    // picks between them on screen and the record still knows which.
+    for (const html of [rectal, vaginal]) {
+      expect(html).not.toContain('مقعد')
+      expect(html).not.toContain('پوئين رستي')
+      expect(html).not.toContain('back passage')
+    }
+  })
+
+  /**
+   * Two puffs come out of ONE device. Repeating the picture the way tablets
+   * repeat would read as "use two inhalers" to the person who cannot read the
+   * word beside it.
+   */
+  it('draws one inhaler for two puffs, and two tablets for two tablets', () => {
+    const count = (html: string) => (html.match(/<svg/g) ?? []).length
+    const two = (f: Form): number => count(renderSlip(slip({
+      visit: visit({ lines: [line(f, { dose: { m: 2, d: 0, n: 0 } })] }),
+    })))
+    expect(two('tab')).toBeGreaterThan(two('inhaler'))
+  })
+
+  /**
+   * A canister is two hundred puffs, so a total would send the chemist looking
+   * for a pack size that does not exist. A suppository is sold in a strip and
+   * counted out exactly like a tablet.
+   */
+  it('totals suppositories and patches, and refuses to total an inhaler', () => {
+    expect(course(line('supp')).n).toBe(10)
+    // "supp" and not "suppositories": the full word printed 13px outside the
+    // days column on A5, measured, and it is how the box is labelled anyway.
+    expect(course(line('supp')).unit).toBe('supp')
+    expect(course(line('patch', { dose: { m: 1, d: 0, n: 0 } })).n).toBe(5)
+    expect(course(line('patch', { dose: { m: 1, d: 0, n: 0 } })).unit).toBe('patches')
+    expect(course(line('inhaler')).n).toBe(0)
+  })
+
+  /**
+   * The picker must not offer "in both eyes" for a suppository. A list with a
+   * mis-tap in it is a list whose mis-tap prints.
+   */
+  it('offers only the sites that can be true for a form', () => {
+    expect(routesFor('supp')).toEqual(['rectal', 'vaginal'])
+    expect(routesFor('drop')).not.toContain('rectal')
+    // and never asks at all where there is only one answer
+    expect(routeMatters('inhaler')).toBe(false)
+    expect(routeMatters('patch')).toBe(false)
+    expect(defaultRoute('inhaler')).toBe('inhale')
+    expect(defaultRoute('patch')).toBe('skin')
+    // rectal, because in a clinic almost every suppository is a child's fever
+    expect(defaultRoute('supp')).toBe('rectal')
   })
 
   /**
@@ -468,6 +616,31 @@ describe('a line that has already been frozen onto the paper', () => {
     expect(html).not.toContain('ٽوبريڪس')
   })
 
+  /**
+   * THE GATE THE BATCH APPROVER RIDES ON. A frozen snapshot carries both the
+   * suggested Sindhi and the verdict on it. The brand's Sindhi prints only
+   * when sdReviewed is true, and the same snap with it false prints the Latin
+   * brand and NOT the word. The batch-approve screen does exactly one thing:
+   * flip that flag on the doctor's medicine, so this is the whole promise it
+   * makes, pinned at the renderer.
+   */
+  it('prints the brand Sindhi only after it is marked reviewed', () => {
+    const seen = { brand: 'ZZTESTOL', strength: '500 mg', generic: 'Paracetamol',
+                   sd: 'زيڊٽيسٽول', unitSd: 'گوري', form: 'tab' as const }
+    const unread = renderSlip(slip({ visit: visit({ lines: [{
+      drugId: 'z', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
+      snap: { ...seen, sdReviewed: false },
+    }] }) }))
+    expect(unread).toContain('ZZTESTOL')
+    expect(unread).not.toContain('زيڊٽيسٽول')
+
+    const read = renderSlip(slip({ visit: visit({ lines: [{
+      drugId: 'z', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
+      snap: { ...seen, sdReviewed: true },
+    }] }) }))
+    expect(read).toContain('زيڊٽيسٽول')
+  })
+
   it('counts a frozen syrup by ITS spoon, not by a five millilitre one', () => {
     const html = renderSlip(slip({ visit: visit({ lines: [{
       drugId: 'd1', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
@@ -500,15 +673,25 @@ describe('a line that has already been frozen onto the paper', () => {
       }
       return [...src.slice(open, end).matchAll(/(\w+)\s*:/g)].map(m => m[1]).sort()
     }
-    const compose = await fs.readFile(new URL('./screens/Compose.tsx', import.meta.url), 'utf8')
+    // The freezing literal moved from Compose.tsx to rx.ts on 11 Aug 2026,
+    // when the second doctor's screen started prescribing through the record
+    // holder and both paths had to share one snapshot builder. This test
+    // followed it there: it still reads the literal that actually runs.
+    const rx = await fs.readFile(new URL('./rx.ts', import.meta.url), 'utf8')
     const render = await fs.readFile(new URL('./print/renderSlip.ts', import.meta.url), 'utf8')
 
-    const frozenKeys = keysIn(compose, 'return l.snap ? l : {')
+    const frozenKeys = keysIn(rx, 'export function snapFor(')
     const fallbackKeys = keysIn(render, 'export function printed(')
 
     for (const k of fallbackKeys) {
-      expect(frozenKeys, `freeze() in Compose.tsx does not copy "${k}", so it never reaches paper`)
+      expect(frozenKeys, `snapFor() in rx.ts does not copy "${k}", so it never reaches paper`)
         .toContain(k)
     }
+
+    // And Compose must actually CALL the shared builder rather than keeping a
+    // literal of its own, or this test is reading the wrong file again.
+    const compose = await fs.readFile(new URL('./screens/Compose.tsx', import.meta.url), 'utf8')
+    expect(compose).toContain('freezeLines(')
+    expect(compose).not.toContain('snap: {')
   })
 })

@@ -13,11 +13,12 @@ import { profile, APP } from '../profile'
 import { paper, pageVars } from '../paper'
 import type { Drug, Visit, RxLine, RxSnap, Form, Route } from '../types'
 import { SUNRISE, SUN, SUNSET, MOON, TAB, HALF, CAP, SPOON, PLATE, CAL, DROP,
+  INHALER, SUPP, PATCH,
          EYE, EAR, NOSE, TUBE, SACHET, adviceIcon } from './icons'
 import { qrSvgSafe } from './qr'
 import { course, courseUnitSd } from '../course'
 import { formSdFor, formEnFor, doseSdFor, doseEnFor1, routeSdFor, routeEnFor, countable,
-         timeSdFor, type TimeKey } from '../data/forms'
+         swallowed, sideMatters, sideSdFor, sideEnFor, timeSdFor, type TimeKey } from '../data/forms'
 import { filled } from '../data/vitals'
 
 // Tolerates undefined on purpose: a medicine the doctor typed himself has no
@@ -36,10 +37,20 @@ const MEAL_SD: Record<RxLine['meal'], string> = {
 /**
  * The picture for one dose of this form.
  *
- * `other` returns null on purpose. It used to fall through to TAB, so an
- * inhaler, a suppository and a pessary all printed a tablet. A missing picture
- * is a gap the doctor fills in his own handwriting; a wrong picture is a
- * patient swallowing the wrong thing.
+ * The rule that built this list: a missing picture is a gap the doctor fills
+ * in his own handwriting, and a wrong picture is a patient swallowing the
+ * wrong thing. So every form fell through to TAB once, which meant an inhaler,
+ * a suppository and a pessary all printed a tablet; then they all fell through
+ * to null, which was honest and printed nothing at all.
+ *
+ * Nothing at all was never meant to be the end of it. An inhaler is the
+ * commonest of these in a Pakistani clinic and it is the one medicine on the
+ * slip a patient has to be TAUGHT to use, so a blank cell beside it was the
+ * worst blank on the page. Three of them have their own picture now.
+ *
+ * `other` still returns null, and still should. It is the pessary, the
+ * nebuliser solution, the mouthwash and the thing nobody here has thought of,
+ * and there is no one picture for those.
  */
 const formIcon = (f: Form): ((w: string, h: string) => string) | null =>
   f === 'cap' ? CAP
@@ -47,13 +58,25 @@ const formIcon = (f: Form): ((w: string, h: string) => string) | null =>
   : f === 'drop' ? DROP
   : f === 'cream' ? TUBE
   : f === 'sachet' ? SACHET
+  // The three that used to fall through to null and print a bare tick. `other`
+  // still does, and still should: it is now the pessary and the nebuliser
+  // solution, and there is no one picture for those.
+  : f === 'inhaler' ? INHALER
+  : f === 'supp' ? SUPP
+  : f === 'patch' ? PATCH
   : f === 'tab' ? TAB
   : null
 
 /** The picture for the site, where the meal picture would say nothing. */
 const siteIcon = (r: Route): ((w: string, h: string) => string) | null =>
   // Nothing for the skin: a cream already carries its tube in all three dose
-  // cells, and printing a fourth tube in this one says nothing new.
+  // cells, and printing a fourth tube in this one says nothing new. Nothing
+  // for `inhale` either, for the same reason: the inhaler is already drawn
+  // three times across the row.
+  //
+  // And nothing for `rectal` or `vaginal`, which is a decision and not a gap.
+  // Those two carry their warning in words, in both scripts, and the words say
+  // NOT BY MOUTH. See ROUTE_WORD in data/forms.ts.
   r === 'eye' ? EYE : r === 'ear' ? EAR : r === 'nose' ? NOSE : null
 
 /** One dose cell: the pictogram, then the number under it. */
@@ -76,9 +99,11 @@ function doseCell(m: RxSnap, n: number, sz: string): string {
    * was written, which is the same fault as a field printed with nothing
    * setting it, one layer down.
    *
-   * An inhaler keeps the tick, because DOSE_WORD.other is deliberately blank:
-   * there is no honest single word for a puff, a suppository and a patch, and
-   * inventing one is what the whole gate exists to prevent.
+   * An `other` keeps the bare tick, because DOSE_WORD.other is deliberately
+   * blank: there is no honest single word for a pessary and a nebuliser
+   * solution at once, and inventing one is what the whole gate exists to
+   * prevent. The inhaler, the suppository and the patch have left this branch
+   * entirely: all three are counted, and all three now say what they are.
    */
   if (!countable(m.form)) {
     const word = doseUnitSd(m)
@@ -86,28 +111,38 @@ function doseCell(m: RxSnap, n: number, sz: string): string {
     const say = word ? `<span class="sd">${esc(word)}</span>`
       : en ? `<span class="mlen">${esc(en)}</span>`
       : '&#10003;'
-    return `<td class="tcell">${ic ? ic(sz, sz) : ''}<div class="dose">${say}</div></td>`
+    return `<td class="tcell"><div class="dz">${ic ? ic(sz, sz) : ''}<div class="dose">${say}</div></div></td>`
   }
 
-  // Syrup counts in spoons, and drops count in drops. This cell used to print
-  // "1 چمچو" whatever the doctor had chosen, so a child prescribed two spoons
-  // at night was sent home with a slip that said one. The dose is the one
-  // number on this page that has to be the number he actually tapped.
-  if (m.form === 'syr' || m.form === 'drop') {
+  /**
+   * COUNTED IN THE NUMBER, DRAWN ONCE.
+   *
+   * Syrup counts in spoons and drops count in drops. This cell used to print
+   * "1 چمچو" whatever the doctor had chosen, so a child prescribed two spoons
+   * at night was sent home with a slip that said one. The dose is the one
+   * number on this page that has to be the number he actually tapped.
+   *
+   * The inhaler joins them, for a reason of its own: two puffs come out of ONE
+   * device. Repeating the picture the way tablets repeat would put two inhalers
+   * in the cell, which reads as "use two inhalers" to exactly the person who
+   * cannot read the word beside it. A drop was already here for the same
+   * reason, so only the syrup repeats its picture.
+   */
+  if (m.form === 'syr' || m.form === 'drop' || m.form === 'inhaler') {
     const many = n === 0.5 ? '½' : String(Math.round(n))
-    const reps = m.form === 'drop' ? 1 : Math.min(Math.max(Math.round(n), 1), 3)
+    const reps = m.form === 'syr' ? Math.min(Math.max(Math.round(n), 1), 3) : 1
     const pics = Array.from({ length: reps }, () => (ic ? ic(sz, sz) : '')).join('')
     const word = doseUnitSd(m)
-    return `<td class="tcell">${pics}<div class="dose">`
+    return `<td class="tcell"><div class="dz">${pics}<div class="dose">`
       + (word ? `<span class="sd">${many} ${esc(word)}</span>`
          : `${many} <span class="mlen">${esc(doseEnFor1(m.form, n))}</span>`)
-      + '</div></td>'
+      + '</div></div></td>'
   }
 
   if (n === 0.5)
-    return `<td class="tcell">${HALF(sz, sz)}<div class="dose">½</div></td>`
+    return `<td class="tcell"><div class="dz">${HALF(sz, sz)}<div class="dose">½</div></div></td>`
   const pics = Array.from({ length: Math.min(Math.round(n), 3) }, () => (ic ? ic(sz, sz) : '')).join('')
-  return `<td class="tcell">${pics}<div class="dose">${Math.round(n)}</div></td>`
+  return `<td class="tcell"><div class="dz">${pics}<div class="dose">${Math.round(n)}</div></div></td>`
 }
 
 /**
@@ -117,15 +152,36 @@ function doseCell(m: RxSnap, n: number, sz: string): string {
  * instead. An eye drop taken after food is a sentence with no meaning in it,
  * and a plate beside an eye drop is a picture of the wrong thing entirely.
  */
-function mealIcon(meal: RxLine['meal'], compact: boolean, m: RxSnap): string {
+function mealIcon(meal: RxLine['meal'], compact: boolean, m: RxSnap, side?: 'R' | 'L'): string {
   const offMouth = !!m.route && m.route !== 'mouth'
   const site = offMouth ? siteIcon(m.route!) : null
   // A site with no picture of its own still must not show a plate: "after food"
   // is as meaningless on a cream as it is on an eye drop.
   if (offMouth && !site) return '<span class="mseq">&mdash;</span>'
+  /**
+   * AND THE FORM ALONE IS ENOUGH TO REFUSE IT.
+   *
+   * The route was doing this work by itself, so a suppository, a patch or an
+   * inhaler with no route on the line printed the plate and pill scene, which
+   * says swallow this after eating. Every medicine the doctor types in himself
+   * arrives with no route, so this was the common case rather than the rare
+   * one, and it was worst on the form that must never be swallowed at all.
+   */
+  if (!swallowed(m.form)) return '<span class="mseq">&mdash;</span>'
   if (site) {
-    const k = compact ? 0.72 : 0.92
-    return `<span class="mseq">${site(`${6.8 * k}mm`, `${6.8 * k}mm`)}</span>`
+    /**
+     * ONE EYE FOR ONE EYE, TWO FOR BOTH.
+     *
+     * The half of "which side" a patient who reads nothing can still act on.
+     * Left against right needs the word and the doctor's finger, but one
+     * against two is a picture, and it is the half that stops a steroid going
+     * into a healthy eye for a week. The pair is drawn smaller so the cell
+     * does not grow, the same trick the plate and pill scene already uses.
+     */
+    const both = sideMatters(m.route) && !side
+    const k = both ? (compact ? 0.6 : 0.74) : (compact ? 0.72 : 0.92)
+    const one = site(`${6.8 * k}mm`, `${6.8 * k}mm`)
+    return `<span class="mseq">${both ? one + one : one}</span>`
   }
   if (meal === 'any') return '<span class="mseq">&mdash;</span>'
   const k = compact ? 0.58 : 0.74
@@ -220,9 +276,34 @@ function nameSdLine(m: RxSnap): string {
   return `<div class="sd nmsd">${brand}${enWord ? ` <span class="nmen-form">— ${esc(enWord)}</span>` : ''}</div>`
 }
 
-/** The words under the site picture, in whichever script has been approved. */
-function siteLabel(m: RxSnap): string | null {
+/**
+ * WHAT GOES UNDER THAT CELL, and it has to obey the same rule as the picture.
+ *
+ * The picture and the words were decided separately, so a suppository with no
+ * route on the line drew no plate and then wrote "ماني کان پوءِ" underneath it
+ * anyway. The words are the half a compounder reads aloud, so that was the
+ * more dangerous half to get wrong.
+ */
+function mealLabel(m: RxSnap, meal: RxLine['meal'], side?: 'R' | 'L'): string {
+  const site = siteLabel(m, side)
+  if (site) return site
+  if (!swallowed(m.form)) return ''
+  return MEAL_SD[meal]
+}
+
+/**
+ * The words under the site picture, in whichever script has been approved.
+ *
+ * `side` overrides the route's own word entirely rather than sitting beside
+ * it, because "in both eyes, in the right eye" on one line is worse than
+ * either sentence on its own.
+ */
+function siteLabel(m: RxSnap, side?: 'R' | 'L'): string | null {
   if (!m.route || m.route === 'mouth') return null
+  if (side && sideMatters(m.route)) {
+    const s = sideSdFor(m.route, side)
+    return s ? esc(s) : `<span class="mlen">${esc(sideEnFor(m.route, side))}</span>`
+  }
   const sd = routeSdFor(m.route)
   return sd ? esc(sd) : `<span class="mlen">${esc(routeEnFor(m.route))}</span>`
 }
@@ -253,12 +334,17 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean, evening: bool
    * counter ticks against, so the paper and the screen cannot drift apart.
    * Blank for a syrup, on purpose: see course.ts.
    *
-   * WHERE IT GOES WAS MEASURED, NOT CHOSEN. Under the day count, which is the
-   * obvious place, it added a fourth line to that cell and pushed an eight
-   * medicine prescription from one A5 sheet onto two. It sits instead on the
-   * line that already carries the Sindhi medicine name, at the empty left end
-   * of it, which costs no height at all and puts the count beside the name
-   * rather than under a different number.
+   * WHERE IT GOES WAS MEASURED, NOT CHOSEN, AND THIS NOTE WAS OUT OF DATE.
+   * It said the box sits on the line carrying the Sindhi medicine name. It does
+   * not, and has not since the row of empty tick boxes that shared the day
+   * column was deleted: it is the second line of the DAY COUNT cell, which is
+   * what the markup below builds and what slip.css has always described.
+   * That cell is the right home for it because the column already answers "how
+   * much altogether", and it costs no row height, because the dose pictogram
+   * beside it is taller than a day count and a total put together. Re-measured
+   * after the row was rebuilt, on A5 with twelve medicines: the cell holds
+   * 7.8mm of type with the total and 4.9mm without, and the row is 9.1mm
+   * either way. The total is still free.
    */
   const c = course(line, m)
   const unit = courseUnitSd(line, m)
@@ -270,9 +356,34 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean, evening: bool
       + '</div>'
     : ''
 
-  const ticks = compact || c.n > 0
-    ? ''
-    : `<div class="tick">${Array.from({ length: Math.min(line.days, 7) }, () => '<i></i>').join('')}</div>`
+  /**
+   * THE EMPTY BOXES ARE GONE, AND THIS IS WHY.
+   *
+   * A row of small unlabelled squares used to print under the day count on any
+   * line with no total. Safeer looked at a rendered sheet and asked what they
+   * meant, and then answered it himself: to my eye they mean nothing. He is
+   * the person who commissioned this design and he reads both scripts. A
+   * patient holding it in a bazaar had no chance.
+   *
+   * They were presumably a tick-one-box-a-day idea, and if so they were fitted
+   * exactly backwards. They appeared only where `course()` gives NO total,
+   * which is drops, creams and inhalers, the medicines where counting the days
+   * off matters least. They never appeared on the antibiotics, where finishing
+   * the course is the whole message, because those have a total. And they were
+   * suppressed entirely in dense spacing, so the same medicine looked
+   * different on two sheets of the same paper.
+   *
+   * Every other mark on this sheet carries a written argument for being there.
+   * This one carried none, in a stylesheet where nothing else is unexplained,
+   * which was the tell. On a printed medical document an element nobody can
+   * read is not neutral: it teaches the reader that some of the marks on this
+   * page can be ignored, and the next mark he ignores may be the dose.
+   *
+   * If a course tracker is ever wanted it belongs on the rows that HAVE a
+   * total, with a word above it saying what to do, and it has to be measured
+   * for the height it costs first.
+   */
+  const ticks = ''
 
   /**
    * IN DENSE SPACING THE WORD "DAYS" GIVES UP ITS LINE TO THE COUNT.
@@ -297,16 +408,14 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean, evening: bool
   const dysd = c.n > 0 ? '' : '<div class="sd dysd">ڏينهن</div>'
   return `<tr>
       <td class="noc">${i}</td>
-      <td class="nmcell">
-        <div class="nmen">
-          <div class="brand">${esc(m.brand)} ${esc(m.strength)}</div>
-          <div class="gen">${esc(m.generic)}</div>
-        </div>
+      <td class="nmcell"><div class="nmg">
+        <div class="brand">${esc(m.brand)} ${esc(m.strength)}</div>
+        <div class="gen">${esc(m.generic)}</div>
         ${nameSdLine(m)}
-      </td>
+      </div></td>
       ${doseCell(m, line.dose.m, sz)}${doseCell(m, line.dose.d, sz)}${
         evening ? doseCell(m, line.dose.e ?? 0, sz) : ''}${doseCell(m, line.dose.n, sz)}
-      <td class="mlcell">${mealIcon(line.meal, compact, m)}<div class="sd mlsd">${siteLabel(m) ?? MEAL_SD[line.meal]}</div></td>
+      <td class="mlcell">${mealIcon(line.meal, compact, m, line.side)}<div class="sd mlsd">${mealLabel(m, line.meal, line.side)}</div></td>
       <td class="dycell"><div class="dyn">${line.days}</div>
         ${dysd}${ticks}${total}</td>
     </tr>`
@@ -419,35 +528,90 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
     degreesEn: dr.degreesEn, degreesSd: dr.degreesSd, reg: dr.reg,
   }
 
+  /**
+   * HOW BIG THE PATIENT-CODE SQUARE PRINTS, IN MILLIMETRES ON THE PAPER.
+   *
+   * The doctor asked for a bigger one and he is right: the code is 21 modules
+   * across, so 9.4mm was .45mm a module, which is about as fine as a cheap USB
+   * scanner will read off laser toner in a shop with one bulb. 16mm on A5 is
+   * .76mm a module and 20mm on A4 is .95mm. Same code, nearly three times the
+   * area, and the scanner stops being the weak part.
+   *
+   * The size lives here, on the svg itself, rather than in slip.css, so there
+   * is one number in one place and it prints correctly even if the stylesheet
+   * never arrives. See the .idcode block in slip.css, which sets everything
+   * around it and nothing about its size.
+   *
+   * LETTERHEAD IS SMALLER FOR A REASON THAT IS NOT OURS. There is no heading
+   * on his own pad, because the top 55mm of it is his own printing and we put
+   * nothing there. So on letterhead the square stays in the patient bar and the
+   * bar grows with it. 14mm on A4 letterhead is what that bar carries with a
+   * quiet zone around the code and eleven medicines still on the sheet, which
+   * is what that paper holds. An A5 letterhead has the least room of any paper
+   * we print, so its square is left exactly where it was.
+   */
+  /**
+   * A5 IS 18mm, AND THE NUMBER IS THE WRAP MARGIN RATHER THAN TASTE.
+   *
+   * Safeer asked for a little larger and left the size to us. Measured on a
+   * full sheet, twelve medicines with a real letterhead: 16mm leaves 7.6mm over
+   * the footer, 18mm leaves 5.6mm, 20mm leaves 3.6mm, and 22mm pushes the
+   * twelfth medicine onto a second sheet.
+   *
+   * The thing that eats that clearance is a medicine whose GENERIC NAME WRAPS
+   * to a second line, which costs 1.6mm. A real prescription already has one:
+   * AUGMENTIN's formula is amoxicillin plus clavulanic acid. So 20mm would
+   * leave room for exactly one long name, and the evening a doctor writes two
+   * of them the twelfth medicine goes to page two, which is the failure this
+   * whole layout exists to prevent. 18mm leaves room for two and is still
+   * nearly four times the area the square had this morning.
+   */
+  const qrMm = lhd ? (pp.size === 'A4' ? 15 : 9.4) : (pp.size === 'A4' ? 24 : 18)
+
+  /**
+   * Suppressed on continuation sheets: one scannable code per visit, never two
+   * pieces of paper that both claim to be the patient's card.
+   *
+   * The prescription id under the square is not decoration and is not a
+   * caption. It is the fallback for the evening the scanner will not read, so
+   * it travels wherever the square travels and it is set to be read across a
+   * counter, not squinted at.
+   */
+  const qr = dr.showQr !== false && sheet === 0 ? qrSvgSafe(d.patientCode, qrMm) : ''
+  const idcode = qr ? `<div class="idcode">${qr}<b class="rxid">${esc(d.rxId)}</b></div>` : ''
+
   // On his own pad we print nothing in the two bands his design already
   // occupies. The heights come from Setup, measured on one of his real sheets.
+  //
+  // The doctor's own lines are wrapped in .hin so the square can sit beside
+  // them at the right end of the heading. On A5 that stack is 16mm tall in a
+  // heading that was already 20.9mm, so the square rides there for almost
+  // nothing, and the patient bar below is 4.3mm shorter for losing it.
   const hdr = lhd
     ? '<div class="lh"><div class="note">YOUR LETTERHEAD — LEFT BLANK</div></div>'
     : `<div class="hdr">
-    <div class="row">
-      <div class="idl">
-        ${dr.logo ? `<img class="logo" src="${dr.logo}" alt="" style="height:${dr.logoMm}mm">` : ''}
-        <div>
-          <div class="docname">${esc(who.nameEn)}</div>
-          <div class="docqual">${esc(who.degreesEn)}${who.reg ? '<br>' + esc(who.reg) : ''}</div>
+    <div class="hin">
+      <div class="row">
+        <div class="idl">
+          ${dr.logo ? `<img class="logo" src="${dr.logo}" alt="" style="height:${dr.logoMm}mm">` : ''}
+          <div>
+            <div class="docname">${esc(who.nameEn)}</div>
+            <div class="docqual">${esc(who.degreesEn)}${who.reg ? '<br>' + esc(who.reg) : ''}</div>
+          </div>
         </div>
+        <div class="sd docsd">${esc(who.nameSd)}<small>${esc(who.degreesSd)}</small></div>
       </div>
-      <div class="sd docsd">${esc(who.nameSd)}<small>${esc(who.degreesSd)}</small></div>
+      <div class="clinicline"><span>${esc(dr.addressEn)}</span><span>${sheets > 1 ? `Sheet ${sheet + 1} of ${sheets}` : esc(dr.timing)}</span></div>
     </div>
-    <div class="clinicline"><span>${esc(dr.addressEn)}</span><span>${sheets > 1 ? `Sheet ${sheet + 1} of ${sheets}` : esc(dr.timing)}</span></div>
+    ${idcode}
   </div>`
-
-  // The square sits beside the number it encodes, so nobody has to be told what
-  // it is for. Suppressed on continuation sheets: one scannable code per visit,
-  // never two pieces of paper that both claim to be the patient's card.
-  const qr = dr.showQr !== false && sheet === 0 ? qrSvgSafe(d.patientCode, 13) : ''
 
   const pt = `<div class="pt">
   <div style="flex:2.2"><b>Patient / <span class="sd">مريض جو نالو</span></b><div class="v">${esc(d.patientName)}</div></div>
   <div style="flex:.8"><b>Age / <span class="sd">عمر</span></b><div class="v">${esc(d.patientAge || '—')}${d.patientSex ? ` <span style="font-size:6.6pt;font-weight:400">/ ${esc(d.patientSex)}</span>` : ''}</div></div>
   <div style="flex:1.2"><b>Patient no. / <span class="sd">مريض نمبر</span></b><div class="v" style="letter-spacing:1.2px">${esc(d.patientCode)}</div></div>
   <div style="flex:1.1"><b>Date / <span class="sd">تاريخ</span></b><div class="v">${date}</div></div>
-  ${qr ? `<div class="qrcell">${qr}<b>${esc(d.rxId)}</b></div>` : ''}
+  ${lhd ? idcode : ''}
 </div>`
 
   /**
@@ -527,7 +691,12 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
     ? `<div class="bx"><h4><span>TESTS TO GET DONE</span><span class="sd">ڪرائڻ واريون ٽيسٽون</span></h4><div class="in">`
       + visit.tests.map(t => {
           const [en, sd] = t.split('|')
-          return `<div class="tst"><div class="bxk"></div><div><div class="sd">${esc(sd || '')}</div><div class="en">${esc(en)}</div></div></div>`
+          // The Sindhi and the English of one test sit on one line, not two.
+          // Stacked they were 6.4mm each and three of them set the height of the
+          // whole tests-and-advice row; side by side a test costs 3.8mm. The
+          // wrapper is what lets them share a line and, when a long test name
+          // will not allow it, wrap instead of overflowing the box.
+          return `<div class="tst"><div class="bxk"></div><div class="tstw"><div class="sd">${esc(sd || '')}</div><div class="en">${esc(en)}</div></div></div>`
         }).join('')
       + '</div></div>'
     : ''
@@ -536,7 +705,15 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
     ? `<div class="bx"><h4><span>ADVICE</span><span class="sd">هدايتون</span></h4><div class="in"><div class="advgrid">`
       + visit.advice.map(a => {
           const [sd, en, ic] = a.split('|')
-          const icon = adviceIcon[ic] ? adviceIcon[ic]('8.4mm', '8.4mm') : ''
+          // 8.4mm, and it was the tallest thing on the bottom of the sheet: two
+          // advice lines set the height of the whole tests-and-advice row at
+          // 21.2mm, taller than two medicines. At 5.6mm the picture is still
+          // 40 per cent over the 4mm floor these pictograms were drawn to
+          // survive, and it is the same size as the dose pictogram beside it in
+          // a dense table, which is a size we have already put on paper.
+          // The DOSE pictograms are untouched: those are the marks a patient
+          // who reads nothing takes his medicine by.
+          const icon = adviceIcon[ic] ? adviceIcon[ic]('5.6mm', '5.6mm') : ''
           return `<div class="adv">${icon}<div><div class="sd">${esc(sd)}</div><div class="aen">${esc(en)}</div></div></div>`
         }).join('')
       + '</div></div></div>'
@@ -562,8 +739,11 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
       </div></div>`
     : ''
 
+  // .credit, not .brand. The medicine name in the table has been .brand since
+  // the first sheet, and while this block shared that class the stylesheet
+  // painted every medicine name in the foot's 5.1pt grey. See slip.css.
   const credit = (dr.showCredit && !lhd)
-    ? `<div class="brand">
+    ? `<div class="credit">
       <span class="bn"><span class="sd">${esc(APP.sd)}</span> <b>${esc(APP.en)}</b></span>
       ${APP.web ? `<span class="ct">${esc(APP.web)}</span>` : ''}
     </div>` : ''

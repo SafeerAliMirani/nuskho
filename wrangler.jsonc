@@ -1,21 +1,35 @@
 {
   // Cloudflare, told explicitly rather than guessed.
   //
-  // The first deploy failed because Cloudflare auto-detected a "Vite framework"
-  // Worker, ran `wrangler deploy`, and then refused because that automatic path
-  // wants Vite 6+. Guessing is fine until it is not; this file removes the guess.
-  //
-  // There is no worker script here on purpose. Nuskho is a static bundle with no
-  // backend and must never acquire one — the whole promise of the product is
-  // that nothing about a patient leaves the clinic's machine. An assets-only
-  // Worker is the shape that cannot quietly grow a server route later.
+  // THE RULE HERE CHANGED SHAPE ON 12 AUG 2026, deliberately. It used to say
+  // "assets only, no worker script, so a server route cannot quietly appear".
+  // Safeer approved the heartbeat middle path (clinic code and app version,
+  // opt-in, nothing else) and the super admin panel that reads it, so a
+  // script exists now — and the rule it lives under is narrower and stated at
+  // the top of worker/site.mjs: NOTHING ON THIS WORKER MAY EVER CARRY PATIENT
+  // DATA. Two routes, a clinic code, a version string, and contract facts
+  // Safeer types himself. The clinical app's only network call is pinned to
+  // two fields by a unit test.
   "name": "nuskho",
   "compatibility_date": "2026-08-03",
+  "main": "worker/site.mjs",
   "assets": {
     "directory": "./dist-web",
-    // One page. Any path serves the app rather than a 404.
+    "binding": "ASSETS",
+    // One page. Any path the worker does not claim serves the app.
     "not_found_handling": "single-page-application"
   },
+  // ONE-TIME SETUP, on Safeer's machine (see RUN-THIS):
+  //   npx wrangler kv namespace create NKHB
+  // then paste the id it prints into the block below and remove the comment
+  // marks. Until then the site deploys and serves exactly as before; /hb and
+  // /sa answer 503 and store nothing.
+  // "kv_namespaces": [
+  //   { "binding": "NKHB", "id": "PASTE-THE-ID-HERE" }
+  // ],
+  // The WhatsApp number the extension button opens. The same number the
+  // website already publishes, so nothing new is disclosed by it.
+  "vars": { "WA": "923333368189" },
   "observability": { "enabled": false },
   "send_metrics": false
 }

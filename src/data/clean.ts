@@ -100,10 +100,25 @@ const FORMS: [RegExp, Form][] = [
   [/\b(inj|injection|amp|ampoule|vial|infusion|iv|im)\b/i, 'other'],
   [/\b(cream|oint|ointment|gel|lotion)\b/i, 'cream'],
   [/\b(sachet|sachets|sach|powder|granules)\b/i, 'sachet'],
-  // Named rather than swept into 'other' silently: these are real forms this
-  // app cannot picture yet, and 'other' now prints no picture at all, which is
-  // the honest answer until somebody draws one.
-  [/\b(spray|inhaler|puff|rotacap|supp|suppository|patch|pessary)\b/i, 'other'],
+  /**
+   * THREE OF THESE HAVE A PICTURE NOW, AND ONE STILL DOES NOT.
+   *
+   * They used to be swept together into `other`, named rather than hidden,
+   * with a note saying that was the honest answer until somebody drew one.
+   * Somebody drew three.
+   *
+   * A PESSARY DELIBERATELY STAYS IN `other`, and it is the sharpest line in
+   * this table. It is shaped like a suppository and it would take the same
+   * picture, but `defaultRoute('supp')` is RECTAL, because in an outpatient
+   * clinic almost every suppository is paracetamol for a child. An importer
+   * that quietly turned a pessary into a suppository would print "in the back
+   * passage, NOT by mouth" on a vaginal medicine. Better no picture than that
+   * sentence on the wrong slip.
+   */
+  [/\b(inhaler|puffs?|evohaler|rotacap|rotahaler|mdi|turbuhaler)\b/i, 'inhaler'],
+  [/\b(supp|suppository|suppositories)\b/i, 'supp'],
+  [/\b(patch|patches|transdermal|tts)\b/i, 'patch'],
+  [/\b(spray|pessary|nebuliser|nebulizer|respules?|mouthwash|gargle)\b/i, 'other'],
 ]
 
 const INJECTION = /\b(inj|injection|amp|ampoule|vial|infusion)\b/i

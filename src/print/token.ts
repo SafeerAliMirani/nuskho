@@ -101,7 +101,7 @@ export function renderToken(t: TokenSlip, width: TokenWidth = 58): string {
   </div>
 
   <div class="tk-fee">
-    <span>FEE &nbsp; <i class="sd">في</i></span>
+    <span>FEE &nbsp; <i class="sd">فيس</i></span>
     <b>${money}</b>
   </div>
 

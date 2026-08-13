@@ -18,7 +18,8 @@
  * other medicines i dont know". That last one is why `other` has to degrade
  * into silence rather than into a tablet.
  */
-export type Form = 'tab' | 'cap' | 'syr' | 'drop' | 'cream' | 'sachet' | 'other'
+export type Form = 'tab' | 'cap' | 'syr' | 'drop' | 'cream' | 'sachet'
+  | 'inhaler' | 'supp' | 'patch' | 'other'
 
 /**
  * WHERE IT GOES. Only asked about the forms where it can differ.
@@ -30,6 +31,7 @@ export type Form = 'tab' | 'cap' | 'syr' | 'drop' | 'cream' | 'sachet' | 'other'
  * syrup and sachet ever written and so costs those nothing.
  */
 export type Route = 'mouth' | 'eye' | 'ear' | 'nose' | 'skin'
+  | 'inhale' | 'rectal' | 'vaginal'
 
 export interface Drug {
   id: string
@@ -112,6 +114,20 @@ export interface RxLine {
   meal: 'after' | 'before' | 'any'
   days: number
   note?: string          // free line for forms that do not fit the grid
+  /**
+   * WHICH EYE, OR WHICH EAR. Absent means both.
+   *
+   * On the LINE and not on the medicine, and that distinction is the whole
+   * design. TOBREX is not a left-eye drug; this man's left eye is a fact about
+   * tonight. Putting it on the Drug would have made the doctor keep two
+   * TOBREX rows on his list and pick the right one under pressure.
+   *
+   * Until this existed the slip had exactly one thing it could say for an eye
+   * drop, "in BOTH eyes", so a doctor treating one red eye printed a paper
+   * telling the patient to medicate the healthy one too. For a steroid drop
+   * that is a week of unnecessary steroid in a good eye.
+   */
+  side?: 'R' | 'L'
   /** written at print time; from then on this, not drugId, is what was prescribed */
   snap?: RxSnap
   /** how many units the pharmacy counter actually handed over. Absent means

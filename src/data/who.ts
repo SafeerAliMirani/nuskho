@@ -415,7 +415,6 @@ export function searchGenerics(q: string, limit = 8): WhoGeneric[] {
 }
 
 /** How much of the formula column has a Sindhi word a person has read. */
-export function sindhiProgress() {
-  const done = who.filter(g => g.sd).length
-  return { done, total: who.length }
-}
+// sindhiProgress() lived here until 12 Aug 2026. Sindhi for medicines is
+// settled in pk.ts as per-brand candidates; nothing counts an sd column here
+// any more.

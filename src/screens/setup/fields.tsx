@@ -367,7 +367,7 @@ export function FeeFields({ v, on }: { v: Profile; on: (p: Partial<Profile>) => 
   return (
     <>
       <div className="fld">
-        <label>Consultation fee &nbsp; في</label>
+        <label>Consultation fee &nbsp; فيس</label>
         <div className="chips">
           {[100, 200, 300, 500, 1000].map(n => (
             <button key={n} className={'chip' + (v.fee === n ? ' have' : '')}

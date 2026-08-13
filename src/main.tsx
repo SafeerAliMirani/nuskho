@@ -6,7 +6,9 @@ import './ui/type.css'
 import './app.css'
 import { keepStorage, snapshotDaily } from './safety'
 import { freshenDemo } from './demo'
-import { initBuilding, buildingMode } from './building'
+import { initBuilding, buildingMode, buildingUnknown } from './building'
+import { ensurePrintStyles } from './print/styles'
+import { sendHeartbeat } from './heartbeat'
 import { adoptOldPin } from './roles'
 
 /**
@@ -46,10 +48,28 @@ freshenDemo()
     createRoot(document.getElementById('root')!).render(
       <StrictMode><Boundary><App /></Boundary></StrictMode>
     )
+    // The Sindhi face for the SCREEN. app.css says font-family:'NK' in 24
+    // places, but the @font-face for NK lived only in the print stylesheet,
+    // which a mirror phone never injects because nothing there prints. On
+    // Windows the generic serif fallback happens to cover Sindhi letters; on
+    // an iPhone it is Times, and ٻ ڀ ڏ ڙ ڪ ڳ ڻ are exactly the letters a
+    // generic fallback drops. The bytes are already in this bundle (the print
+    // module imports them ?raw), so injecting after first paint costs no
+    // download, only makes the rules resolve.
+    setTimeout(() => { try { ensurePrintStyles() } catch { /* screen still works in fallback */ } }, 300)
+    // The opt-in heartbeat: two fields, fire and forget, cannot block, cannot
+    // throw past its own catch. See src/heartbeat.ts for the whole contract.
+    setTimeout(() => sendHeartbeat(), 1200)
     // AFTER initBuilding has decided what this copy is: registering from a
     // top-level 'load' listener ran before the decision existed and would
     // have installed the cache-first worker on the hub origin anyway.
-    if (location.protocol.startsWith('http') && 'serviceWorker' in navigator && buildingMode() === 'off') {
+    // buildingUnknown(): the hub probe FAILED rather than answered, so this
+    // may be the hub origin behind one wifi blink. Registering now would pin
+    // the device to a cache-first worker it can never shed; skipping costs
+    // one visit's offline cache on the public site, which re-registers next
+    // open. Be wrong in the recoverable direction.
+    if (location.protocol.startsWith('http') && 'serviceWorker' in navigator
+        && buildingMode() === 'off' && !buildingUnknown()) {
       navigator.serviceWorker.register('./sw.js').catch(() => { /* offline is optional */ })
     }
   })

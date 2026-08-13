@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   mirrorSubscribe, mirrorAuth, mirrorSignOut, intent, hostUp, setHostHere, hubIsLocal,
-  MIRROR_ROLES, buildingRoles, type WireState, type WireRx, type WireSlip, type WireVisit,
-  type WireDoctor,
+  MIRROR_ROLES, buildingRoles, buildingDocs, type WireState, type WireRx, type WireSlip,
+  type WireVisit, type WireDoctor, type WireMed, type WireOpenVisit, type IntentKind,
 } from '../building'
 import { ROLE_NAME, ROLE_SD, ROLE_WHAT, can, type Role } from '../roles'
 import { roleIsOn } from '../staff'
-import { VITALS, INSTANT, type VitalDef } from '../data/vitals'
+import { VITALS, INSTANT, filled, vitalText, type VitalDef } from '../data/vitals'
 import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
 import { readQrPayload } from '../print/qr'
-import { printToken } from '../print/print'
+import { printToken, printSlip } from '../print/print'
 import { paper } from '../paper'
 import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn } from '../ui/art'
 import { APP } from '../profile'
@@ -19,6 +19,15 @@ import Toasts from '../ui/Toasts'
 import { whyItFailed } from '../fail'
 import { Note } from '../ui/Note'
 import type { TokenSlip } from '../print/token'
+import { signal } from '../ui/bus'
+import { primeSound } from '../ui/sound'
+import { searchDictionary, dictLine, type DictEntry } from '../data/dictionary'
+import { sideMatters, TIMES } from '../data/forms'
+import { sameMolecule } from '../data/who'
+import { labTests, adviceList } from '../data/formulary'
+import { lineIsEmpty } from '../rx'
+import type { SlipData } from '../print/renderSlip'
+import type { RxLine } from '../types'
 
 /**
  * A PHONE IN THE BUILDING. A door and a screen, and deliberately nothing else.
@@ -37,6 +46,9 @@ import type { TokenSlip } from '../print/token'
 
 const ICON: Record<string, (p: { size?: number }) => JSX.Element> = {
   counter: IcMoney, compounder: IcQueue, pharmacy: IcPill, clinicadmin: IcChart,
+  // same icon Lock.tsx uses for the doctor at the clinic machine: one person,
+  // one picture, whichever door he walks through
+  doctor: IcUser,
 }
 
 const LABEL: Record<string, string> = {
@@ -45,6 +57,9 @@ const LABEL: Record<string, string> = {
 }
 
 const ROLE_KEY = 'nuskho.mirrorRole'
+/** Which room this doctor's phone belongs to, beside the role in the same
+ *  sitting. Restored on reload exactly like the role is, just below. */
+const DOC_KEY = 'nuskho.mirrorDoc'
 
 export default function Mirror() {
   const [role, setRole] = useState<Role | null>(() => {
@@ -53,21 +68,38 @@ export default function Mirror() {
       return r && (MIRROR_ROLES as string[]).includes(r) ? (r as Role) : null
     } catch { return null }
   })
+  const [docId, setDocId] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(DOC_KEY) } catch { return null }
+  })
   const [s, setS] = useState<WireState | null>(null)
   const [rx, setRx] = useState<WireRx>([])
+  const [rawUp, setRawUp] = useState(hostUp())
+  /**
+   * What the header SHOWS, which deliberately lags what the wire KNOWS when
+   * the news is bad. iOS drops the WebSocket on every screen lock and it
+   * reconnects by itself within a heartbeat or two, so without this lag the
+   * compounder read "clinic machine not answering" sixty times an evening
+   * for a condition that healed before he finished the sentence. Bad news
+   * waits six seconds; good news shows instantly.
+   */
   const [up, setUp] = useState(hostUp())
+  useEffect(() => {
+    if (rawUp) { setUp(true); return }
+    const t = setTimeout(() => setUp(false), 6000)
+    return () => clearTimeout(t)
+  }, [rawUp])
   const [err, setErr] = useState('')
   const [tour, setTour] = useState(false)
 
   const out = () => {
     mirrorSignOut()
-    try { sessionStorage.removeItem(ROLE_KEY) } catch { /* ignore */ }
-    setRole(null); setS(null)
+    try { sessionStorage.removeItem(ROLE_KEY); sessionStorage.removeItem(DOC_KEY) } catch { /* ignore */ }
+    setRole(null); setDocId(null); setS(null)
   }
 
   useEffect(() => {
     mirrorSubscribe({
-      state: setS, rx: setRx, up: setUp,
+      state: setS, rx: setRx, up: setRawUp,
       err: w => {
         setErr(w)
         setTimeout(() => setErr(''), 5000)
@@ -76,8 +108,8 @@ export default function Mirror() {
       // no longer in memory: the honest place to be is the door, not a screen
       // whose buttons quietly do nothing
       expired: () => {
-        try { sessionStorage.removeItem(ROLE_KEY) } catch { /* ignore */ }
-        setRole(null); setS(null)
+        try { sessionStorage.removeItem(ROLE_KEY); sessionStorage.removeItem(DOC_KEY) } catch { /* ignore */ }
+        setRole(null); setDocId(null); setS(null)
       },
     })
   }, [])
@@ -112,7 +144,12 @@ export default function Mirror() {
               <span className={'rolechip ' + role} style={{ cursor: 'default' }}>
                 {ROLE_NAME[role]} <i className="sd">{ROLE_SD[role]}</i>
               </span>
-              {tourFor(role).length > 0 &&
+              {/* tourFor('doctor') is written for the HOST screens (the queue,
+                  the rooms strip, My figures) and none of those controls are
+                  on this phone. A ring pointing at a control that is not
+                  there is the exact bug commit c108939 fixed, so this screen
+                  gets no tour yet rather than a wrong one. */}
+              {role !== 'doctor' && tourFor(role).length > 0 &&
                 <button className="lnk paper" onClick={() => setTour(true)}>Help</button>}
               <button className="lnk paper" onClick={out}>Sign out</button>
             </>
@@ -131,10 +168,16 @@ export default function Mirror() {
       {err && role && <div className="mirwarn err">{err}</div>}
 
       {!role
-        ? <MirrorDoor up={up} onIn={r => {
-            setRole(r)
-            if (!tourSeen(r)) setTour(true)
-            try { sessionStorage.setItem(ROLE_KEY, r) } catch { /* ignore */ }
+        ? <MirrorDoor up={up} onIn={(r, doctorId) => {
+            setRole(r); setDocId(doctorId ?? null)
+            // doctor-mirror steps are host-only (see the Help gate above): never
+            // auto-open a tour that would ring nothing on this phone
+            if (r !== 'doctor' && !tourSeen(r)) setTour(true)
+            try {
+              sessionStorage.setItem(ROLE_KEY, r)
+              if (doctorId) sessionStorage.setItem(DOC_KEY, doctorId)
+              else sessionStorage.removeItem(DOC_KEY)
+            } catch { /* ignore */ }
           }} />
         : !s
         ? <div className="pane"><p className="hint">
@@ -144,7 +187,16 @@ export default function Mirror() {
         : role === 'counter' ? <MDesk s={s} />
         : role === 'compounder' ? <MQueue s={s} role={role} />
         : role === 'pharmacy' ? <MPharm s={s} rx={rx} />
-        : <MOps s={s} />}
+        : role === 'doctor' ? <MDr s={s} docId={docId} />
+        : role === 'clinicadmin' ? <MOps s={s} />
+        /* Every mirror role above is named. A role this switch has never
+           heard of used to fall through to the clinic admin's figures, which
+           is a screen quietly shown to the wrong job. A new role added to
+           MIRROR_ROLES without a screen now says so instead of guessing. */
+        : <div className="pane"><p className="hint">
+            This job has no phone screen yet. Sign out and pick another role,
+            or use the clinic machine.
+          </p></div>}
 
       {tour && role && <Tour role={role} onClose={() => setTour(false)} />}
     </div>
@@ -156,20 +208,38 @@ export default function Mirror() {
 /** An empty list is not an answer, it is the absence of one. */
 const mine = (rs: Role[]): Role[] => (rs.length ? rs : MIRROR_ROLES)
 
-function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
+function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role, doctorId?: string) => void }) {
   const [want, setWant] = useState<Role | null>(null)
   const [pin, setPin] = useState('')
   const [bad, setBad] = useState('')
   const [busy, setBusy] = useState(false)
+  /** Doctor tapped, more than one room in this building: which room this phone
+   *  is asking for, remembered through the PIN step below. */
+  const [askDoc, setAskDoc] = useState(false)
+  const [wantDoc, setWantDoc] = useState<string | undefined>(undefined)
 
-  async function go(r: Role, p: string) {
+  async function go(r: Role, p: string, doctorId?: string) {
+    // Wake the audio hardware INSIDE the tap, before any await. WebKit only
+    // honours AudioContext.resume() during a real user gesture, so without
+    // this line the doctor's bell is silent on every iPhone mirror for the
+    // life of the tab: the context is created suspended inside a WebSocket
+    // handler and can never be resumed. Chrome forgave this; Safari does not.
+    // Same call, same reason, as Lock.tsx's choose().
+    primeSound()
     setBusy(true)
-    const res = await mirrorAuth(r, p)
+    const res = await mirrorAuth(r, p, doctorId)
     setBusy(false)
-    if (res.ok) { onIn(r); return }
+    if (res.ok) { onIn(r, res.doctorId); return }
     // the empty first tap just found out this role HAS a PIN: show its box
-    if (p === '' && res.why.includes('right')) { setWant(r); setBad(''); return }
+    if (p === '' && res.why.includes('right')) { setWant(r); setWantDoc(doctorId); setBad(''); return }
     setBad(res.why); setPin('')
+  }
+
+  /** Doctor, chosen room: one tap here starts the same PIN dance every other
+   *  role goes through, now carrying which room it is for. */
+  function pickDoctor(doctorId: string) {
+    setAskDoc(false)
+    go('doctor', '', doctorId)
   }
 
   const local = hubIsLocal()
@@ -225,7 +295,23 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
             : 'The clinic machine is not answering. Signing in needs it on, because the PINs live there and nowhere else.'}
         </p>
       )}
-      {want ? (
+      {askDoc ? (
+        <>
+          <div className="whoback">
+            <b>{ROLE_NAME.doctor} <span className="sd">{ROLE_SD.doctor}</span></b>
+            <button className="lnk" onClick={() => setAskDoc(false)}>not me</button>
+          </div>
+          <p className="pick">Which doctor?</p>
+          <div className="chips">
+            {buildingDocs().map(d => (
+              <button key={d.id} className="chip mdr-docpick" disabled={busy}
+                      onClick={() => pickDoctor(d.id)}>
+                {d.nameEn} · Room {d.room}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : want ? (
         <>
           <div className="whoback">
             <b>{ROLE_NAME[want]} <span className="sd">{ROLE_SD[want]}</span></b>
@@ -235,10 +321,10 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
             <label>PIN</label>
             <input type="password" inputMode="numeric" autoFocus value={pin} maxLength={8}
                    onChange={e => { setPin(e.target.value.replace(/[^0-9]/g, '')); setBad('') }}
-                   onKeyDown={e => { if (e.key === 'Enter' && pin) go(want, pin) }} />
+                   onKeyDown={e => { if (e.key === 'Enter' && pin) go(want, pin, wantDoc) }} />
           </div>
           {bad && <p className="usable bad">{bad}</p>}
-          <button className="btn wide" disabled={!pin || busy} onClick={() => go(want, pin)}>
+          <button className="btn wide" disabled={!pin || busy} onClick={() => go(want, pin, wantDoc)}>
             Open &nbsp; کوليو
           </button>
         </>
@@ -269,7 +355,14 @@ function MirrorDoor({ up, onIn }: { up: boolean; onIn: (r: Role) => void }) {
                         // the mouse is a lie told sixty times an evening. The arrow
                         // goes too: it is the part that says "this leads somewhere".
                         title={off && !busy ? 'The clinic machine is not answering' : undefined}
-                        onClick={() => { setBad(''); go(r, '') }}>
+                        onClick={() => {
+                          setBad('')
+                          // several rooms: ask which one BEFORE the PIN, so the
+                          // very first mirrorAuth call already carries it
+                          if (r === 'doctor' && buildingDocs().length > 1) { setAskDoc(true); return }
+                          const solo = r === 'doctor' && buildingDocs().length === 1 ? buildingDocs()[0].id : undefined
+                          go(r, '', solo)
+                        }}>
                   <span className="wi"><I size={20} /></span>
                   <span className="n">{ROLE_NAME[r]} <i className="sd">{ROLE_SD[r]}</i></span>
                   <small>{ROLE_WHAT[r]}</small>
@@ -409,7 +502,7 @@ function MDesk({ s }: { s: WireState }) {
         <span><IcWarn size={15} /> <b>Cannot wait</b></span>
       </label>
       <div className="fld feerow">
-        <label><IcMoney size={13} /> Fee taken now &nbsp; في</label>
+        <label><IcMoney size={13} /> Fee taken now &nbsp; فيس</label>
         <div className="row">
           <input value={amt} inputMode="numeric" placeholder="Rs"
                  onChange={e => setAmt(e.target.value.replace(/\D/g, '').slice(0, 6))} />
@@ -420,7 +513,7 @@ function MDesk({ s }: { s: WireState }) {
         </div>
       </div>
       <button className="btn wide" disabled={!name.trim() || busy} onClick={() => fire('addPatient')}>
-        {busy ? 'Asking the clinic machine…' : <>Add to queue &nbsp; قطار ۾ شامل ڪريو</>}
+        {busy ? 'Asking the clinic machine…' : <>Add to queue &nbsp; لائين ۾ شامل ڪريو</>}
       </button>
       {msg && <p className="usable" style={{ marginTop: 8 }}>{msg}</p>}
 
@@ -764,6 +857,517 @@ function MQueue({ s, role }: { s: WireState; role: Role }) {
   )
 }
 
+/* ---------------------------------------------------------- the doctor's phone
+ *
+ * SINCE 11 AUG 2026, THE SECOND ROOM PRESCRIBES FROM ITS OWN SCREEN.
+ *
+ * Everything below composes in memory and asks the clinic machine, exactly
+ * like every other mirror screen. The room check happens on the record
+ * holder, not here (see building.ts): this screen only ever sees the patients
+ * `openVisit` hands back, and it never gets to choose whose room it is.
+ *
+ * A LINE IS NEVER FROZEN HERE. `freezeLines`, `snapFor` and the medicine
+ * picker's `Drug` records all stay on the record holder. This screen holds
+ * `RxLine`s and a thin `WireMed` list (id, brand, strength, generic, form,
+ * route). That is enough to draw the grid, never enough to print without asking.
+ */
+
+/** 0 to 1 to 2 to half to 0. The same convention Compose's dose grid uses,
+ *  copied rather than shared: the two screens do not import each other. */
+const cycle = (n: number) => (n === 0 ? 1 : n === 1 ? 2 : n === 2 ? 0.5 : 0)
+
+/** Compose's own list, word for word. It is not exported there, since the two
+ *  prescribing screens stay independent files, so it is repeated here. */
+const NEXT_VISIT = ['in 3 days', 'in 5 days', 'in 1 week', 'in 2 weeks', 'in 1 month',
+                    'only if it gets worse']
+
+/** One medicine line, drawn and edited. Split out of MDr so the per-line
+ *  JSX reads as one thing, the way VBox does for a vitals box. */
+function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
+  l: RxLine; i: number
+  medsMap: Record<string, WireMed>
+  /** the other line numbers sharing this one's molecule, if any */
+  twin?: number[]
+  onChange: (patch: Partial<RxLine>) => void
+  onRemove: () => void
+}) {
+  const med = medsMap[l.drugId]
+  // the snap wins once the visit is printed: it is what actually went on
+  // paper, and it must read the same even if the medicine list changes later
+  const brand = l.snap?.brand ?? med?.brand ?? '?'
+  const strength = l.snap?.strength ?? med?.strength ?? ''
+  const generic = l.snap?.generic ?? med?.generic ?? ''
+  const route = l.snap?.route ?? med?.route
+  const empty = lineIsEmpty(l)
+  return (
+    <div className="line">
+      <div className="hd">
+        <div><b>{i + 1}. {brand} {strength}</b><small>{generic}</small></div>
+        <button className="x" onClick={onRemove}>×</button>
+      </div>
+      <div className="dosegrid">
+        {TIMES.map(k => (
+          <button key={k} className={`dbtn mdr-dose-${k}${l.dose[k] ? ' on' : ''}`}
+                  onClick={() => onChange({ dose: { ...l.dose, [k]: cycle(l.dose[k] ?? 0) } })}>
+            {l.dose[k] === 0.5 ? '½' : l.dose[k] || '-'}
+            <small>{k.toUpperCase()}</small>
+          </button>
+        ))}
+        {/* an eye or an ear asks which side; everything else asks about food,
+            and never both. See sideMatters in data/forms.ts. */}
+        {sideMatters(route) ? (
+          <button className="dbtn on" style={{ minWidth: 64 }}
+                  onClick={() => onChange({ side: l.side === undefined ? 'R' : l.side === 'R' ? 'L' : undefined })}>
+            {l.side === 'R' ? 'R' : l.side === 'L' ? 'L' : 'Both'}
+            <small>{route === 'ear' ? 'EAR' : 'EYE'}</small>
+          </button>
+        ) : (
+          <button className="dbtn on" style={{ minWidth: 96 }}
+                  onClick={() => onChange({ meal: l.meal === 'after' ? 'before' : 'after' })}>
+            {l.meal === 'before' ? 'before' : 'after'}<small>FOOD</small>
+          </button>
+        )}
+        <div className="stp">
+          <button onClick={() => onChange({ days: Math.max(1, l.days - 1) })}>−</button>
+          <div className="v">{l.days} d</div>
+          <button onClick={() => onChange({ days: Math.min(30, l.days + 1) })}>+</button>
+        </div>
+      </div>
+      <div className="chips mdr-dayschips">
+        {[3, 5, 7, 10, 15, 30].map(n => (
+          <button key={n} className={'chip mdr-dayschip' + (l.days === n ? ' on' : '')}
+                  onClick={() => onChange({ days: n })}>{n}</button>
+        ))}
+      </div>
+      <div className="fld" style={{ marginTop: 8, marginBottom: 0 }}>
+        <input value={l.note ?? ''} maxLength={160} placeholder="note, optional"
+               onChange={e => onChange({ note: e.target.value || undefined })} />
+      </div>
+      {empty && <div className="badmsg">No dose set. This would print with no instruction.</div>}
+      {twin && (
+        <div className="badmsg warn">
+          Same medicine as line {twin.map(k => k + 1).join(' and ')}:
+          {' '}both are {generic}. Check the total dose is what you mean.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MDr({ s, docId }: { s: WireState; docId: string | null }) {
+  const me = s.doctors.find(d => d.id === docId)
+
+  const [meds, setMeds] = useState<WireMed[]>([])
+  const medsMap = useMemo(() => Object.fromEntries(meds.map(m => [m.id, m])), [meds])
+
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [visit, setVisit] = useState<WireOpenVisit | null>(null)
+  const [lines, setLines] = useState<RxLine[]>([])
+  const [diagnosis, setDiagnosis] = useState('')
+  const [tests, setTests] = useState<string[]>([])
+  const [advice, setAdvice] = useState<string[]>([])
+  const [nextVisit, setNextVisit] = useState('')
+  const [q, setQ] = useState('')
+
+  /** MQueue's own pattern, generalised over the five things this screen can
+   *  ask: a busy guard keyed by what is happening, a plain sentence the
+   *  moment the clinic machine refuses or never answers, and the guard always
+   *  comes back so the next tap works. */
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+
+  async function ask(key: string, did: string, kind: IntentKind, p: Record<string, unknown>) {
+    if (busy === key) return null
+    setBusy(key); setErr('')
+    try {
+      const r = await intent(kind, p)
+      if (r.ok === false) { setErr(whyItFailed(r.why, did)); return null }
+      return r
+    } catch (e) {
+      console.error('[nuskho] ' + did, e)
+      setErr(whyItFailed(e, did))
+      return null
+    } finally {
+      setBusy('')
+    }
+  }
+
+  // his own list, once, the moment this screen opens. Not a db read, a wire ask.
+  useEffect(() => {
+    (async () => {
+      const r = await ask('meds', 'Your medicine list could not be fetched', 'myMeds', {})
+      if (r) setMeds((r.meds as WireMed[]) ?? [])
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function applyVisit(v: WireOpenVisit) {
+    setVisit(v)
+    setLines(v.lines)
+    setDiagnosis(v.diagnosis ?? '')
+    setTests(v.tests)
+    setAdvice(v.advice)
+    setNextVisit(v.nextVisit ?? '')
+  }
+
+  /**
+   * THE LATEST EDIT, OFF A REF, SO A DEBOUNCED SAVE NEVER SENDS A STALE
+   * CLOSURE. Every render refreshes this; `flush` below reads it rather than
+   * whatever `lines` happened to be when the timer was scheduled.
+   */
+  const formRef = useRef({ lines, diagnosis, tests, advice, nextVisit })
+  formRef.current = { lines, diagnosis, tests, advice, nextVisit }
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** stops two saves overlapping; deliberately not the `busy` state above, so
+   *  a background save never disables a button the doctor is looking at */
+  const savingRef = useRef(false)
+
+  function touch() {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => { flush() }, 600)
+  }
+
+  /** Send whatever is pending now. Used by the debounce above, and awaited
+   *  directly before print and before leaving the patient, so nothing typed
+   *  in the last 600ms is ever left behind on the record holder. */
+  async function flush(): Promise<boolean> {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    if (!openId || visit?.printedAt) return true
+    if (savingRef.current) return true
+    savingRef.current = true
+    const f = formRef.current
+    try {
+      const r = await intent('saveRx', {
+        visitId: openId, lines: f.lines,
+        diagnosis: f.diagnosis || undefined,
+        tests: f.tests, advice: f.advice,
+        nextVisit: f.nextVisit || undefined,
+      })
+      if (r.ok === false) {
+        setErr(String(r.why ?? 'That was not saved.'))
+        await resync()   // the host's state is the truth; this screen catches up to it
+        return false
+      }
+      return true
+    } catch (e) {
+      console.error('[nuskho] the prescription was not saved', e)
+      setErr(whyItFailed(e, 'That change was not saved'))
+      return false
+    } finally {
+      savingRef.current = false
+    }
+  }
+
+  /** Re-read the patient after a refused save. Deliberately not `ask()`: that
+   *  clears `err` on the way in, and the sentence just set above is the one
+   *  thing the doctor needs to still see when this finishes. */
+  async function resync() {
+    if (!openId) return
+    try {
+      const r = await intent('openVisit', { visitId: openId })
+      if (r.ok === false) { setErr(String(r.why ?? 'That patient could not be reopened.')); return }
+      applyVisit(r.v as WireOpenVisit)
+    } catch (e) {
+      console.error('[nuskho] resync failed', e)
+      setErr(whyItFailed(e, 'That patient could not be reopened'))
+    }
+  }
+
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current) }, [])
+
+  async function openRow(vid: string) {
+    await flush()   // whatever was pending on the last patient lands first
+    setErr(''); setQ(''); setVisit(null); setOpenId(vid)
+    const r = await ask('open:' + vid, 'That patient could not be opened', 'openVisit', { visitId: vid })
+    if (r) applyVisit(r.v as WireOpenVisit)
+    else setOpenId(null)
+  }
+
+  async function back() {
+    const ok = await flush()
+    if (!ok) return   // stay put; the sentence explains why, and resync already ran
+    setOpenId(null); setVisit(null); setErr('')
+  }
+
+  function setLine(i: number, patch: Partial<RxLine>) {
+    setLines(ls => ls.map((l, k) => (k === i ? { ...l, ...patch } : l)))
+    touch()
+  }
+  function removeLine(i: number) {
+    setLines(ls => ls.filter((_, k) => k !== i))
+    touch()
+  }
+  function setDiag(v: string) { setDiagnosis(v); touch() }
+  function toggleTest(key: string) {
+    setTests(ts => (ts.includes(key) ? ts.filter(x => x !== key) : [...ts, key]))
+    touch()
+  }
+  function toggleAdvice(key: string) {
+    setAdvice(as => (as.includes(key) ? as.filter(x => x !== key) : [...as, key]))
+    touch()
+  }
+  function setNext(v: string) { setNextVisit(v); touch() }
+
+  function addOwn(hit: WireMed) {
+    setLines(ls => [...ls, { drugId: hit.id, dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5 }])
+    setQ('')
+    touch()
+  }
+
+  async function addFromShelf(e: DictEntry) {
+    const r = await ask('take:' + e.brand + '|' + e.strength, 'That medicine could not be added',
+      'takeMed', { brand: e.brand, strength: e.strength, form: e.form })
+    if (!r) return
+    const med = r.med as WireMed
+    setMeds(ms => [...ms, med])
+    setLines(ls => [...ls, { drugId: (r.id as string | undefined) ?? med.id,
+      dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5 }])
+    setQ('')
+    touch()
+  }
+
+  async function doPrint() {
+    if (!openId || busy === 'print') return
+    setBusy('print'); setErr('')
+    try {
+      const ok = await flush()
+      if (!ok) return
+      const r = await intent('printRx', { visitId: openId })
+      if (r.ok === false) { setErr(String(r.why ?? 'That did not print.')); return }
+      const slip = r.slip as SlipData
+      try {
+        await printSlip(slip)
+      } catch (e) {
+        console.error('[nuskho] print failed', e)
+        setErr('Check the printer is on and has paper, then press PRINT again.')
+        return
+      }
+      // the slip carries the just-frozen visit back: printedAt and the
+      // snapped lines come from the record holder, never invented here
+      setVisit(v => (v ? { ...v, status: 'done', printedAt: slip.visit.printedAt, lines: slip.visit.lines } : v))
+      setQ(''); setErr('')
+    } catch (e) {
+      console.error('[nuskho] printRx failed', e)
+      setErr(whyItFailed(e, 'That did not print'))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const ownHits = useMemo(() => {
+    const k = q.trim().toLowerCase()
+    if (k.length < 2) return []
+    return meds.filter(m => m.brand.toLowerCase().startsWith(k) || m.generic.toLowerCase().startsWith(k)).slice(0, 12)
+  }, [meds, q])
+
+  const shelfHits = useMemo(() => {
+    if (q.trim().length < 2) return []
+    const norm = (b: string, st: string) => (b + st).toLowerCase().replace(/[^a-z0-9]/g, '')
+    const have = new Set(meds.map(m => norm(m.brand, m.strength)))
+    return searchDictionary(q).filter(e => !have.has(norm(e.brand, e.strength)))
+  }, [meds, q])
+
+  const twins = useMemo(
+    () => sameMolecule(lines.map(l => l.snap?.generic ?? medsMap[l.drugId]?.generic)),
+    [lines, medsMap],
+  )
+
+  // mirrors visitDoctorId in doctors.ts: a visit with no doctorId at all is
+  // the first doctor's, the sentinel every pre-rooms record already carries.
+  // Nothing is imported for this. It is inlined so this screen's only source
+  // of truth about rooms stays the wire, never a second copy of doctors.ts.
+  const mine = useMemo(() => s.visits.filter(v => (v.doctorId ?? 'D1') === docId), [s.visits, docId])
+  const waiting = useMemo(
+    () => [...mine.filter(v => v.status === 'waiting')]
+      .sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || a.token - b.token),
+    [mine],
+  )
+  const printedToday = mine.filter(v => v.printedAt).length
+
+  const locked = !!visit?.printedAt
+
+  return (
+    <div className="pane">
+      {!openId ? (
+        <>
+          <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <h2 style={{ marginBottom: 0 }}>
+              <IcUser size={17} /> {me ? `${me.nameEn} · Room ${me.room}` : 'Your room'}
+            </h2>
+            {/* Plain, on purpose: ui/Bell.tsx counts who else is listening, which
+                is host-only state a phone cannot see, and would tell a doctor on
+                his own mirror that nobody could hear him even while the
+                compounder's phone is open right beside him. This just rings. */}
+            <button className="btn ghost mdr-bell" onClick={() => signal({ kind: 'bell', from: 'doctor' })}>
+              Ring the desk
+            </button>
+          </div>
+          {!docId && (
+            <p className="usable bad">
+              This phone does not know which room it is signed in for. Sign out and sign in again.
+            </p>
+          )}
+          {err && <p className="usable bad">{err}</p>}
+          <p className="hint">{printedToday} printed today.</p>
+          {waiting.map(v => (
+            <div key={v.id} className="qwrap">
+              <button className={'qrow mdr-qrow' + (v.urgent ? ' urgent' : '')} onClick={() => openRow(v.id)}>
+                <span className="tk">{v.token}</span>
+                <span className="nm">{v.name}</span>
+                {v.urgent && <span className="uflag"><IcWarn size={13} /> cannot wait</span>}
+                {v.hasVitals && (
+                  <span className="mdr-vdot" title="vitals taken" aria-label="vitals taken" style={{
+                    width: 8, height: 8, borderRadius: '50%', background: 'var(--g)', flex: 'none', marginLeft: 6,
+                  }} />
+                )}
+              </button>
+            </div>
+          ))}
+          {!waiting.length && <p className="hint">Nobody waiting in your room right now.</p>}
+        </>
+      ) : !visit ? (
+        <>
+          <button className="btn ghost mdr-back" onClick={() => { setOpenId(null); setErr('') }}>← Queue</button>
+          <p className="hint">{err || 'Fetching this patient from the clinic machine…'}</p>
+        </>
+      ) : (
+        <>
+          <button className="btn ghost mdr-back" onClick={back} style={{ marginBottom: 12 }}>← Queue</button>
+
+          <div className="who">
+            {visit.patient.name}
+            <span>Token {visit.token} · No. {visit.patient.code}
+              {visit.patient.age ? ` · ${visit.patient.age}` : ''}
+              {visit.patient.sex ? ` · ${visit.patient.sex}` : ''}
+            </span>
+          </div>
+          {visit.prev && (visit.prev.diagnosis || visit.prev.brands.length > 0) && (
+            <div className="prev">
+              Last time: {[visit.prev.diagnosis, visit.prev.brands.join(', ')].filter(Boolean).join(', ')}
+            </div>
+          )}
+
+          <h2>Vitals</h2>
+          {filled(visit.vitals).length > 0 ? (
+            <p className="hint mdr-vitals">
+              {filled(visit.vitals).map(([d, val]) => `${d.short} ${vitalText(d.key, val)}`).join(' · ')}
+            </p>
+          ) : (
+            <p className="hint">No vitals taken yet.</p>
+          )}
+
+          {/* Above the locked note and above the medicines, because it is true
+              of the whole panel and a doctor scrolled past a long prescription
+              must not have to hunt for why the last thing he did failed. */}
+          {err && (
+            <div className="saidno" style={{ marginTop: 8 }}>
+              <Note tone="stop" title="That did not go through">{err}</Note>
+            </div>
+          )}
+
+          {locked && (
+            <div className="lockbar mdr-locked-note">
+              Printed. Amend at the clinic machine if something must change.
+              <div className="row" style={{ marginTop: 10 }}>
+                <button className="btn ghost mdr-reprint" disabled={busy === 'print'} onClick={doPrint}>
+                  {busy === 'print' ? 'Printing…' : 'Reprint'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0, opacity: locked ? .55 : 1 }}>
+            <h2>Diagnosis</h2>
+            <div className="fld">
+              <input value={diagnosis} maxLength={240} placeholder="what he found"
+                     onChange={e => setDiag(e.target.value)} />
+            </div>
+
+            <h2><IcPill size={17} /> Medicines</h2>
+            <div className="fld">
+              <input className="mdr-search" value={q} placeholder="Type two letters to find a medicine…"
+                     onChange={e => setQ(e.target.value)} />
+            </div>
+            {q.trim().length >= 2 && (
+              <div className="dict">
+                {ownHits.length === 0 && shelfHits.length === 0 && <div className="dhead">Nothing found</div>}
+                {ownHits.length > 0 && <div className="dhead">Your list</div>}
+                {ownHits.map(m => (
+                  <button key={m.id} className="drow2 mdr-ownhit" onClick={() => addOwn(m)}>
+                    <span className="dl">{m.brand}{m.strength ? ' ' + m.strength : ''} · {m.generic}</span>
+                    <span className="add">add</span>
+                  </button>
+                ))}
+                {shelfHits.length > 0 && <div className="dhead">shelf</div>}
+                {shelfHits.map(e => (
+                  <button key={e.brand + '|' + e.strength} className="drow2 mdr-shelfhit"
+                          disabled={busy === 'take:' + e.brand + '|' + e.strength}
+                          onClick={() => addFromShelf(e)}>
+                    <span className="dl">{dictLine(e)}</span>
+                    <span className="add">add</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {lines.map((l, i) => (
+              <MedLine key={i} l={l} i={i} medsMap={medsMap} twin={twins.get(i)}
+                       onChange={patch => setLine(i, patch)} onRemove={() => removeLine(i)} />
+            ))}
+            {!lines.length && <p className="hint">Nothing prescribed yet. Search above to add the first medicine.</p>}
+
+            <h2>Lab tests</h2>
+            <div className="chips">
+              {labTests.map(t => {
+                const key = `${t.en}|${t.sd}`; const on = tests.includes(key)
+                return (
+                  <button key={t.en} className={`chip ${on ? 'on' : ''}`} onClick={() => toggleTest(key)}>
+                    {t.en}
+                  </button>
+                )
+              })}
+            </div>
+
+            <h2>Advice</h2>
+            <div className="chips">
+              {adviceList.map(a => {
+                const key = `${a.sd}|${a.en}|${a.icon}`; const on = advice.includes(key)
+                return (
+                  <button key={a.en} className={`chip ${on ? 'on' : ''}`} onClick={() => toggleAdvice(key)}>
+                    {a.en}
+                  </button>
+                )
+              })}
+            </div>
+
+            <h2>Next visit</h2>
+            <div className="chips">
+              {NEXT_VISIT.map(w => {
+                const on = nextVisit === w
+                return (
+                  <button key={w} className={`chip ${on ? 'on' : ''}`}
+                          onClick={() => setNext(on ? '' : w)}>{w}</button>
+                )
+              })}
+            </div>
+            <input className="nextvin" value={nextVisit} maxLength={60}
+                   placeholder="or type it, printed as you type it"
+                   onChange={e => setNext(e.target.value)} />
+          </fieldset>
+
+          {!locked && (
+            <div className="sticky">
+              <button className="btn wide mdr-print" disabled={busy === 'print' || !lines.length} onClick={doPrint}>
+                {busy === 'print' ? 'Printing…' : `PRINT for ${visit.patient.name} (${lines.length})`}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 /* --------------------------------------------------------- the pharmacy's phone */
 
 function MPharm({ s, rx }: { s: WireState; rx: WireRx }) {
@@ -873,6 +1477,12 @@ function MShop() {
 
 function MOurCounter({ s, rx }: { s: WireState; rx: WireRx }) {
   const [open, setOpen] = useState<string | null>(null)
+  /** Which line's partial count is being typed, and the digits so far. An
+   *  inline box instead of prompt(): iOS offers "block dialogs" after a busy
+   *  evening's third one, and once ticked, prompt() returns null with no
+   *  message and the "gave 6, short 4" flow is dead for the sitting. */
+  const [askIdx, setAskIdx] = useState<number | null>(null)
+  const [askVal, setAskVal] = useState('')
   const byId = useMemo(() => new Map(rx.map(r => [r.visitId, r.lines])), [rx])
   const printed = s.visits.filter(v => v.printedAt && v.linesN > 0)
     .sort((a, b) => (b.printedAt ?? 0) - (a.printedAt ?? 0))
@@ -910,11 +1520,23 @@ function MOurCounter({ s, rx }: { s: WireState; rx: WireRx }) {
                       </small>
                     </div>
                     {l.n > 0 && !done && l.given !== undefined && (
-                      <button className="lnk" onClick={() => {
-                        const raw = prompt(`How many actually given? Course is ${l.n}.`, String(l.given ?? l.n))
-                        if (raw === null) return
-                        intent('setGiven', { visitId: v.id, index: i, given: +raw.replace(/[^0-9]/g, '') || 0 })
-                      }}>gave {l.given}</button>
+                      askIdx === i ? (
+                        <span className="row" style={{ gap: 6, alignItems: 'center' }}>
+                          <input className="mdr-gave" type="text" inputMode="numeric" autoFocus
+                                 value={askVal} style={{ width: 64, fontSize: 18, padding: '6px 8px' }}
+                                 onChange={e => setAskVal(e.target.value.replace(/[^0-9]/g, ''))} />
+                          <button className="chip on" onClick={() => {
+                            const k = Math.max(0, Math.min(l.n, +askVal || 0))
+                            intent('setGiven', { visitId: v.id, index: i, given: k })
+                            setAskIdx(null)
+                          }}>OK</button>
+                          <button className="lnk" onClick={() => setAskIdx(null)}>x</button>
+                        </span>
+                      ) : (
+                        <button className="lnk" onClick={() => {
+                          setAskIdx(i); setAskVal(String(l.given ?? l.n))
+                        }}>gave {l.given}</button>
+                      )
                     )}
                   </div>
                 ))}

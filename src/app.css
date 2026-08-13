@@ -140,7 +140,11 @@ svg{flex:none}
 .top{
   position:sticky;top:0;z-index:30;min-height:var(--header);
   background:linear-gradient(112deg,#0a3a2e 0%,var(--g) 46%,#17705a 100%);
-  color:#fff;padding:var(--s3) var(--s5);
+  color:#fff;
+  /* viewport-fit=cover runs the layout under the iPhone notch and clock; on
+     every other device the env() terms are zero and this is the old padding */
+  padding:calc(var(--s3) + env(safe-area-inset-top,0px)) calc(var(--s5) + env(safe-area-inset-right,0px))
+          var(--s3) calc(var(--s5) + env(safe-area-inset-left,0px));
   display:flex;gap:var(--s3);justify-content:space-between;align-items:center;flex-wrap:wrap;
   box-shadow:0 1px 0 rgba(255,255,255,.13) inset, var(--sh-3);
 }
@@ -753,7 +757,7 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
     min-width:0;border-radius:var(--r3);box-shadow:var(--sh-4)}
   .menu button{padding:15px var(--s4);font-size:16px}
 
-  .pane{padding:var(--s4) var(--s3) 96px}
+  .pane{padding:var(--s4) calc(var(--s3) + env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) calc(var(--s3) + env(safe-area-inset-left,0px))}
 
   /* thumbs, not cursors */
   .fld input,.fld select{padding:14px var(--s3);font-size:16px}  /* 16px stops iOS zooming */
@@ -773,7 +777,10 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
   .line{padding:var(--s3);border-radius:var(--r2)}
   .dosegrid{gap:var(--s2)}
   .dbtn{min-width:56px;flex:1}
-  .sticky{position:fixed;left:0;right:0;bottom:0;padding:var(--s3);
+  .sticky{position:fixed;left:0;right:0;bottom:0;
+    /* the home-indicator strip is a live control on iPhone: PRINT must sit
+       above it, not inside it */
+    padding:var(--s3) var(--s3) calc(var(--s3) + env(safe-area-inset-bottom,0px));
     background:var(--card);border-top:1px solid var(--line);
     box-shadow:0 -6px 20px rgba(16,23,21,.09);flex-direction:column}
   .sticky .btn{width:100%}
@@ -1778,7 +1785,8 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
   box-shadow:0 0 0 3px var(--gold),0 0 0 9999px rgba(6,26,21,.42);
   transition:top .22s ease,left .22s ease,width .22s ease,height .22s ease}
 
-.tourcard{position:fixed;z-index:61;right:22px;bottom:22px;width:372px;max-width:calc(100vw - 28px);
+.tourcard{position:fixed;z-index:61;right:22px;bottom:calc(22px + env(safe-area-inset-bottom,0px));
+  width:372px;max-width:calc(100vw - 28px);
   background:var(--card);border-radius:18px;overflow:hidden;
   box-shadow:0 24px 60px -18px rgba(6,26,21,.5),0 0 0 1px rgba(9,61,51,.1);
   animation:tcin .26s cubic-bezier(.2,.7,.3,1)}
@@ -1818,7 +1826,8 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .tc-note{font-size:11.4px;color:var(--faint);padding:2px 18px 14px;margin:0;line-height:1.5}
 
 @media (max-width:620px){
-  .tourcard{right:8px;left:8px;bottom:8px;width:auto}
+  /* Next must not share pixels with the iOS home swipe */
+  .tourcard{right:8px;left:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));width:auto}
   .tc-body h3{font-size:15.5px}
 }
 /* the mirror header carries a role chip, Help and Sign out on a 390px phone,
@@ -1915,3 +1924,13 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
    basis of its own it grew to half the counter's screen and stopped reading as
    a checkbox at all. */
 .chip.tickbtn{flex:0 0 auto;min-width:46px;text-align:center}
+
+/* The batch Sindhi approver in the review queue: a word list a person reads
+   down, the suggestion large and right-to-left so it can actually be judged. */
+.bulksd .sdlist{display:flex;flex-direction:column;gap:2px;max-height:52vh;overflow:auto}
+.bulksd .sdrow{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:8px;cursor:pointer}
+.bulksd .sdrow:hover{background:var(--wash,#f2f6f4)}
+.bulksd .sdrow.on{background:#e7f2ec}
+.bulksd .sdrow input{width:20px;height:20px;flex:0 0 auto}
+.bulksd .sdrow .en{flex:1;min-width:0}
+.bulksd .sdrow .sd{font-family:'NK',serif;font-size:21px;color:var(--g);white-space:nowrap}

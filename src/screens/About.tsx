@@ -141,12 +141,25 @@ export default function About({ onBack }: { onBack: () => void }) {
       </p>
 
       {store && !store.persisted && (
-        <Note tone="warn" title="This computer has not promised to keep your records">
-          Chrome is storing the clinic's records as if they were a web page it may throw
-          away when the disk gets tight, and "Clear browsing data" would take them
-          instantly. Nothing is lost yet ({store.usedMb} MB stored). <b>Export a backup
-          today</b>, and keep exporting weekly until this line disappears.
-        </Note>
+        // Two different browsers, two different true sentences. Naming Chrome
+        // on an iPad, and prescribing a prompt Safari never shows, taught the
+        // one person reading it to ignore every warning this app makes.
+        typeof navigator.storage?.persist === 'function' ? (
+          <Note tone="warn" title="This computer has not promised to keep your records">
+            The browser is storing the clinic's records as if they were a web page it may
+            throw away when the disk gets tight, and "Clear browsing data" would take them
+            instantly. Nothing is lost yet ({store.usedMb} MB stored). <b>Export a backup
+            today</b>, and keep exporting weekly until this line disappears.
+          </Note>
+        ) : (
+          <Note tone="warn" title="This browser will not promise to keep your records">
+            Safari deletes a website's stored records if the site is not opened for 7 days,
+            and it cannot be asked not to. Nothing is lost yet ({store.usedMb} MB stored).
+            Open Nuskho every working day, add it to the Home Screen, and <b>export a
+            backup weekly</b>. This line will not disappear on this browser, because the
+            promise it asks for does not exist here.
+          </Note>
+        )
       )}
 
       <h2><IcShield size={17} /> What this software promises</h2>

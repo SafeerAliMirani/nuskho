@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- SAFEER'S PRIVATE SUPER ADMIN PANEL. Dev-server only, by construction:
+     vite builds a single entry (index.html), so this page has no build
+     output, no route and no deploy. Run it on your own machine with
+     `npx vite` and open http://localhost:5173/dev-sa.html -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Nuskho, the office</title>
+  <style>
+    body{font:15px/1.5 system-ui,sans-serif;max-width:960px;margin:24px auto;padding:0 16px;color:#182420}
+    h1{font-size:22px;color:#0f5c4a} h2{font-size:16px;margin-top:28px}
+    table{border-collapse:collapse;width:100%} td,th{border-bottom:1px solid #e2e8e5;padding:8px 10px;text-align:left;vertical-align:top}
+    th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#5c6b64}
+    input,textarea{font:inherit;padding:8px 10px;border:1px solid #cfd8d3;border-radius:8px;width:100%;box-sizing:border-box}
+    button{font:inherit;padding:8px 14px;border:0;border-radius:8px;background:#0f5c4a;color:#fff;cursor:pointer}
+    button.ghost{background:#eef2f0;color:#182420}
+    label{display:block;font-size:12.5px;color:#5c6b64;margin:10px 0 3px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:180px}
+    #g-out{font-size:30px;letter-spacing:2px;font-weight:800;color:#0f5c4a;margin:8px 0 2px;min-height:36px}
+    #msg{margin:10px 0;font-weight:600}
+    .card{background:#f7faf8;border:1px solid #e2e8e5;border-radius:14px;padding:14px 16px;margin-top:14px}
+    small{color:#5c6b64}
+  </style>
+</head>
+<body>
+  <h1>Nuskho, the office</h1>
+  <p><small>This page exists only on this machine. The clinics' app knows nothing of it,
+  and nothing here can reach a patient: the worker it talks to stores clinic codes,
+  versions and contract facts, and that is the whole universe.</small></p>
+
+  <div class="card">
+    <div class="row">
+      <div><label>Worker URL</label><input id="c-url"></div>
+      <div><label>SA key</label><input id="c-key" type="password" autocomplete="off"></div>
+      <div style="flex:0;align-self:end"><button id="c-save">Save</button></div>
+      <div style="flex:0;align-self:end"><button id="reload" class="ghost">Reload</button></div>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <h2>The clinics</h2>
+  <div id="list"><small>…</small></div>
+
+  <div class="card">
+    <h2 style="margin-top:0">A clinic's record</h2>
+    <div class="row">
+      <div><label>Clinic code</label><input id="f-code" placeholder="LRK-014"></div>
+      <div style="flex:0;align-self:end"><button id="f-new" class="ghost">New / open by code</button></div>
+    </div>
+    <div id="editor" style="display:none">
+      <div class="row">
+        <div><label>Clinic name</label><input id="f-name"></div>
+        <div><label>Paid until</label><input id="f-paid" type="date"></div>
+        <div><label>Monthly amount, Rs</label><input id="f-amount" inputmode="numeric"></div>
+        <div><label>Contact</label><input id="f-contact"></div>
+      </div>
+      <label>Payments received, one per line: day amount note (2026-08-01 5000 august)</label>
+      <textarea id="f-invoices" rows="4"></textarea>
+      <label>Notes</label>
+      <textarea id="f-notes" rows="3"></textarea>
+      <div class="row" style="margin-top:12px;align-items:center">
+        <div id="f-link" style="flex:1"><small>no link yet</small></div>
+        <div style="flex:0"><button id="f-rotate" class="ghost">New link</button></div>
+      </div>
+      <div class="row" style="margin-top:12px;align-items:center">
+        <div style="flex:0"><button id="f-save">Save the record</button></div>
+        <div style="flex:1"></div>
+        <div style="flex:0"><label style="display:inline"><input type="checkbox" id="f-sure" style="width:auto"> I mean it</label></div>
+        <div style="flex:0"><button id="f-del" class="ghost">Delete this clinic</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">An unlock code, offline</h2>
+    <p><small>The same algorithm the clinic's own Setup screen checks against, imported
+    from the app's source, not copied. The internet can be off.</small></p>
+    <div class="row">
+      <div><label>Clinic code</label><input id="g-clinic" placeholder="LRK-014"></div>
+      <div><label>New paid-until date</label><input id="g-day" type="date"></div>
+      <div style="flex:0;align-self:end"><button id="g-go">Make the code</button></div>
+    </div>
+    <div id="g-out"></div>
+    <div><small id="g-note"></small></div>
+  </div>
+
+  <script type="module" src="/src/dev/sa.ts"></script>
+</body>
+</html>

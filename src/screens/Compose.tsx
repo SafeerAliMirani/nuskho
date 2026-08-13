@@ -8,7 +8,7 @@ import { toSindhi, splitBrand } from '../data/translit'
 import { searchDictionary, dictLine, type DictEntry } from '../data/dictionary'
 import { printSlip } from '../print/print'
 import { doctorById, multiRoom, visitDoctorId } from '../doctors'
-import { sendOn, unsend, incoming, sendTargets, destinationEn, destinationSd, type Incoming } from '../refer'
+import { sendOn, unsend, incoming, sendTargets, destinationEn, type Incoming } from '../refer'
 import { filled } from '../data/vitals'
 import { IcBook, IcPill } from '../ui/art'
 import { Note } from '../ui/Note'
@@ -21,8 +21,9 @@ import { warmPlan } from '../print/paginate'
 import { notePrinted, printerLikelyCold } from '../safety'
 import { whyItFailed } from '../fail'
 import { sameMolecule } from '../data/who'
+import { lineIsEmpty, linesReady, freezeLines, slipDataFor, drugFromShelf } from '../rx'
 import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
-import { doseSdFor, defaultRoute, TIMES, timeEnFor } from '../data/forms'
+import { sideMatters, TIMES, timeEnFor } from '../data/forms'
 
 /** 0 → 1 → 2 → ½ → 0. "2 tablets" is routine for adult paracetamol; without it
  *  the doctor reaches for his pad, and after three reaches he stops opening the app. */
@@ -35,7 +36,11 @@ const cycle = (n: number) => (n === 0 ? 1 : n === 1 ? 2 : n === 2 ? 0.5 : 0)
 const NEXT_VISIT = ['in 3 days', 'in 5 days', 'in 1 week', 'in 2 weeks', 'in 1 month',
                     'only if it gets worse']
 
-const isEmpty = (l: RxLine) => !l.dose.m && !l.dose.d && !l.dose.e && !l.dose.n
+// The empty-line rule, the freezing loop and the SlipData builder all moved to
+// rx.ts on 11 Aug 2026, when the second doctor's screen (building.ts) started
+// prescribing too. One literal each, shared by both paths, watched by the
+// literal-comparison test in refer.test.ts. This screen keeps only the UI.
+const isEmpty = lineIsEmpty
 
 export default function Compose({ visitId, onDone, onBack }: {
   visitId: string; onDone: () => void; onBack: () => void
@@ -402,24 +407,17 @@ export default function Compose({ visitId, onDone, onBack }: {
     const key = `${e.brand} ${e.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '')
     const already = all.find(d => `${d.brand} ${d.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '') === key)
     if (already) { setQ(''); addDrug(already.id); return }
-    const d: Drug = {
-      id: 'own_' + uid(), brand: e.brand, strength: e.strength, generic: e.generic,
-      // NOT !!e.sd. A dictionary entry is a candidate, not a verdict: the person
-      // in this clinic still has to read the word before it can print.
-      sd: e.sd, sdReviewed: false, form: e.form, addedAt: Date.now(),
-      // The shelf knows an eye drop from an ear drop and from the amoxicillin
-      // drops a baby swallows. `defaultRoute` cannot: it answers "by mouth" for
-      // every drop there is, and a mouth on an eye drop prints the plate and
-      // pill picture that means after food. Ask the row first.
-      unitSd: doseSdFor(e.form), route: e.route ?? defaultRoute(e.form),
-    }
+    // One builder for both prescribing screens; the reasoning about sdReviewed
+    // and the route lives on drugFromShelf in rx.ts now.
+    const d: Drug = drugFromShelf(e, 'own_' + uid())
     await db.drugs.add(d)
     setAll(await doctorDrugs(formulary))
     setQ(''); setNearMiss(null)
     apply(v => ({ ...v, lines: [...v.lines, { drugId: d.id, dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5 }] }))
   }
 
-  const badIdx = visit.lines.findIndex(isEmpty)
+  const ready = linesReady(visit.lines, drugs)
+  const badIdx = ready.bad
   /**
    * Which lines are the same molecule as some other line, computed once for the
    * whole prescription rather than once per row. The formula column is the only
@@ -435,27 +433,12 @@ export default function Compose({ visitId, onDone, onBack }: {
    * which is worse than not printing at all: the patient takes it to a chemist
    * who cannot serve it, and nobody in the clinic sees what went out.
    */
-  const namelessIdx = visit.lines.findIndex(l => !(l.snap?.brand || drugs[l.drugId]?.brand))
+  const namelessIdx = ready.nameless
 
   /** Build exactly what printSlip will be given, so the warm-up and the real
    *  print agree on the layout key. */
   function slipData() {
-    // In a building with several rooms the heading names the visit's own
-    // doctor. Solo visits carry no doctorId and the profile prints, as always.
-    const room = doctorById(cur.current!.doctorId)
-    return {
-      visit: cur.current!, patientName: pt!.name, patientAge: pt!.age, patientSex: pt!.sex,
-      patientCode: patientCode(pt!.num), drugs, rxId: cur.current!.id.slice(-6),
-      doctor: room ? {
-        nameEn: room.nameEn, nameSd: room.nameSd,
-        degreesEn: room.degreesEn, degreesSd: room.degreesSd, reg: room.reg,
-      } : undefined,
-      // Resolved here rather than in the print module, which is handed data and
-      // never looks anything up. See SlipData.sentTo.
-      sentTo: cur.current!.sentOn
-        ? { en: destinationEn(cur.current!.sentOn), sd: destinationSd(cur.current!.sentOn) }
-        : undefined,
-    }
+    return slipDataFor(cur.current!, pt!, drugs)
   }
 
   /**
@@ -481,20 +464,7 @@ export default function Compose({ visitId, onDone, onBack }: {
    * to RxSnap it belongs here the same day.
    */
   async function freeze(): Promise<boolean> {
-    return apply(v => ({
-      ...v,
-      lines: v.lines.map(l => {
-        const g = drugs[l.drugId]
-        return l.snap ? l : {
-          ...l,
-          snap: {
-            brand: g?.brand ?? '', strength: g?.strength ?? '', generic: g?.generic ?? '',
-            sd: g?.sd ?? '', sdReviewed: g?.sdReviewed === true, unitSd: g?.unitSd ?? '',
-            form: g?.form ?? 'tab', route: g?.route, mlPerDose: g?.mlPerDose,
-          },
-        }
-      }),
-    }))
+    return apply(v => ({ ...v, lines: freezeLines(v.lines, drugs) }))
   }
 
   /**
@@ -725,10 +695,26 @@ export default function Compose({ visitId, onDone, onBack }: {
                     <small>{timeEnFor(k).toUpperCase()}</small>
                   </button>
                 ))}
-                <button className="dbtn on" style={{ minWidth: 96 }}
-                        onClick={() => setLine(i, { meal: l.meal === 'after' ? 'before' : l.meal === 'before' ? 'any' : 'after' })}>
-                  {l.meal === 'after' ? 'after' : l.meal === 'before' ? 'before' : '—'}<small>FOOD</small>
-                </button>
+                {/* WHICH EYE, AND ONLY WHERE THERE ARE TWO OF THEM.
+                    The slip could say one thing for an eye drop and it was "in
+                    BOTH eyes", so a doctor treating one red eye printed a paper
+                    telling the patient to medicate the healthy one as well. It
+                    cycles rather than opening a picker, because it sits in a
+                    row of controls the doctor taps without looking down, and it
+                    starts on BOTH, which is what the app used to assume and is
+                    still the commoner answer. */}
+                {sideMatters(drugs[l.drugId]?.route ?? l.snap?.route) ? (
+                  <button className="dbtn on" style={{ minWidth: 78 }}
+                          onClick={() => setLine(i, { side: l.side === undefined ? 'R' : l.side === 'R' ? 'L' : undefined })}>
+                    {l.side === 'R' ? 'right' : l.side === 'L' ? 'left' : 'both'}
+                    <small>{(drugs[l.drugId]?.route ?? l.snap?.route) === 'ear' ? 'EAR' : 'EYE'}</small>
+                  </button>
+                ) : (
+                  <button className="dbtn on" style={{ minWidth: 96 }}
+                          onClick={() => setLine(i, { meal: l.meal === 'after' ? 'before' : l.meal === 'before' ? 'any' : 'after' })}>
+                    {l.meal === 'after' ? 'after' : l.meal === 'before' ? 'before' : '—'}<small>FOOD</small>
+                  </button>
+                )}
                 <div className="stp">
                   <button onClick={() => setLine(i, { days: Math.max(1, l.days - 1) })}>−</button>
                   <div className="v">{l.days} d</div>

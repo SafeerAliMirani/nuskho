@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { db, similarDrugs, archiveDrug } from '../../db'
 import {
-  FORMS, FORM_LABEL, ROUTES, ROUTE_LABEL, routeMatters, defaultRoute, doseSdFor,
+  FORMS, FORM_LABEL, routesFor, ROUTE_LABEL, routeMatters, defaultRoute, doseSdFor,
   pendingWords, setWordOk,
 } from '../../data/forms'
 import type { Drug } from '../../types'
@@ -57,6 +57,89 @@ function WordsToRead() {
           </span>
         </label>
       ))}
+    </div>
+  )
+}
+
+/**
+ * TICK MANY AT ONCE, BECAUSE THE SHELF NOW HAS THOUSANDS.
+ *
+ * Every medicine a doctor takes off the Pakistani shelf arrives with a
+ * SUGGESTED Sindhi name and `sdReviewed: false`, so the slip prints the Latin
+ * brand off the box until a person reads the Sindhi. That rule does not bend:
+ * nothing prints unreviewed Sindhi, ever. What changed on 12 Aug is only the
+ * SPEED of the reading, at Safeer's choice, now that the shelf carries
+ * thousands of suggestions instead of eight names.
+ *
+ * This lists every medicine on the clinic's own list whose Sindhi is still
+ * unread, shows the word large and right-to-left so it can actually be read,
+ * and lets a person approve a whole screenful at once. It is the batch form of
+ * the single tick in the medicine box below, not a way around it: a human
+ * still sees each word and can leave any one unticked. Approving flips
+ * `sdReviewed` to true on that medicine and nowhere else, so a slip already
+ * printed is untouched and the shelf itself is never edited.
+ *
+ * It only ever shows medicines the clinic actually took, so a doctor reads the
+ * Sindhi for the fifty medicines he prescribes, never the five thousand he
+ * does not.
+ */
+function BulkSindhi({ live, onDone }: { live: Drug[]; onDone: () => Promise<void> }) {
+  const waiting = live.filter(d => (d.sd ?? '') !== '' && d.sdReviewed !== true)
+  const [pick, setPick] = useState<Record<string, boolean>>({})
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  if (!waiting.length) return null
+
+  const chosen = waiting.filter(d => pick[d.id])
+  const allOn = chosen.length === waiting.length && waiting.length > 0
+
+  async function approve() {
+    if (!chosen.length || busy) return
+    setBusy(true); setErr('')
+    try {
+      // one write per medicine, the same update the box below makes, so a
+      // failure part-way leaves the ones already done correctly approved
+      for (const d of chosen) await db.drugs.update(d.id, { sdReviewed: true })
+      setPick({})
+      await onDone()
+    } catch (e) {
+      console.error('[nuskho] a batch Sindhi approval was not saved', e)
+      setErr(whyItFailed(e, 'Some of those were not approved'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="lhbox bulksd">
+      <h3>Sindhi names to read: {waiting.length}</h3>
+      <p className="hint">
+        These medicines carry a suggested Sindhi name that has not been read yet, so the
+        slip is printing the English name. Read each one. Tick the ones that are right and
+        approve them, and from then on the Sindhi prints. Leave any you are unsure about,
+        and it keeps printing English, which is safe.
+      </p>
+      {err && <Note tone="stop" title="Not all saved">{err}</Note>}
+      <div className="row" style={{ margin: '6px 0 10px', gap: 8 }}>
+        <button className="lnk" onClick={() =>
+          setPick(allOn ? {} : Object.fromEntries(waiting.map(d => [d.id, true])))}>
+          {allOn ? 'untick all' : 'tick all ' + waiting.length}
+        </button>
+        <span style={{ flex: 1 }} />
+        <button className="btn" disabled={!chosen.length || busy} onClick={approve}>
+          {busy ? 'Approving…' : 'Approve the ' + chosen.length + ' ticked'}
+        </button>
+      </div>
+      <div className="sdlist">
+        {waiting.map(d => (
+          <label key={d.id} className={'sdrow' + (pick[d.id] ? ' on' : '')}>
+            <input type="checkbox" checked={!!pick[d.id]}
+                   onChange={e => setPick(p => ({ ...p, [d.id]: e.target.checked }))} />
+            <span className="en"><b>{d.brand}</b> {d.strength}</span>
+            <span className="sd" dir="rtl">{d.sd}</span>
+          </label>
+        ))}
+      </div>
     </div>
   )
 }
@@ -161,6 +244,8 @@ export default function ReviewQueue() {
 
       <WordsToRead />
 
+      <BulkSindhi live={live} onDone={load} />
+
       <div className="sumbox">
         <div><span>On his list</span><b>{live.length}</b></div>
         <div><span>Waiting for us</span><b>{pending.length}</b></div>
@@ -200,7 +285,7 @@ export default function ReviewQueue() {
           {routeMatters(edit.form) && (
             <div className="fld"><label>Where does it go?</label>
               <div className="chips">
-                {ROUTES.map(r => (
+                {routesFor(edit.form).map(r => (
                   <button key={r} className={'chip' + ((edit.route ?? defaultRoute(edit.form)) === r ? ' have' : '')}
                           onClick={() => setEdit({ ...edit, route: r })}>{ROUTE_LABEL[r]}</button>
                 ))}

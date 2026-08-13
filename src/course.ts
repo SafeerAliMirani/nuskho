@@ -65,12 +65,35 @@ export function course(l: RxLine, snap?: RxSnap): { n: number; unit: string } {
    * a number here would be arithmetic nobody uses, and a bottle count would be
    * a guess dressed up as a fact. The chemist sells one and always has.
    */
-  if (form === 'drop' || form === 'cream' || form === 'other') {
+  /**
+   * AN INHALER JOINS THEM, A SUPPOSITORY AND A PATCH DO NOT.
+   *
+   * One canister is two hundred puffs, so "20 puffs" would send a chemist
+   * looking for a pack size that does not exist. Suppositories and patches are
+   * sold in strips and boxes and counted out exactly like tablets, so they
+   * get their total: ten suppositories is ten suppositories.
+   */
+  if (form === 'drop' || form === 'cream' || form === 'other' || form === 'inhaler') {
     return { n: 0, unit: `${l.days} days` }
   }
 
   const n = Math.ceil(perDay * l.days)
-  return { n, unit: form === 'cap' ? 'capsules' : form === 'sachet' ? 'sachets' : 'tablets' }
+  return {
+    n,
+    unit: form === 'cap' ? 'capsules'
+      : form === 'sachet' ? 'sachets'
+      /**
+       * "supp", not "suppositories", and it was measured rather than chosen.
+       * The full word runs 13px out of the days column on A5 and 8px on A4,
+       * which is text printed over a table border on a medical document. It is
+       * also exactly how the box is labelled, PARACETAMOL SUPP 125MG, so the
+       * chemist is reading the word he already reads. This only ever shows
+       * while the Sindhi is unread; once it is, the cell says 10 شافو.
+       */
+      : form === 'supp' ? 'supp'
+      : form === 'patch' ? 'patches'
+      : 'tablets',
+  }
 }
 
 /**

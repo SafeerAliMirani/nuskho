@@ -32,6 +32,10 @@ export default function Pharmacy({ visits, onChange }: {
   const [q, setQ] = useState('')
   const [names, setNames] = useState<Record<string, { name: string; code: string }>>({})
   const [open, setOpen] = useState<string | null>(null)
+  /** Inline partial-give count, replacing prompt(): see Mirror.tsx's shop
+   *  counter for why a dialog dies silently on iOS. */
+  const [askIdx, setAskIdx] = useState<number | null>(null)
+  const [askVal, setAskVal] = useState('')
 
   // Printed today, newest first: the short list a counter actually works from.
   const printed = visits
@@ -206,12 +210,23 @@ export default function Pharmacy({ visits, onChange }: {
                         </small>
                       </div>
                       {c.n > 0 && !done && lineDone(l) && (
-                        <button className="lnk" onClick={() => {
-                          const raw = prompt(`How many actually given? Course is ${c.n}.`, String(g ?? c.n))
-                          if (raw === null) return
-                          const k = Math.max(0, Math.min(c.n, +raw.replace(/[^0-9]/g, '') || 0))
-                          setGiven(v, i, k)
-                        }}>gave {g}</button>
+                        askIdx === i ? (
+                          <span className="row" style={{ gap: 6, alignItems: 'center' }}>
+                            <input type="text" inputMode="numeric" autoFocus
+                                   value={askVal} style={{ width: 64, fontSize: 18, padding: '6px 8px' }}
+                                   onChange={e => setAskVal(e.target.value.replace(/[^0-9]/g, ''))} />
+                            <button className="chip on" onClick={() => {
+                              const k = Math.max(0, Math.min(c.n, +askVal || 0))
+                              setGiven(v, i, k)
+                              setAskIdx(null)
+                            }}>OK</button>
+                            <button className="lnk" onClick={() => setAskIdx(null)}>x</button>
+                          </span>
+                        ) : (
+                          <button className="lnk" onClick={() => {
+                            setAskIdx(i); setAskVal(String(g ?? c.n))
+                          }}>gave {g}</button>
+                        )
                       )}
                     </div>
                   )

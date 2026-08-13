@@ -18,9 +18,17 @@ import type { Form, Route } from '../types'
  * ڪيپسول, سيرپ, چمچو — ship as read, because they have been printed and
  * checked since the first sheet.
  *
- * EVERYTHING ELSE HERE WAS READ BY SAFEER ON 7 AUG 2026 and confirmed correct:
- * قطرا, ڪريم, ساشي, لڳايو, شام, and the four sites ٻنهي اکين ۾, ٻنهي ڪنن ۾,
- * نڪ ۾, چمڙيءَ تي. They ship as read, in the source and not in one machine's
+ * READ BY SAFEER ON 7 AUG 2026 and confirmed correct: قطرا, ڪريم, ساشي, لڳايو,
+ * شام, and the four sites ٻنهي اکين ۾, ٻنهي ڪنن ۾, نڪ ۾, چمڙيءَ تي.
+ *
+ * READ BY SAFEER ON 8 AUG 2026, thirteen more, with the three forms that used
+ * to hide under `other` and the sides that an eye drop could never say:
+ * ساهه واري دوا, شافو, چمڙيءَ جي پٽي, ڦوڪ, پٽي, ساهه سان اندر ڇڪيو,
+ * ساڄي اک ۾, کاٻي اک ۾, ساڄي ڪن ۾, کاٻي ڪن ۾, and وات ۾ نه, which he wrote
+ * himself for the suppository and the pessary after rejecting my polite
+ * euphemism for one that names no part of the body at all.
+ *
+ * All of them ship as read, in the source and not in one machine's
  * localStorage, for the reason who.ts gives about the formula column: a word
  * checked once should be checked forever, for every clinic, and not asked
  * again of every doctor who installs this.
@@ -47,10 +55,31 @@ export const FORM_WORD: Record<Form, Word> = {
   drop: { en: 'drops', sd: 'قطرا', ok: true },
   cream: { en: 'cream', sd: 'ڪريم', ok: true },
   sachet: { en: 'sachet', sd: 'ساشي', ok: true },
-  // Deliberately blank. An `other` is an inhaler, a suppository, a patch, a
-  // pessary or something nobody here has thought of, and naming it دوا told
-  // the patient nothing while looking like it had. The doctor's own written
-  // note carries these, which is what happens today on a paper pad.
+  /**
+   * THE THREE THAT USED TO HIDE UNDER `other`.
+   *
+   * `other` printed no word and no picture, on purpose, because a wrong
+   * picture is a patient swallowing the wrong thing. That was the right
+   * refusal and it was never meant to be permanent: the commonest `other` in a
+   * Pakistani clinic is an inhaler, and an inhaler that prints nothing tells a
+   * patient who cannot read absolutely nothing about the one medicine on his
+   * slip that he has to be taught to use.
+   *
+   * All three shipped UNREAD and printed their English for exactly as long as
+   * that was true, which is the whole of what the gate is for. Safeer read them
+   * on 8 Aug 2026 and confirmed all three, so they print their Sindhi now.
+   *
+   * His note on ساهه واري دوا is worth keeping, because it explains why this is
+   * not a transliteration: it means "breathing medicine", which is how a
+   * patient here is actually told what an inhaler is. شافو is the ordinary
+   * medical word, and چمڙيءَ جي پٽي is literally the skin's patch.
+   */
+  inhaler: { en: 'inhaler', sd: 'ساهه واري دوا', ok: true },
+  supp: { en: 'suppository', sd: 'شافو', ok: true },
+  patch: { en: 'skin patch', sd: 'چمڙيءَ جي پٽي', ok: true },
+  // Still deliberately blank, and still needed. An `other` is now a pessary, a
+  // nebuliser solution, a mouthwash or something nobody here has thought of.
+  // Naming it دوا told the patient nothing while looking like it had.
   other: { en: '', sd: '', ok: true },
 }
 
@@ -62,6 +91,11 @@ export const DOSE_WORD: Record<Form, Word> = {
   drop: { en: 'drops', sd: 'قطرا', ok: true },
   cream: { en: 'apply', sd: 'لڳايو', ok: true },
   sachet: { en: 'sachet', sd: 'ساشي', ok: true },
+  // A puff, not an inhaler: what the patient takes is one breath from a device
+  // he keeps. Printing "1 inhaler" in a dose cell would read as a whole canister.
+  inhaler: { en: 'puff', sd: 'ڦوڪ', ok: true },
+  supp: { en: 'suppository', sd: 'شافو', ok: true },
+  patch: { en: 'patch', sd: 'پٽي', ok: true },
   other: { en: '', sd: '', ok: true },
 }
 
@@ -98,7 +132,71 @@ export const ROUTE_WORD: Record<Route, Word> = {
   ear: { en: 'in both ears', sd: 'ٻنهي ڪنن ۾', ok: true },
   nose: { en: 'in the nose', sd: 'نڪ ۾', ok: true },
   skin: { en: 'on the skin', sd: 'چمڙيءَ تي', ok: true },
+  inhale: { en: 'breathe it in', sd: 'ساهه سان اندر ڇڪيو', ok: true },
+  /**
+   * SAY WHERE IT MUST NOT GO, AND SAY NOTHING ABOUT WHERE IT DOES.
+   *
+   * The first version of these two named the site, politely, and Safeer read
+   * the polite Sindhi and had to ask me what it meant. That question WAS the
+   * test result: if it stopped a Sindhi speaker who already knew what the
+   * medicine was, it would stop a mother at a counter, and an instruction that
+   * has to be puzzled out is the whole problem on this line.
+   *
+   * He chose the negative, and gave three reasons that are better than my
+   * original ones. It kills the actual hazard, which in an OPD is a parent
+   * giving a melting suppository by mouth. It keeps a blunt anatomical word
+   * off a paper that gets read aloud by family in a public bazaar. And by
+   * saying only what must not happen, it sends the person back to the doctor's
+   * own note for what must, which is where that instruction belongs anyway.
+   *
+   * SO BOTH ROUTES PRINT THE SAME FOUR WORDS, on purpose. The distinction
+   * between them survives on the SCREEN, where the doctor picks it and where
+   * ROUTE_LABEL still says Back passage or Vaginal, and in the record. It just
+   * does not go on the paper, because the paper has one job here.
+   *
+   * These two ship READ. Safeer wrote them himself on 8 Aug 2026, in this
+   * exact form, which is the same standing the nine words of 7 Aug have.
+   */
+  rectal: { en: 'NOT by mouth', sd: 'وات ۾ نه', ok: true },
+  vaginal: { en: 'NOT by mouth', sd: 'وات ۾ نه', ok: true },
 }
+
+/**
+ * WHICH EYE. WHICH EAR.
+ *
+ * `ROUTE_WORD.eye` says "in both eyes" and it was the only thing an eye drop
+ * could say, so one red eye got a prescription for two. Safeer asked what the
+ * app did for one eye and the answer was: the wrong thing, silently, on paper,
+ * every time.
+ *
+ * These are a second axis and not more routes, because the side belongs to
+ * this prescription and the route belongs to the medicine. Keyed by both so
+ * "right" is never printed on its own: a bare ساڄي on a line whose picture is
+ * an eye is still a guess for anybody who cannot read the brand above it.
+ *
+ * Read and confirmed by Safeer on 8 Aug 2026, which is why they print. He
+ * asked for these four ahead of the other seven and he was right to: the
+ * pictogram carries only the ONE-versus-BOTH half, one eye drawn for one and
+ * two for both, and left against right is an instruction no picture on this
+ * sheet can give. Getting it wrong has consequences a drawing cannot warn
+ * about.
+ */
+export const SIDE_WORD: Record<'eyeR' | 'eyeL' | 'earR' | 'earL', Word> = {
+  eyeR: { en: 'in the RIGHT eye', sd: 'ساڄي اک ۾', ok: true },
+  eyeL: { en: 'in the LEFT eye', sd: 'کاٻي اک ۾', ok: true },
+  earR: { en: 'in the RIGHT ear', sd: 'ساڄي ڪن ۾', ok: true },
+  earL: { en: 'in the LEFT ear', sd: 'کاٻي ڪن ۾', ok: true },
+}
+
+/** Does asking which side make sense at all? Only where there are two of them. */
+export const sideMatters = (r?: Route): boolean => r === 'eye' || r === 'ear'
+
+const sideKey = (r: Route, side: 'R' | 'L') =>
+  ((r === 'eye' ? 'eye' : 'ear') + side) as 'eyeR' | 'eyeL' | 'earR' | 'earL'
+
+export const sideSdFor = (r: Route, side: 'R' | 'L'): string =>
+  sdOf('side:' + sideKey(r, side), SIDE_WORD[sideKey(r, side)])
+export const sideEnFor = (r: Route, side: 'R' | 'L'): string => SIDE_WORD[sideKey(r, side)].en
 
 /* --------------------------------------------------- what has been read yet */
 
@@ -136,6 +234,7 @@ export function pendingWords(): { key: string; en: string; sd: string; ok: boole
   for (const [f, w] of Object.entries(FORM_WORD)) push('form:' + f, w)
   for (const [f, w] of Object.entries(DOSE_WORD)) push('dose:' + f, w)
   for (const [r, w] of Object.entries(ROUTE_WORD)) push('route:' + r, w)
+  for (const [k, w] of Object.entries(SIDE_WORD)) push('side:' + k, w)
   for (const [t, w] of Object.entries(TIME_WORD)) push('time:' + t, w)
   return out
 }
@@ -176,24 +275,70 @@ export const FORMS: Form[] = ['tab', 'cap', 'syr', 'drop', 'cream', 'sachet', 'o
 
 export const FORM_LABEL: Record<Form, string> = {
   tab: 'Tablet', cap: 'Capsule', syr: 'Syrup', drop: 'Drops',
-  cream: 'Cream or ointment', sachet: 'Sachet', other: 'Something else',
+  cream: 'Cream or ointment', sachet: 'Sachet',
+  inhaler: 'Inhaler', supp: 'Suppository', patch: 'Skin patch',
+  other: 'Something else',
 }
 
 /** Routes worth asking about, and only for the forms where it can differ. */
-export const ROUTES: Route[] = ['mouth', 'eye', 'ear', 'nose', 'skin']
+export const ROUTES: Route[] = ['mouth', 'eye', 'ear', 'nose', 'skin', 'inhale', 'rectal', 'vaginal']
 
 export const ROUTE_LABEL: Record<Route, string> = {
   mouth: 'By mouth', eye: 'Eye', ear: 'Ear', nose: 'Nose', skin: 'On the skin',
+  inhale: 'Breathed in', rectal: 'Back passage', vaginal: 'Vaginal',
 }
 
+/**
+ * IS THIS EVEN SWALLOWED? The question the meal picture never asked.
+ *
+ * "After food" was suppressed by the ROUTE alone, so a suppository, a patch or
+ * an inhaler that happened to carry no route printed the plate and pill scene,
+ * which says swallow this after eating. A medicine typed in by the doctor
+ * himself carries no route, so this was not the rare case, it was the common
+ * one, and it was worst on the one form that must never be swallowed.
+ *
+ * The form knows the answer on its own and never needs a route to give it.
+ */
+export const swallowed = (f: Form): boolean =>
+  f === 'tab' || f === 'cap' || f === 'syr' || f === 'drop' || f === 'sachet' || f === 'other'
+
 /** Does asking about the site make sense for this form? */
-export const routeMatters = (f: Form): boolean => f === 'drop' || f === 'cream' || f === 'other'
+export const routeMatters = (f: Form): boolean =>
+  f === 'drop' || f === 'cream' || f === 'other' || f === 'supp'
+
+/**
+ * WHICH SITES TO OFFER, rather than all eight for everything.
+ *
+ * A list that offers "in both eyes" for a suppository is a list with a
+ * mis-tap in it, and the mis-tap prints. An inhaler and a patch are not asked
+ * at all: `routeMatters` is false for both because there is only ever one
+ * answer, and asking a question with one answer teaches people to tap without
+ * reading.
+ */
+export const routesFor = (f: Form): Route[] =>
+  f === 'supp' ? ['rectal', 'vaginal']
+  : f === 'cream' ? ['skin', 'vaginal']
+  : f === 'drop' ? ['mouth', 'eye', 'ear', 'nose']
+  : ROUTES
 
 /** The site a form defaults to when nobody has said. */
-export const defaultRoute = (f: Form): Route => (f === 'cream' ? 'skin' : 'mouth')
+export const defaultRoute = (f: Form): Route =>
+  f === 'cream' || f === 'patch' ? 'skin'
+  : f === 'inhaler' ? 'inhale'
+  // Most suppositories in an outpatient clinic are paracetamol for a child
+  // with a fever, so rectal is the safe default and the picker offers the
+  // other. A default of `mouth` here would print "after food" on a thing that
+  // must never be swallowed.
+  : f === 'supp' ? 'rectal'
+  : 'mouth'
 
 /** Is this line dosed as a countable number the patient can see? A cream is
  *  not: "1.5 creams" is not a thing, and printing a half circle beside it
  *  would be a picture of a tablet cut in two. */
 export const countable = (f: Form): boolean =>
   f === 'tab' || f === 'cap' || f === 'syr' || f === 'drop' || f === 'sachet'
+  // Two puffs, two suppositories, one patch: all three are numbers a patient
+  // acts on. The inhaler is counted but never DRAWN twice, because two puffs
+  // come out of one device and two devices is a different instruction. That
+  // separation lives in the dose cell, not here.
+  || f === 'inhaler' || f === 'supp' || f === 'patch'

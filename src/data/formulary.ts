@@ -1,5 +1,31 @@
 import type { Drug } from '../types'
 
+/**
+ * THE SINDHI IN THIS FILE WAS CHECKED ON 8 AUG 2026.
+ *
+ * Every Sindhi string that Nuskho prints was pulled out into one worksheet and
+ * read by a Sindhi speaker on Safeer's side. Most of it came back fine. What
+ * was wrong is corrected here, and the corrections are worth knowing because
+ * they are all the same kind of mistake and the next person will make it too:
+ *
+ *   URDU WEARING SINDHI CLOTHES. خون for blood where a Sindhi speaker says رت.
+ *   ڪمر for the back where he says پٺي. Both were perfectly correct words that
+ *   nobody in Larkana would have used, which on this document is the same as
+ *   being wrong.
+ *
+ *   GENDER. A ٽيسٽ is feminine in Sindhi, so it takes جي and not جو. Three of
+ *   the six lab tests had it the other way round.
+ *
+ *   AND ONE THAT WAS NOT A NUANCE AT ALL. Constipation was listed as قبضو,
+ *   which is not constipation. It means an illegal occupation of land. It is
+ *   corrected to قبضي. It was on the doctor's screen and never on paper, which
+ *   is the only reason it was not worse.
+ *
+ * The rule this file now inherits: a Sindhi string added here is a claim in a
+ * language, and it does not become true by being typed carefully. It needs a
+ * speaker.
+ */
+
 // THE MOST IMPORTANT FILE IN THE PILOT.
 // This is not a national drug database and must never become one.
 // Before the pilot evening: photograph 20 of THAT doctor's own handwritten
@@ -38,15 +64,18 @@ export const formulary: Drug[] = [
  * built them, from his own prescribing, and he knows what is in them. Nothing
  * we wrote goes into a prescription without him choosing every line of it.
  */
-export const packages: { name: string; sd: string; lines: { drugId: string; m: number; d: number; n: number; meal: 'after'|'before'|'any'; days: number }[] }[] = []
+// The `packages` export (our pre-written prescription bundles) was removed on
+// 12 Aug 2026: it had been an empty array with a type for months, promising a
+// feature deliberately not built. The doctor's own saved sets are the real
+// version of this idea and they live in db.ts.
 
 /** stored on the visit as 'en|sd' */
 export const labTests = [
-  { en: 'CBC', sd: 'خون جو مڪمل ٽيسٽ' },
+  { en: 'CBC', sd: 'رت جي مڪمل ٽيسٽ' },
   { en: 'Blood sugar F/R', sd: 'بلڊ شگر' },
-  { en: 'Urine R/E', sd: 'پيشاب جو ٽيسٽ' },
-  { en: 'LFT', sd: 'جگر جو ٽيسٽ' },
-  { en: 'RFT', sd: 'گڏن جو ٽيسٽ' },
+  { en: 'Urine R/E', sd: 'پيشاب جي ٽيسٽ' },
+  { en: 'LFT', sd: 'جگر جي ٽيسٽ' },
+  { en: 'RFT', sd: 'بڪين جي ٽيسٽ' },
   { en: 'Chest X-ray', sd: 'ڇاتيءَ جو ايڪسري' },
 ]
 

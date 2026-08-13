@@ -18,13 +18,29 @@ body{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;color:#000;}
 .pad{padding:0 7mm;}
 
 /* header */
-.hdr{padding:4.4mm 7mm 2.6mm;border-bottom:2.4pt solid #0f5c4a;}
+/* 12.7mm of sheet holding 3.3mm of type, and the rest of it was padding. A
+   millimetre here is a millimetre; a millimetre in a medicine row is twelve.
+   Down to 8.5mm on a blank profile: 1.6mm off the top pad, 1mm off the bottom,
+   .7mm off the gap over the address line, .2mm off the rule. The doctor's own
+   name and degrees are untouched, so a heading with a name in it grows by
+   exactly what the name is worth and no more. */
+/* THE HEADING IS A ROW NOW, BECAUSE THE PATIENT-CODE SQUARE MOVED INTO IT.
+   His name, degrees, registration and address stack on the left exactly as
+   before and are not touched. What is new is the column on the right, and it
+   costs the sheet nothing on a working clinic profile: measured on A5, that
+   stack is 16mm tall inside a 20.9mm heading, so a square that fits in 16mm is
+   free, and the 4.3mm the square gave back when it left the patient bar pays
+   for the little it goes over. See .idcode at the foot of this file. */
+.hdr{padding:2.8mm 7mm 1.6mm;border-bottom:1.8pt solid #0f5c4a;display:flex;align-items:center;}
+/* min-width:0, so a long clinic address shortens the doctor's block rather than
+   pushing the square off the right edge of the paper. */
+.hin{flex:1 1 auto;min-width:0;}
 .hdr .row{display:flex;align-items:flex-start;justify-content:space-between;gap:4mm;}
 .docname{font-size:13.4pt;font-weight:700;line-height:1.1;}
 .docqual{font-size:7pt;color:#333;margin-top:.7mm;line-height:1.3;}
 .docsd{font-size:11.5pt;font-weight:700;text-align:right;line-height:1.45;}
 .docsd small{display:block;font-size:7.6pt;font-weight:400;color:#333;}
-.clinicline{margin-top:1.6mm;font-size:6.6pt;color:#444;display:flex;justify-content:space-between;}
+.clinicline{margin-top:.9mm;font-size:6.6pt;line-height:1.2;color:#444;display:flex;justify-content:space-between;}
 
 /* strips */
 /* THE PATIENT BAR, TIGHTENED.
@@ -32,11 +48,11 @@ body{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;color:#000;}
    band of white under its value doing nothing. On an A5 sheet that band is about
    4mm, which is a medicine. Cells are now centred vertically instead of pinned
    to the top, the padding is halved, and the square is 10mm rather than 13. */
-.pt{display:flex;align-items:stretch;border:.9pt solid #111;margin:2mm 0 1.2mm;font-size:7.4pt;}
+.pt{display:flex;align-items:stretch;border:.9pt solid #111;margin:1mm 0 .8mm;font-size:7.4pt;}
 .pt>div{padding:.7mm 1.8mm;border-right:.6pt solid #999;flex:1;
   display:flex;flex-direction:column;justify-content:center;}
 .pt>div:last-child{border-right:0;}
-.pt b{display:block;font-size:5.5pt;font-weight:400;color:#666;text-transform:uppercase;letter-spacing:.35px;line-height:1.25;}
+.pt b{display:block;font-size:5.5pt;font-weight:400;color:#454545;text-transform:uppercase;letter-spacing:.35px;line-height:1.25;}
 .pt .v{font-size:8.6pt;font-weight:700;margin-top:.15mm;line-height:1.15;}
 /* ONE LINE, ALWAYS.
    A diagnosis and six readings is seven cells across 134mm of usable width, so
@@ -44,23 +60,27 @@ body{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;color:#000;}
    it is labelling: the label drops to 5pt, the Sindhi sits on its own line under
    it rather than beside it, and the unit tucks in after the value. Wrapping was
    the honest fallback while the cells were too fat; making them fit is better,
-   because a second row costs another 6mm of a sheet that has none to spare. */
-.vt .vu{font-size:5.8pt;font-weight:400;color:#555;}
-.vt b .sd{display:block;font-size:6pt;color:#444;font-weight:400;line-height:1.15;}
+   because a second row costs another 6mm of a sheet that has none to spare.
+   THE DIAGNOSIS CELL IS THE ONE EXCEPTION and it is marked as such further
+   down: it is 2.2 shares wide rather than 1, so its Sindhi label fits beside
+   the English one and the band is 2.4mm shorter for it. The reading cells are
+   unchanged, because 19mm is still 19mm. */
+.vt .vu{font-size:5.8pt;font-weight:400;color:#333;}
+.vt b .sd{display:block;font-size:6pt;color:#444;font-weight:400;line-height:1;}
 .vt>div{white-space:nowrap;}
 /* Six readings do not fit across an A5 sheet on one line, and a doctor who runs
    a BP, a pulse, a temperature, a weight, a sugar and an HbA1c is exactly the
    doctor this strip exists for. So it wraps to a second row rather than pushing
    the last reading off the paper, where nobody would ever see it was missing. */
-.vt{display:flex;flex-wrap:nowrap;border:.9pt solid #111;margin-bottom:1.2mm;overflow:hidden;}
+.vt{display:flex;flex-wrap:nowrap;border:.9pt solid #111;margin-bottom:.8mm;overflow:hidden;}
 /* NO min-width:0 here, deliberately.
    With it, a flex item is allowed to shrink below its own content, and since
    these cells are nowrap the text then printed straight over the cell beside it:
    "DIAGNOSIS" and "BP" on top of each other, unreadable, and only visible on
    paper. Leaving min-width at auto means a cell that will not fit wraps onto a
    second row instead, which is exactly what should happen. */
-.vt>div{padding:.6mm 1.5mm;border-right:.6pt solid #999;flex:1 1 0;min-width:0;overflow:hidden;}
-.vt b{font-size:5pt;letter-spacing:.3px;line-height:1.2;}
+.vt>div{padding:.4mm 1.4mm;border-right:.6pt solid #999;flex:1 1 0;min-width:0;overflow:hidden;}
+.vt b{font-size:5pt;letter-spacing:.3px;line-height:1.05;}
 .vt .v{font-size:8pt;line-height:1.15;margin-top:.1mm;}
 /* the diagnosis is words, not a number, so it is the one cell allowed to be
    wider than its neighbours and the one allowed to wrap inside itself */
@@ -70,17 +90,30 @@ body{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;color:#000;}
 .vt>div.v-bp{flex:1.3 1 0;}
 .vt>div.dx{flex:2.2 1 0;white-space:normal;}
 .vt>div.dx .v{font-size:8.6pt;line-height:1.1;}
+/* THE BOX THE DOCTOR ASKED ABOUT FIRST.
+   The narrow reading cells need their Sindhi on a line of its own or "BP" and
+   "بلڊ پريشر" do not both fit across 19mm. The diagnosis cell is 2.2 shares of
+   the strip, about 40mm, so its label has room to sit on ONE line and the band
+   loses the 2.4mm that second line was costing. Only this cell: the readings
+   keep their stacked label, unmeasured is unchanged. */
+.vt>div.dx b .sd{display:inline;margin-left:1.4mm;}
 .vt>div:last-child{border-right:0;}
-.vt b{display:block;font-size:5.5pt;color:#666;letter-spacing:.4px;text-transform:uppercase;font-weight:400}
-.vt .v{font-size:9pt;font-weight:700;margin-top:.2mm;white-space:nowrap;}
-.vt .v em{font-style:normal;font-size:5.4pt;color:#777;font-weight:400;}
+.vt b{display:block;font-size:5.5pt;color:#454545;letter-spacing:.4px;text-transform:uppercase;font-weight:400}
+.vt .v{font-size:9pt;font-weight:700;margin-top:.05mm;white-space:nowrap;}
+.vt .v em{font-style:normal;font-size:5.4pt;color:#444;font-weight:400;}
 .vt .dx{flex:2.1;background:#f4f7f6;}
 .vt .dx .v{font-size:9.4pt;}
 
 /* medicine table */
 table.rx{width:100%;border-collapse:collapse;table-layout:fixed;}
-table.rx th{font-size:5.8pt;font-weight:400;color:#fff;background:#0f5c4a;padding:.8mm 0;text-align:center;letter-spacing:.3px;}
-table.rx th .sd{font-size:7.6pt;display:block;font-weight:700;}
+/* More under than over, because the tails of منجهند and ڏينهن hang below the
+   line and the bar they hang into is solid green. */
+table.rx th{font-size:5.8pt;font-weight:400;color:#fff;background:#0f5c4a;padding:.35mm 0 .6mm;
+  line-height:1.15;text-align:center;letter-spacing:.3px;}
+/* The Sindhi in the green bar keeps its 7.6pt. Only the leading comes down, and
+   it was checked at print size for clipped diacritics: 1.05 of 7.6pt is 2.8mm,
+   and the tallest mark on منجهند sits inside that. */
+table.rx th .sd{font-size:7.6pt;display:block;font-weight:700;line-height:1.05;}
 table.rx td{border-bottom:.7pt solid #bbb;vertical-align:middle;padding:0;}
 .c-no{width:5.6mm}.c-nm{width:44mm}.c-t{width:14.5mm}.c-ml{width:15mm}.c-dy{width:17mm}
 /* FOUR TIMES A DAY. The fourth dose column is 14.5mm the name cannot spare on
@@ -90,19 +123,114 @@ table.rx td{border-bottom:.7pt solid #bbb;vertical-align:middle;padding:0;}
 table.rx.q4 .c-nm{width:38.5mm}table.rx.q4 .c-t{width:11.5mm}
 td.noc{background:#0f5c4a;color:#fff;font-size:11pt;font-weight:700;text-align:center;}
 .mono td.noc{background:#000;}
-.nmcell{padding:.9mm 2mm .9mm 2.4mm;}
-.brand{font-size:11pt;font-weight:700;line-height:1.03;}
-.gen{font-size:6.2pt;color:#555;margin-top:.4mm;}
-.nmsd{font-size:9pt;font-weight:700;margin-top:.6mm;}
-.tcell,.mlcell,.dycell{text-align:center;padding:1.1mm 0;}
+/* THE SINDHI NAME MOVES UP BESIDE THE ENGLISH ONE, ON A5 TOO.
+   This cell is what sets the height of a medicine row, and the row is the
+   multiplier: on a twelve medicine slip every millimetre here is twelve.
+   Stacked, it was .9 padding + 5.7 English + 5.6 Sindhi + .9 padding = 13.1mm.
+   Side by side it is .7 + 6.4 + .7 = 7.8mm, which is 5.3mm a row and 64mm on a
+   twelve line prescription: the difference between two sheets and one.
+
+   MEASURED FIRST, because 44mm of name column (38.5mm on a four times a day
+   slip) is not much. Of the twelve commonest names on the demo sheet, eleven
+   put the widest English line and the Sindhi one side by side in under 40mm.
+   The twelfth is AUGMENTIN, whose generic is "Amoxicillin + Clavulanic acid"
+   at 27.5mm: with the Sindhi's 21.1mm that is 48.6mm and it does not fit.
+   NOTHING IS CLIPPED WHEN IT DOES NOT FIT. The English column is minmax(0,1fr),
+   so a generic too long for the space left simply wraps onto a second line and
+   that one row grows back. A long name costs its own row and never a word.
+
+   WHICH LINE THE SINDHI JOINS was decided by measuring, not by taste. Beside
+   the BRAND is where A4 puts it and it reads best, but a brand at 11pt is about
+   25mm and the Sindhi is up to 25mm, so on 44mm of A5 the brand wrapped to two
+   lines on nine of the twelve demo medicines and the cell got TALLER, not
+   shorter. Beside the GENERIC, which is 6.2pt and about 12mm, it fits on
+   eleven of twelve. So the brand keeps a line of its own on A5 and the two
+   quiet lines share the second one. A4 still puts it beside the brand: it has
+   77mm and the measurement there is not close. */
+/* THE GRID IS ON AN INNER DIV, NOT ON THE CELL. Putting display:grid on the
+   <td> takes it out of the table: it stops stretching to the row, so its
+   bottom rule printed a short grey line floating above the real row line and
+   the name sat pinned to the top of its row instead of centred in it. Only
+   paper and a screenshot say so; every measurement still passed.
+
+   THIS PARAGRAPH HAD NO OPENING SLASH-STAR, AND THE PADDING BELOW WAS DEAD
+   TWICE OVER. A stylesheet cannot ignore loose prose: the parser read the whole
+   paragraph as a selector, swallowed the block after it, and threw both away.
+   And even once that was closed, a bare `.nmcell` is one class against the two
+   elements and one class of `table.rx td{padding:0}` further up, so it lost on
+   weight as well. Measured on a plain A5 slip in roomy spacing: the name cell
+   had NO padding on any side, so RISEK 20 mg printed hard against the green
+   number box and touched the rules above and below it. Nothing was clipped and
+   every check passed; a screenshot at four times print size is what showed it.
+   The table is in the selector to win that fight. Cost of the padding coming
+   back: 1.4mm a row, roomy spacing only, and it is free on the sheet that
+   matters because a twelve medicine A5 slip is set in the dense tier, which
+   carries its own padding and never lost it. */
+table.rx .nmcell{padding:.7mm 2mm .7mm 2.4mm;}
+/* ON A FOUR TIMES A DAY SLIP THE CELL IS 5.5mm NARROWER AND THAT PADDING NO
+   LONGER FITS INSIDE IT. Measured with the padding restored: Omeprazole wanted
+   11.9mm of the 10.9mm left beside the Sindhi name and ran 1.1mm into the gap
+   between them, so the quiet grey generic finished about a millimetre from the
+   Sindhi brand instead of two. 1.6mm still holds the name clear of the green
+   number box, which is the whole job of the left padding. */
+table.rx.q4 .nmcell{padding-left:1.6mm;padding-right:1mm;}
+.nmg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto);
+  column-gap:2mm;align-items:baseline;}
+.brand{font-size:11pt;font-weight:700;line-height:1.03;grid-column:1/-1;}
+/* overflow-wrap is the backstop, and it must never be needed. A generic name is
+   one long word with nowhere to break, so without this a name wider than the
+   room beside the Sindhi one simply runs across it, and two scripts printed on
+   top of each other is the one thing on this sheet nobody could read at all.
+   With it, such a name takes a second line and that row gets taller, which the
+   fitter measures and pays for. Every name in the book fits on one line today. */
+.gen{font-size:6.2pt;color:#333;margin-top:.3mm;line-height:1.15;grid-column:1;
+  overflow-wrap:anywhere;}
+/* No white-space:nowrap here, deliberately. A Sindhi name longer than the room
+   left for it wraps to a second line; with nowrap it would print over the
+   English name beside it, and only paper would say so. */
+.nmsd{font-size:9pt;font-weight:700;margin-top:0;text-align:right;line-height:1.3;
+  grid-column:2;grid-row:2;}
+/* 1.1mm of padding here was 2.2mm a row and 26mm on a twelve line slip, and the
+   pictogram it was framing is the one mark a patient who reads nothing can use.
+   The picture and the number keep every millimetre they had; the white space
+   around them does not. */
+.tcell,.mlcell,.dycell{text-align:center;padding:.45mm 0;}
 .tcell.off{background:repeating-linear-gradient(135deg,#fff,#fff 1.6mm,#f0f0f0 1.6mm,#f0f0f0 3.2mm);}
-.dose{font-size:7.2pt;font-weight:700;margin-top:.2mm;}
-.dose .sd{font-size:8pt;}
-.mlsd{font-size:8.2pt;font-weight:700;margin-top:.3mm;line-height:1.15;}
+/* AN INVISIBLE LINE OF TYPE WAS SETTING THE HEIGHT OF THESE CELLS.
+   The pictogram is an inline element, so the browser reserved a whole line box
+   for the text strut it sits on, and there is no text on that line. Measured:
+   .9mm a row, which is 11mm on a twelve medicine slip, spent on nothing anybody
+   can see. line-height:0 gives the cell back to the picture. NOTHING SHRINKS:
+   the pictogram, the number and the Sindhi dose word are all exactly the size
+   they were, and each gets its own leading back on the lines below. */
+.tcell,.mlcell,.dycell{line-height:0;}
+/* the dash in a cell with no dose is real type and keeps a real line */
+.tcell.off{line-height:1.2;}
+/* THE NUMBER SITS BESIDE THE PICTURE WHEN THERE IS ROOM FOR IT.
+   Under it, one tablet cost 5.6mm of picture plus 2.5mm of number and this cell
+   set the height of every row on the sheet. Beside it, the same picture at the
+   same size and the same number at the same size cost 5.6mm, and the row is set
+   by the medicine name instead: 1.2mm a row, 14mm on a twelve line slip, which
+   is what a real doctor's heading costs.
+   IT WRAPS, AND THAT IS THE WHOLE SAFETY OF IT. The dose column is 14.5mm, or
+   11.5mm on a four times a day slip. Two tablets and a number, or one spoon and
+   the word چمچو, do not fit on one line, so they go back to being stacked
+   exactly as before. Nothing is ever squeezed and nothing is ever cut: the
+   layout simply takes the shorter of the two shapes that both already print. */
+.dz{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+  column-gap:.7mm;row-gap:.2mm;}
+.dose{font-size:7.2pt;font-weight:700;line-height:1.15;}
+/* چمچو and لڳايو carry marks under the line, so the Sindhi dose word keeps
+   more leading than the Latin number beside it. Checked at print size. */
+.dose .sd{font-size:8pt;line-height:1.3;}
+.mlsd{font-size:8.2pt;font-weight:700;margin-top:.3mm;line-height:1.25;}
 .dyn{font-size:14pt;font-weight:700;line-height:1;}
-.dysd{font-size:8.2pt;font-weight:700;}
-.tick{margin-top:.7mm;display:flex;gap:.6mm;justify-content:center;}
-.tick i{width:2.2mm;height:2.2mm;border:.6pt solid #666;display:block;}
+/* ڏينهن has a descender on the ه, so this line keeps generous leading even
+   though the cell around it no longer reserves a line for nothing. */
+.dysd{font-size:8.2pt;font-weight:700;line-height:1.3;}
+/* .tick is gone. It printed a row of unlabelled squares under the day count
+   and it was the only mark on this sheet with no argument for existing. See
+   renderSlip.ts for the whole reasoning. */
 /* THE TOTAL TO HAND OVER. Deliberately in the days column and deliberately
    quieter than the day count: the patient's eye needs the big 5, the chemist's
    eye is looking for a smaller number beside a unit and finds it in one place
@@ -129,27 +257,38 @@ table.rx.mx .tot .sd{font-size:6.8pt;}
 .page.a4 .tot b{font-size:10pt;}
 .page.a4 .tot .sd{font-size:9.4pt;}
 
-/* compact mode for long prescriptions */
+/* COMPACT MODE, AND IT HAS TO BE WORTH CHOOSING.
+   computePlan tries the roomy sheet, then this one, then two sheets. Until now
+   the only thing this tier changed was the pictogram, 7mm down to 5.6mm, which
+   moved the answer by about a millimetre a row: never enough to turn two sheets
+   into one, so the fitter went straight past it to a second sheet almost every
+   time. A tier nobody picks is a tier that does not exist.
+   It now buys a row properly: 10.4mm roomy, 8.6mm dense. That is 21mm on a
+   twelve medicine slip, which is the difference the doctor asked for. What it
+   spends is leading and padding and the two quiet English lines. What it does
+   NOT spend is the dose pictogram below 5.6mm, the dose number, or the Sindhi
+   dose word: those three are what a patient who reads nothing goes home with. */
 table.rx.cmp td{border-bottom:.6pt solid #ccc}
-table.rx.cmp .nmcell{padding:.7mm 2mm .7mm 2.4mm}
+table.rx.cmp th{padding:.3mm 0}
+table.rx.cmp .nmcell{padding:.5mm 2mm .5mm 2.4mm}
 table.rx.cmp .brand{font-size:9.6pt}
-table.rx.cmp .gen{font-size:5.6pt;margin-top:.2mm}
-table.rx.cmp .nmsd{font-size:7.8pt;margin-top:.3mm}
-table.rx.cmp .tcell,table.rx.cmp .mlcell,table.rx.cmp .dycell{padding:.6mm 0}
+table.rx.cmp .gen{font-size:5.6pt;margin-top:.15mm}
+table.rx.cmp .nmsd{font-size:7.8pt;margin-top:0;line-height:1.2}
+table.rx.cmp .tcell,table.rx.cmp .mlcell,table.rx.cmp .dycell{padding:.3mm 0}
 table.rx.cmp .dose{font-size:6.2pt}
 table.rx.cmp .dose .sd{font-size:7pt}
-table.rx.cmp .mlsd{font-size:7pt}
+table.rx.cmp .mlsd{font-size:7pt;margin-top:.15mm}
 table.rx.cmp .dyn{font-size:11.5pt}
 table.rx.cmp .dysd{font-size:7pt}
 table.rx.cmp td.noc{font-size:9.5pt}
 
 .contbar{margin-top:1.6mm;border:.9pt solid #111;background:#f4f7f6;padding:1.4mm 2mm;display:flex;justify-content:space-between;align-items:center;font-size:6.4pt;}
 .contbar .sd{font-size:8.6pt;font-weight:700;}
-.pgtag{position:absolute;top:1.6mm;left:7mm;font-size:6pt;color:#555;letter-spacing:.6px;}
+.pgtag{position:absolute;top:1.6mm;left:7mm;font-size:6pt;color:#333;letter-spacing:.6px;}
 .cont2{display:flex;border:.9pt solid #111;margin:2.6mm 0 1.6mm;font-size:7.4pt;background:#f4f7f6;}
 .cont2>div{padding:1.1mm 2mm;border-right:.6pt solid #999;flex:1}
 .cont2>div:last-child{border-right:0}
-.cont2 b{display:block;font-size:5.7pt;font-weight:400;color:#666;text-transform:uppercase;letter-spacing:.4px}
+.cont2 b{display:block;font-size:5.7pt;font-weight:400;color:#454545;text-transform:uppercase;letter-spacing:.4px}
 .cont2 .v{font-size:8.8pt;font-weight:700;margin-top:.3mm}
 
 /* ULTRA compact: 15 medicines on one sheet */
@@ -160,7 +299,7 @@ table.rx.u td{border-bottom:.5pt solid #cfd6d4;padding:0;height:7.85mm}
 table.rx.u td.noc{font-size:8pt}
 .nmu{padding:0 1.6mm 0 2mm;line-height:1.05}
 .nmu b{font-size:8.6pt;letter-spacing:.1px}
-.nmu .gu{font-size:5.4pt;color:#666;margin-left:1.4mm}
+.nmu .gu{font-size:5.4pt;color:#454545;margin-left:1.4mm}
 .nmu .sdu{font-size:8pt;font-weight:700;float:right;margin-right:.5mm}
 .tu{text-align:center;font-size:5pt}
 .tu b{font-size:8pt;margin-left:.6mm;vertical-align:middle}
@@ -171,8 +310,8 @@ table.rx.u td.noc{font-size:8pt}
 .dyu .sd{font-size:7.4pt;margin-left:.8mm;font-weight:700}
 .vline{border:.9pt solid #111;padding:.9mm 2mm;margin-bottom:1.4mm;font-size:7pt;display:flex;gap:3mm;flex-wrap:wrap;align-items:center}
 .vline b{font-size:8.6pt}
-.vline em{font-style:normal;color:#777;font-size:6pt}
-.vline .lbl{color:#666;font-size:5.6pt;letter-spacing:.4px;text-transform:uppercase}
+.vline em{font-style:normal;color:#444;font-size:6pt}
+.vline .lbl{color:#454545;font-size:5.6pt;letter-spacing:.4px;text-transform:uppercase}
 .legend.thin{padding:.7mm 2mm;margin-top:1mm}
 .legend.thin .lg span{font-size:5.4pt}
 .legend.thin .lg .sd{font-size:7pt}
@@ -190,7 +329,7 @@ table.rx.mx .dysd{font-size:7.4pt}
 .nogrid{padding:.7mm 2.5mm;background:#fbfcfc}
 .ln3{display:flex;align-items:center;gap:2.4mm}
 .sdi{font-size:8.4pt;font-weight:700;line-height:1.3;direction:rtl;font-family:'NK',serif}
-.eni{font-size:5.7pt;color:#555;margin-top:.3mm;letter-spacing:.1px}
+.eni{font-size:5.7pt;color:#333;margin-top:.3mm;letter-spacing:.1px}
 .warnx{margin-top:.8mm;border:.7pt solid #b3261e;color:#b3261e;border-radius:1mm;padding:.5mm 1.4mm;
  font-size:8pt;font-weight:700;direction:rtl;font-family:'NK',serif;display:inline-block}
 .warnx span{font-family:'Liberation Sans',Arial,sans-serif;font-size:5.4pt;direction:ltr;font-weight:400}
@@ -203,37 +342,48 @@ table.rx.mx .dysd{font-size:7.4pt}
 .brow .bi{flex:none;padding-top:.3mm}
 .brow .bt{flex:1}
 .brow .bt b{font-size:9pt;display:block;line-height:1.1}
-.brow .bt .g2{font-size:5.8pt;color:#555;margin-top:.3mm}
+.brow .bt .g2{font-size:5.8pt;color:#333;margin-top:.3mm}
 .brow .bt .s2{font-size:8.6pt;font-weight:700;margin-top:.6mm;direction:rtl;font-family:'NK',serif}
 .brow .bq{flex:none;text-align:center;width:20mm}
 .brow .bq .n6{font-size:13pt;font-weight:700;line-height:1}
-.brow .bq .l6{font-size:5.4pt;color:#555;letter-spacing:.3px}
+.brow .bq .l6{font-size:5.4pt;color:#333;letter-spacing:.3px}
 .brow .bq .sd{font-size:7.6pt;font-weight:700}
 
 /* legend */
-.legend{margin-top:1.2mm;border:.8pt dashed #0f5c4a;padding:1.3mm 2mm;display:flex;justify-content:space-between;align-items:center;}
+/* Every pictogram and every word stays. What went is 1.2mm of padding and the
+   leading around two very short lines: 8.4mm down to 6.4mm, which is a fifth of
+   a medicine row bought without touching a single mark a patient reads. */
+.legend{margin-top:.8mm;border:.8pt dashed #0f5c4a;padding:.5mm 2mm .8mm;display:flex;justify-content:space-between;align-items:center;}
 .mono .legend{border-color:#000;}
 .lg{display:flex;align-items:center;gap:1.2mm;}
-.lg span{font-size:6pt;line-height:1.1;}
-.lg .sd{font-size:7.6pt;font-weight:700;display:block;}
+.lg span{font-size:6pt;line-height:1.05;}
+.lg .sd{font-size:7.6pt;font-weight:700;display:block;line-height:1.1;}
 
 /* boxes row: tests + advice */
-.boxes{display:flex;gap:2.5mm;margin-top:1.2mm;align-items:stretch;}
+.boxes{display:flex;gap:2.5mm;margin-top:.8mm;align-items:stretch;}
 .bx{border:.9pt solid #111;flex:1;display:flex;flex-direction:column;}
-.bx h4{margin:0;background:#0f5c4a;color:#fff;font-size:5.8pt;font-weight:400;padding:.8mm 2mm;letter-spacing:.4px;display:flex;justify-content:space-between;align-items:center;}
-.bx h4 .sd{font-size:8.2pt;font-weight:700;}
+.bx h4{margin:0;background:#0f5c4a;color:#fff;font-size:5.8pt;font-weight:400;padding:.45mm 2mm;
+  line-height:1.15;letter-spacing:.4px;display:flex;justify-content:space-between;align-items:center;}
+.bx h4 .sd{font-size:8.2pt;font-weight:700;line-height:1.15;}
 .mono .bx h4{background:#000;}
-.bx .in{padding:1mm 2mm;flex:1;}
-.tst{display:flex;align-items:flex-start;gap:1.6mm;margin-bottom:.7mm;}
+.bx .in{padding:.7mm 2mm;flex:1;}
+.tst{display:flex;align-items:flex-start;gap:1.6mm;margin-bottom:.45mm;}
 .tst:last-child{margin-bottom:0}
 .tst .bxk{width:2.8mm;height:2.8mm;border:.8pt solid #333;flex:none;margin-top:.5mm;}
-.tst .sd{font-size:8.4pt;font-weight:700;line-height:1.2;}
+/* THE TEST NAME AND ITS SINDHI SHARE A LINE.
+   Stacked, three tests cost 19.2mm and set the height of the whole boxes row.
+   Side by side they cost 11.4mm. The box is 65mm wide on A5 and the widest pair
+   on the demo sheet, "رت ۾ کنڊ" with "Blood sugar F/R 1", measures 27mm, so
+   they sit together with room over. flex-wrap, so a long test name drops its
+   English to a second line rather than running out of the box. */
+.tstw{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:1.6mm;min-width:0;}
+.tst .sd{font-size:8.4pt;font-weight:700;line-height:1.15;}
 .bx .in.two{display:grid;grid-template-columns:1fr 1fr;gap:.6mm 3mm;}
-.tst .en{font-size:5.8pt;color:#555;letter-spacing:.2px;}
-.advgrid{display:grid;grid-template-columns:1fr;gap:.9mm;}
+.tst .en{font-size:5.8pt;color:#333;letter-spacing:.2px;}
+.advgrid{display:grid;grid-template-columns:1fr;gap:.6mm;}
 .adv{display:flex;align-items:center;gap:1.6mm;}
-.adv .sd{font-size:8.4pt;font-weight:700;line-height:1.2;}
-.adv .aen{font-size:5.6pt;color:#555;}
+.adv .sd{font-size:8.4pt;font-weight:700;line-height:1.15;}
+.adv .aen{font-size:5.6pt;color:#333;}
 
 /* SENT ON — the referral band.
    Full width and directly under the tests/advice row, because it is an
@@ -250,16 +400,20 @@ table.rx.mx .dysd{font-size:7.4pt}
 .page.a4 .swhy{font-size:8.4pt;}
 
 /* doctor's handwriting strip */
-.note2{margin-top:1.4mm;border-top:1.6pt solid #111;padding-top:1mm}
-.note2 .nh{display:flex;justify-content:space-between;align-items:center;font-size:5.8pt;color:#444;letter-spacing:.4px}
-.note2 .nh .sd{font-size:8.4pt;font-weight:700;color:#000}
+/* The space he writes in is the point of this block, so the RULE keeps almost
+   all of its depth: 6.4mm down to 6mm, which is still a comfortable line of
+   handwriting. The 2.4mm came off the label's leading, the padding over it and
+   the rule above it, none of which anybody writes on. */
+.note2{margin-top:.9mm;border-top:1.2pt solid #111;padding-top:.6mm}
+.note2 .nh{display:flex;justify-content:space-between;align-items:center;font-size:5.8pt;line-height:1.15;color:#444;letter-spacing:.4px}
+.note2 .nh .sd{font-size:8.4pt;font-weight:700;line-height:1.1;color:#000}
 .note2 .nh .pen{display:flex;align-items:center;gap:1.4mm}
-.note2 .lines{margin-top:.8mm}
-.note2 .lines i{display:block;border-bottom:.6pt dotted #999;height:6.4mm}
+.note2 .lines{margin-top:.4mm}
+.note2 .lines i{display:block;border-bottom:.6pt dotted #999;height:5.6mm}
 .note2 .lines i:last-child{border-bottom-style:solid;border-bottom-color:#bbb}
 
 /* footer */
-.foot{position:absolute;left:7mm;right:7mm;bottom:calc(4mm + var(--lhb,0mm));}
+.foot{position:absolute;left:7mm;right:7mm;bottom:calc(3mm + var(--lhb,0mm));}
 /* One rule, one line, no boxes.
    Two bordered boxes sat here and between them ate about 20mm off the bottom of
    every A5 sheet — which is two more medicines. Neither earned it: the keep-it
@@ -267,9 +421,9 @@ table.rx.mx .dysd{font-size:7.4pt}
    slip that already carries a registration number and prints identically every
    time. What is left is a hairline and two short lines of type. */
 .fbar{display:flex;gap:3mm;align-items:baseline;justify-content:space-between;
-  border-top:.8pt solid #111;padding-top:1.1mm;}
+  border-top:.8pt solid #111;padding-top:.8mm;}
 .keep{display:flex;gap:2.4mm;align-items:baseline;flex:1;min-width:0;}
-.keep .sd{font-size:7.8pt;font-weight:700;line-height:1.3;}
+.keep .sd{font-size:7.8pt;font-weight:700;line-height:1.1;}
 .keep .en{font-size:5.8pt;color:#444;}
 /* The appointments number sits at the FOOT, small, beside the keep-it line, and
    never in the heading. In the heading it reads as the doctor's own number. */
@@ -277,19 +431,33 @@ table.rx.mx .dysd{font-size:7.4pt}
 .keep .appt .sd{font-size:7pt;color:#000;}
 .sign{flex:none;text-align:right;}
 .sign .rule{display:block;width:38mm;border-top:.6pt solid #999;margin:5.2mm 0 .5mm auto;}
-.sign .lbl{font-size:5.6pt;color:#555;}
+.sign .lbl{font-size:5.6pt;color:#333;}
 .sign .lbl .sd{font-size:7pt;color:#000;font-weight:700;}
 .nextv{font-size:5.8pt;color:#333;white-space:nowrap;}
 .nextv b{font-size:7pt;}
-.fine{margin-top:1.2mm;display:flex;justify-content:space-between;align-items:center;font-size:5.8pt;color:#555;}
-.fine .sd{font-size:7.6pt;color:#000;font-weight:700;}
-.brand{margin-top:1mm;border-top:.4pt dotted #c4c4c4;padding-top:.8mm;
+.fine{margin-top:.7mm;display:flex;justify-content:space-between;align-items:center;font-size:5.8pt;line-height:1.2;color:#333;}
+.fine .sd{font-size:7.6pt;line-height:1.15;color:#000;font-weight:700;}
+/* THIS BLOCK WAS CALLED .brand AND IT WAS PAINTING THE MEDICINE NAMES.
+   The medicine name has been .brand since the first sheet (see the table above).
+   When the small Nuskho mark at the foot was given the same class, this rule
+   came later in the file, matched with the same weight, and won: on A5 every
+   medicine name printed at 5.1pt in grey #7a7a7a, with a dotted rule over it,
+   SMALLER AND FAINTER THAN THE GENERIC NAME UNDER IT. On A4 the collision ran
+   the other way and the credit line printed at 12.4pt, bigger than the words
+   telling the patient to finish his course. Neither is visible in any check
+   that reads text; both are obvious the moment a sheet is looked at.
+   Renamed to .credit. Cost of putting the name back to 11pt: 1.1mm a row,
+   13mm on a twelve medicine slip, which is paid for below. */
+/* The line-height is written down because it used to be borrowed. While this
+   block was .brand it inherited line-height:1.03 from the medicine name rule;
+   renaming it took that away and the credit line grew 1.2mm on its own. */
+.credit{margin-top:.6mm;border-top:.4pt dotted #c4c4c4;padding-top:.5mm;
  display:flex;justify-content:space-between;align-items:baseline;gap:2mm;
- font-size:5.1pt;color:#7a7a7a;letter-spacing:.15px;}
-.brand b{color:#3a3a3a;font-weight:700;}
-.brand .bn{white-space:nowrap}
-.brand .bn .sd{font-size:6.6pt;color:#3a3a3a;font-weight:700;display:inline}
-.brand .ct{white-space:nowrap;text-align:right}
+ font-size:5.1pt;line-height:1.05;color:#7a7a7a;letter-spacing:.15px;}
+.credit b{color:#3a3a3a;font-weight:700;}
+.credit .bn{white-space:nowrap}
+.credit .bn .sd{font-size:6.6pt;color:#3a3a3a;font-weight:700;display:inline}
+.credit .ct{white-space:nowrap;text-align:right}
 
 /* overprint variant */
 .lh{height:var(--lht,44mm);border-bottom:.6pt dashed #c00;position:relative;}
@@ -336,13 +504,16 @@ table.rx.mx .dysd{font-size:7.4pt}
 .page.a4 table.rx th .sd{font-size:9pt;}
 .page.a4 td.noc{font-size:13pt;}
 
-/* English left, Sindhi right, on one line — the whole point of the extra width */
-.page.a4 .nmcell{display:flex;align-items:center;justify-content:space-between;gap:4mm;
-  padding:1.4mm 3mm 1.4mm 3.2mm;}
-.page.a4 .nmen{min-width:0;flex:1 1 auto;}
-.page.a4 .brand{font-size:12.4pt;}
+/* English left, Sindhi right, on one line. A5 does this now as well; A4 only
+   pays more for the gap and the type, because it has the width to spend. */
+.page.a4 .nmcell{padding:1mm 3mm 1mm 3.2mm;}
+.page.a4 .nmg{column-gap:4mm;}
+.page.a4 .brand{font-size:12.4pt;grid-column:1;}
 .page.a4 .gen{font-size:7.4pt;}
-.page.a4 .nmsd{font-size:11.5pt;margin-top:0;text-align:right;white-space:nowrap;flex:0 0 auto;}
+/* 77mm of name column, and the widest English line plus the Sindhi measures
+   64mm on the longest name in the book. So on A4 the Sindhi goes back up beside
+   the brand, level with it, exactly as it has since this paper existed. */
+.page.a4 .nmsd{font-size:11.5pt;grid-row:1/span 2;align-self:center;}
 .page.a4 .tot b{font-size:8.8pt;}
 .page.a4 .tot .sd{font-size:8.4pt;}
 .page.a4 table.rx.cmp .nmcell{padding:1mm 3mm;}
@@ -355,7 +526,6 @@ table.rx.mx .dysd{font-size:7.4pt}
 .page.a4 .mlsd{font-size:9.6pt;}
 .page.a4 .dyn{font-size:17pt;}
 .page.a4 .dysd{font-size:9.6pt;}
-.page.a4 .tick i{width:2.8mm;height:2.8mm;}
 
 .page.a4 .lg span{font-size:7.2pt;}
 .page.a4 .bx h4{font-size:7.6pt;}
@@ -375,15 +545,66 @@ table.rx.mx .dysd{font-size:7.4pt}
 .hdr .logo{display:block;width:auto;max-width:52mm;object-fit:contain;}
 .page.a4 .hdr .logo{max-width:70mm;}
 
-/* the patient-code square. Sits in the patient bar beside the number it holds,
-   so no one has to be told what it is. Fixed millimetres: a QR that scales with
-   the layout is a QR that becomes unreadable on one paper size and nobody
-   notices until a scanner is standing on a desk in Larkana. */
-.pt .qrcell{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.4mm 1.2mm;border-right:0;}
-.pt .qr{display:block;width:9.4mm;height:9.4mm;margin:0 auto;}
-.pt .qrcell b{display:block;text-align:center;font-size:5pt;letter-spacing:.4px;
-  color:#555;margin-top:.2mm;font-weight:400;text-transform:none;}
-.page.a4 .pt .qr{width:13mm;height:13mm;}
+/* THE PATIENT-CODE SQUARE AND THE SIX CHARACTERS UNDER IT.
+   The square holds the patient's number for the scanner on the clinic desk; the
+   line under it is the prescription's own id, and it is what a person reads out
+   on the evening the scanner will not read. They travel together, always.
+
+   WHERE IT LIVES, AND WHY IT MOVED OUT OF THE PATIENT BAR.
+   It used to sit in the last cell of that bar, which capped it at 9.4mm on A5:
+   the bar is sized by ordinary lines of type, and a square any taller made the
+   whole bar taller. Measured on a twelve medicine A5 slip, the square was
+   costing that bar 4.3mm, which is half a medicine, and getting a code a cheap
+   USB scanner reads only just well enough.
+
+   The heading is the honest home. With a real clinic profile the doctor's name,
+   degrees, registration and address stack 16mm tall inside a 20.9mm heading and
+   the whole right-hand half of that band is white paper. So the square sits at
+   the right end of it, 16mm across, and the arithmetic on the sheet that
+   matters is: heading 20.9 -> 24.8mm, patient bar 12.5 -> 8.3mm. Clear space
+   over the footer on a twelve medicine A5 slip went 7.15 -> 7.57mm, so the
+   sheet is .4mm BETTER off than before and the square has 2.9 times the area.
+
+   MODULES, WHICH IS THE ONLY MEASURE A SCANNER CARES ABOUT. The code is 21
+   modules across, so A5 goes from .45mm a module to .76mm, and A4 from .62mm to
+   .95mm. The old note here said 29 modules at .32mm and it was simply wrong:
+   the viewBox says 21 and always has for a patient code this length.
+   The quiet zone is white paper on three sides. Under the square the only ink
+   is the six characters, and they now stand 1.4mm off it, which is nearly two
+   modules, where in the bar they stood .1mm off it and a fifth of a module.
+
+   ON HIS OWN LETTERHEAD THERE IS NO HEADING TO PUT IT IN. The top 55mm of that
+   sheet is his pre-printed design and we print nothing there, so on letterhead
+   paper the square stays in the patient bar, where it always was. It still
+   grows, to as much as that bar can carry without costing a medicine: A4
+   letterhead 13 -> 14mm, with the bar going 16.7 -> 21.5mm, and eleven
+   medicines still on that sheet, which is what fits on that paper. An A5
+   letterhead has less room than any paper we print and its square is left at
+   the 9.4mm it has always been.
+
+   FIXED MILLIMETRES, NOT A PERCENTAGE, and they are set on the svg itself in
+   renderSlip.ts rather than here. One number, in one place, that prints the
+   same whether or not this stylesheet ever loads. A QR that scales with the
+   layout is a QR that goes unreadable on one paper size and nobody finds out
+   until a scanner is sitting on a desk in Larkana. */
+.idcode{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.idcode .qr{display:block;}
+/* The prescription id, read aloud when the scanner sulks, so it is bigger and
+   blacker than the 5pt grey it was when it lived in the bar: 6.6pt on A5. */
+.idcode .rxid{display:block;text-align:center;font-size:6.6pt;letter-spacing:.7px;
+  line-height:1.05;color:#222;margin-top:1.4mm;font-weight:700;text-transform:none;}
+.hdr .idcode{margin-left:4mm;}
+.page.a4 .idcode .rxid{font-size:8pt;margin-top:1.8mm;}
+/* LETTERHEAD ONLY, AND THE PADDING IS THE QUIET ZONE.
+   .pt>div would otherwise give this cell a divider, a share of the width and
+   the bar's own padding. The padding here is not decoration: at 15mm the square
+   sat hard against the black frame of the bar on all three sides, with the top
+   row of modules touching the rule, which is exactly what a scanner reads as
+   part of the code. 1.6mm all round is 2.4 modules of white at the letterhead's
+   .67mm pitch, where before there was .2mm and a third of a module, and the
+   square came down to 14mm to pay for it. Read off a rendered A4 letterhead at
+   four times print size, because on screen at 100% it looks fine either way. */
+.pt .idcode{flex:none;border-right:0;padding:1.6mm 1.6mm .6mm;}
 
 /* A form word whose Sindhi nobody has read yet prints in English, in the Latin
    face, so the line still says what is in the box. See data/forms.ts. */

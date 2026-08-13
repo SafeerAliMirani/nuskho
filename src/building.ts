@@ -1,7 +1,10 @@
 import {
   db, uid, nextToken, nextPatientNum, findByCode, patientCode, closeVisit, markRefunded,
-  daySummary, todaysVisits, markTestsPaid,
+  daySummary, todaysVisits, markTestsPaid, doctorDrugs, lastVisit,
 } from './db'
+import { formulary } from './data/formulary'
+import { dictionary } from './data/dictionary'
+import { linesReady, freezeLines, slipDataFor, drugFromShelf } from './rx'
 import { checkRolePin, can, type Role } from './roles'
 import { activeDoctors, isSitting, setSitting, multiRoom, doctorById, visitDoctorId } from './doctors'
 import { course } from './course'
@@ -12,7 +15,7 @@ import { storeKind, storeSeesTheDay, type Store } from './store'
 import { chargesFor, chargeTotal } from './testfees'
 import { staffRoles } from './staff'
 import { INSTANT } from './data/vitals'
-import type { FeeState, VisitStatus } from './types'
+import type { FeeState, VisitStatus, RxLine, Form, Route } from './types'
 
 /**
  * THE BUILDING, ON ITS OWN WIFI.
@@ -41,8 +44,13 @@ import type { FeeState, VisitStatus } from './types'
  * what the desk's paper register already shows the room: names, numbers,
  * money state. Medicine lines cross ONLY to a device signed in as pharmacy,
  * and only for printed slips — the same lines the patient is carrying past
- * that counter on paper. Diagnoses, histories and vitals details never leave
- * the record holder. And nothing here ever touches the internet: the socket
+ * that counter on paper. Diagnoses, vitals and prescription detail cross to
+ * exactly one further place, since 11 Aug 2026: a device signed in as
+ * DOCTOR, for HIS OWN ROOM's patients only, after his PIN. The second doctor
+ * prescribes at his own screen now, and what crosses to that screen is what
+ * his own paper pad would hold anyway. The room check happens HERE, on the
+ * record holder, on every single ask; a mirror never gets to choose whose
+ * patient it reads. And nothing here ever touches the internet: the socket
  * is same-origin on the building's own wire.
  *
  * The PINs stay where they live. A mirror's sign-in sends the typed PIN to
@@ -108,10 +116,35 @@ export type WireSlip = {
   lines: WireRxLine[]
 }
 
+/** One medicine on the doctor's own list, as his mirror screen picks from
+ *  it. Display and composing fields only: the Sindhi, the unit words and the
+ *  snapshot all stay with the record holder, which is the only place a
+ *  prescription is ever frozen. */
+export type WireMed = {
+  id: string; brand: string; strength: string; generic: string
+  form: Form; route?: Route
+}
+
+/** A doctor's mirror asking to see his own patient. Everything his paper pad
+ *  would hold, and nothing about anyone else's room. */
+export type WireOpenVisit = {
+  id: string; token: number; status: VisitStatus; urgent?: boolean
+  printedAt?: number
+  patient: { name: string; age?: string; sex?: 'M' | 'F'; code: string }
+  diagnosis?: string
+  vitals?: Record<string, string>
+  lines: RxLine[]
+  tests: string[]
+  advice: string[]
+  nextVisit?: string
+  prev?: { at: number; diagnosis?: string; brands: string[] } | null
+}
+
 export type IntentKind =
   | 'addPatient' | 'openByCode' | 'closeVisit' | 'setVitals' | 'markRefunded'
   | 'setGiven' | 'giveAll' | 'reopen' | 'reprint' | 'setSitting' | 'openSlip'
   | 'markTestsPaid'
+  | 'openVisit' | 'saveRx' | 'printRx' | 'myMeds' | 'takeMed'
 
 /** Which permission each intent needs, checked by the record holder against
  *  the ROLE the mirror signed in as. One list, same as roles.ts: nothing
@@ -122,12 +155,24 @@ const NEED: Record<IntentKind, Parameters<typeof can>[0]> = {
   reprint: 'money', setSitting: 'queue', openSlip: 'dispense',
   // the person who did the test is the person who collects for it
   markTestsPaid: 'tests',
+  // the second doctor's screen. All of these ALSO pass the room check inside
+  // applyIntent: 'prescribe' says he is a doctor, the doctorId on his sitting
+  // says which one, and another room's patient answers as if it did not exist.
+  openVisit: 'prescribe', saveRx: 'prescribe', printRx: 'prescribe',
+  myMeds: 'prescribe', takeMed: 'medicines',
 }
 
-/** The roles a phone may hold. The doctor prescribes at the record holder's
- *  machine, and the Nuskho role changes identity — neither belongs on a
- *  mirror in this first building. */
-export const MIRROR_ROLES: Role[] = ['counter', 'compounder', 'pharmacy', 'clinicadmin']
+/** The roles a device on the wire may hold. The Nuskho role changes identity
+ *  and stays at the record holder's machine.
+ *
+ *  THE DOCTOR JOINED THIS LIST ON 11 AUG 2026, reversing the launch decision
+ *  that he prescribes only at the record holder's keyboard. Safeer chose
+ *  "Build it". What did NOT change is the constitution: his screen is still a
+ *  mirror that holds nothing. The record holder keeps the only database,
+ *  writes every line, freezes every snapshot and allocates every number; the
+ *  doctor's device composes in memory, asks, and prints what it is handed
+ *  back, exactly the way the token slip has always printed on phones. */
+export const MIRROR_ROLES: Role[] = ['doctor', 'counter', 'compounder', 'pharmacy', 'clinicadmin']
 
 /* ------------------------------------------------- the bell, across machines
  *
@@ -200,14 +245,35 @@ export function setHostHere(v: boolean): void {
  * clinic folder (file://) cannot answer, the public web copy answers with the
  * app's own HTML which fails to parse, so both stay exactly what they were.
  */
+/**
+ * True when the hub probe ERRORED rather than answered. An answered "not a
+ * hub" (the public website, a 404) is knowledge; a dropped fetch is not, and
+ * the difference decides whether the offline worker may register. One wifi
+ * blip between the HTML arriving and this probe used to leave mode 'off', and
+ * the very next line of main.tsx installed the cache-first worker on the hub
+ * origin, pinning the phone to tonight's build for ever. An iPhone has no way
+ * to unregister a service worker that anyone in a clinic would find.
+ */
+let probeUnsure = false
+export const buildingUnknown = (): boolean => probeUnsure
+
 export async function initBuilding(): Promise<void> {
   if (!location.protocol.startsWith('http')) return
-  try {
-    const r = await fetch('/hub.json', { cache: 'no-store' })
-    const j = await r.json()
-    if (j?.hub !== true) return
-    onWire_local = j.local === true
-  } catch { return }
+  // Three tries, briefly spaced. The wifi blink this rides out is seconds
+  // long; anything longer is answered honestly by probeUnsure instead.
+  let j: { hub?: unknown; local?: unknown } | null = null
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fetch('/hub.json', { cache: 'no-store' })
+      j = await r.json()
+      break
+    } catch {
+      if (i === 2) { probeUnsure = true; return }
+      await new Promise(res => setTimeout(res, 400 * (i + 1)))
+    }
+  }
+  if (j?.hub !== true) return
+  onWire_local = j.local === true
   mode = hostHere() ? 'host' : 'mirror'
   connect()
   if (mode === 'host') startHost()
@@ -220,11 +286,6 @@ type Msg = Record<string, unknown> & { t: string; from?: number; to?: number }
 
 let ws: WebSocket | null = null
 const listeners = new Set<(m: Msg) => void>()
-
-export function onWire(h: (m: Msg) => void): () => void {
-  listeners.add(h)
-  return () => listeners.delete(h)
-}
 
 function send(m: Record<string, unknown>): void {
   if (ws?.readyState === 1) ws.send(JSON.stringify(m))
@@ -248,7 +309,9 @@ function connect(): void {
 
 /* ---------------------------------------------------------------- the mirror */
 
-export type AuthResult = { ok: true; role: Role } | { ok: false; why: string }
+export type AuthResult =
+  | { ok: true; role: Role; doctorId?: string }
+  | { ok: false; why: string }
 
 let hostId = 0
 let hostSeen = 0
@@ -268,8 +331,12 @@ let hostSeen = 0
  * thing by looking at the desks.
  */
 let hostStaff: Role[] | null = null
+/** The rooms, off the same heartbeat: a doctor picking his own name at the
+ *  door needs the list before anybody signs in. Names and room numbers are
+ *  what the letterhead and the signboard outside already say. */
+let hostDocs: { id: string; nameEn: string; nameSd: string; room: string }[] | null = null
 let sid = ''
-let lastAuth: { role: Role; pin: string } | null = null
+let lastAuth: { role: Role; pin: string; doctorId?: string } | null = null
 let reqN = 0
 let resumedThisSocket = false
 const pending = new Map<number, (m: Msg) => void>()
@@ -285,6 +352,11 @@ export const hostUp = () => Date.now() - hostSeen < 10000
 /** The doors this building actually has. Null until the host has been heard,
  *  which is honest: a door offered before the building answers is a guess. */
 export const buildingRoles = (): Role[] | null => hostStaff
+
+/** The building's rooms, for the door's "which doctor" question. Empty until
+ *  the host has been heard. */
+export const buildingDocs = (): { id: string; nameEn: string; nameSd: string; room: string }[] =>
+  hostDocs ?? []
 
 export function mirrorSubscribe(cb: {
   state: (s: WireState) => void
@@ -328,6 +400,7 @@ function startMirror(): void {
       hostSeen = Date.now()
       if (Array.isArray(m.staff)) hostStaff = (m.staff as string[]).filter(
         r => (MIRROR_ROLES as string[]).includes(r)) as Role[]
+      if (Array.isArray(m.docs)) hostDocs = m.docs as typeof hostDocs
       if (!was && upCb) upCb(true)
       // a fresh socket after a drop: pick the old sitting back up, once
       if (sid && !resumedThisSocket) { resumedThisSocket = true; send({ t: 'resume', to: hostId, sid }) }
@@ -361,14 +434,14 @@ function ask(m: Record<string, unknown>, timeoutMs = 8000): Promise<Msg> {
   })
 }
 
-export async function mirrorAuth(role: Role, pin: string): Promise<AuthResult> {
-  const r = await ask({ t: 'auth', role, pin })
+export async function mirrorAuth(role: Role, pin: string, doctorId?: string): Promise<AuthResult> {
+  const r = await ask({ t: 'auth', role, pin, doctorId })
   if (r.t === 'authok') {
     sid = String(r.sid)
-    lastAuth = { role, pin }
+    lastAuth = { role, pin, doctorId }
     resumedThisSocket = true
     try { sessionStorage.setItem('nuskho.mirrorSid', sid) } catch { /* memory is enough */ }
-    return { ok: true, role: r.role as Role }
+    return { ok: true, role: r.role as Role, doctorId: r.doctorId ? String(r.doctorId) : undefined }
   }
   return { ok: false, why: String(r.why ?? 'That is not right. Try again.') }
 }
@@ -386,7 +459,7 @@ export async function intent(kind: IntentKind, p: Record<string, unknown>): Prom
   // VISIBLY instead of showing buttons that silently do nothing
   if (r.ok === false && r.code === 'expired') {
     if (lastAuth) {
-      const again = await mirrorAuth(lastAuth.role, lastAuth.pin)
+      const again = await mirrorAuth(lastAuth.role, lastAuth.pin, lastAuth.doctorId)
       if (again.ok) {
         const r2 = await ask({ t: 'intent', kind, p, sid })
         if (r2.ok === false && errCb) errCb(String(r2.why ?? 'That did not go through.'))
@@ -403,7 +476,12 @@ export async function intent(kind: IntentKind, p: Record<string, unknown>): Prom
 
 /* ------------------------------------------------------------------- the host */
 
-type Sitting = { role: Role; fromId: number; at: number }
+type Sitting = {
+  role: Role; fromId: number; at: number
+  /** which room, when the role is doctor: set at sign-in, checked on every
+   *  clinical ask. A doctor sitting without a room can open nothing. */
+  doctorId?: string
+}
 
 const sittings = new Map<string, Sitting>()   // sid -> who
 
@@ -548,7 +626,9 @@ const clip = (v: unknown, n: number): string => String(v ?? '').slice(0, n).trim
 
 /** The one place a mirror's asked-for change becomes a record: the same
  *  functions the solo product calls, on the one database that exists. */
-async function applyIntent(kind: IntentKind, p: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function applyIntent(
+  kind: IntentKind, p: Record<string, unknown>, sit?: Sitting,
+): Promise<Record<string, unknown>> {
   if (kind === 'addPatient' || kind === 'openByCode') {
     let patientId: string
     if (kind === 'openByCode') {
@@ -720,6 +800,145 @@ async function applyIntent(kind: IntentKind, p: Record<string, unknown>): Promis
     setSitting(String(p.doctorId ?? ''), p.sitting === true)
     return { ok: true }
   }
+
+  /* ----------------------------------------- the second doctor's own screen
+   *
+   * Four rules, enforced here and nowhere later:
+   *
+   * ROOM. Every clinical ask answers only for the room on the sitting.
+   * Another room's patient answers "another room's", whether it exists or
+   * not, so the wire cannot be used to enumerate the day.
+   *
+   * ONE WRITER. The mirror sends what the doctor decided; this machine turns
+   * it into the record with the same functions the solo screen uses. A line
+   * arriving with a snapshot is stripped of it: freezing is the record
+   * holder's act, at print time, from ITS OWN medicine list.
+   *
+   * LOCKED IS LOCKED. A printed prescription refuses saveRx the same way the
+   * host screen locks after printing. Amending stays at the clinic machine.
+   *
+   * UNTRUSTED NUMBERS. Doses clamp to half steps within [0, 20], days to
+   * [1, 365], strings to sane lengths, the line count to 30 — the same
+   * clip-everything stance as every other intent, because a wire value is a
+   * wire value whoever signed the sitting.
+   */
+  const room = sit?.doctorId
+  const mineToo = (vv: { doctorId?: string }) => !!room && visitDoctorId(vv.doctorId) === room
+
+  if (kind === 'myMeds') {
+    const ds = await doctorDrugs(formulary)
+    const meds: WireMed[] = ds.map(d => ({
+      id: d.id, brand: d.brand, strength: d.strength, generic: d.generic,
+      form: d.form, route: d.route,
+    }))
+    return { ok: true, meds }
+  }
+
+  if (kind === 'takeMed') {
+    const brand = clip(p.brand, 60), strength = clip(p.strength, 40), form = clip(p.form, 10)
+    const e = dictionary.find(x => x.brand === brand && x.strength === strength && x.form === form)
+    if (!e) return { ok: false, why: 'That one is not on this machine\u2019s shelf. Add it at the clinic machine.' }
+    // the same near-duplicate rule as takeFromDictionary: his existing row
+    // wins, spelled the way he writes it
+    const key = (b: string, st: string) => (b + ' ' + st).toLowerCase().replace(/[^a-z0-9]/g, '')
+    const ds = await doctorDrugs(formulary)
+    const already = ds.find(d => key(d.brand, d.strength) === key(e.brand, e.strength))
+    if (already) {
+      return { ok: true, id: already.id, med: {
+        id: already.id, brand: already.brand, strength: already.strength,
+        generic: already.generic, form: already.form, route: already.route,
+      } satisfies WireMed }
+    }
+    const d = drugFromShelf(e, 'own_' + uid())
+    await db.drugs.add(d)
+    return { ok: true, id: d.id, med: {
+      id: d.id, brand: d.brand, strength: d.strength, generic: d.generic,
+      form: d.form, route: d.route,
+    } satisfies WireMed }
+  }
+
+  if (kind === 'openVisit') {
+    if (!v || !mineToo(v)) return { ok: false, why: 'That patient is another room\u2019s.' }
+    const pt = await db.patients.get(v.patientId)
+    if (!pt) return { ok: false, why: 'That token is gone.' }
+    const prev = await lastVisit(pt.id, v.id)
+    const o: WireOpenVisit = {
+      id: v.id, token: v.token, status: v.status, urgent: v.urgent, printedAt: v.printedAt,
+      patient: { name: pt.name, age: pt.age, sex: pt.sex, code: patientCode(pt.num) },
+      diagnosis: v.diagnosis, vitals: v.vitals,
+      lines: v.lines, tests: v.tests, advice: v.advice, nextVisit: v.nextVisit,
+      prev: prev ? {
+        at: prev.createdAt, diagnosis: prev.diagnosis,
+        brands: prev.lines.map(l => l.snap?.brand ?? '').filter(Boolean),
+      } : null,
+    }
+    return { ok: true, v: o }
+  }
+
+  if (kind === 'saveRx') {
+    if (!v || !mineToo(v)) return { ok: false, why: 'That patient is another room\u2019s.' }
+    if (v.printedAt) return { ok: false, why: 'Printed already. Amend it at the clinic machine.' }
+    const ds = await doctorDrugs(formulary)
+    const dmap = Object.fromEntries(ds.map(d => [d.id, d]))
+    const half = (x: unknown) => Math.min(20, Math.max(0, Math.round((Number(x) || 0) * 2) / 2))
+    const raw = Array.isArray(p.lines) ? (p.lines as Record<string, unknown>[]).slice(0, 30) : []
+    const lines: RxLine[] = []
+    for (const rl of raw) {
+      const drugId = clip(rl.drugId, 48)
+      if (!dmap[drugId]) {
+        return { ok: false, why: 'A medicine on this prescription is not on the clinic list any more. Take that line off and pick it again.' }
+      }
+      const dd = (rl.dose && typeof rl.dose === 'object' ? rl.dose : {}) as Record<string, unknown>
+      const dose: RxLine['dose'] = { m: half(dd.m), d: half(dd.d), n: half(dd.n) }
+      const e2 = half(dd.e)
+      if (e2) dose.e = e2
+      const line: RxLine = {
+        drugId, dose,
+        meal: rl.meal === 'before' ? 'before' : 'after',
+        days: Math.min(365, Math.max(1, Math.round(Number(rl.days) || 0) || 1)),
+      }
+      const note = clip(rl.note, 160)
+      if (note) line.note = note
+      if (rl.side === 'R' || rl.side === 'L') line.side = rl.side
+      lines.push(line)
+    }
+    const list = (x: unknown, n: number, len: number) =>
+      Array.isArray(x) ? x.slice(0, n).map(t => clip(t, len)).filter(Boolean) : []
+    await db.visits.update(vid, {
+      lines,
+      diagnosis: clip(p.diagnosis, 240) || undefined,
+      tests: list(p.tests, 12, 60),
+      advice: list(p.advice, 8, 120),
+      nextVisit: clip(p.nextVisit, 60) || undefined,
+    })
+    return { ok: true }
+  }
+
+  if (kind === 'printRx') {
+    if (!v || !mineToo(v)) return { ok: false, why: 'That patient is another room\u2019s.' }
+    const pt = await db.patients.get(v.patientId)
+    if (!pt) return { ok: false, why: 'That token is gone.' }
+    const ds = await doctorDrugs(formulary)
+    const dmap = Object.fromEntries(ds.map(d => [d.id, d]))
+    // Same paper again: nothing re-stamped, no second chime, and the stored
+    // snapshots carry the words, so a medicine renamed since still prints as
+    // it printed the first time.
+    if (v.printedAt) return { ok: true, slip: slipDataFor(v, pt, dmap), again: true }
+    if (!v.lines.length) return { ok: false, why: 'Nothing is prescribed yet.' }
+    const ready = linesReady(v.lines, dmap)
+    if (ready.bad >= 0) return { ok: false, why: 'Line ' + (ready.bad + 1) + ' has no dose yet.' }
+    if (ready.nameless >= 0) {
+      return { ok: false, why: 'Line ' + (ready.nameless + 1) + ' has no medicine name. Take it off and pick it again.' }
+    }
+    // freeze and stamp in one write, so no reload can ever see a printed
+    // visit whose lines are not frozen
+    const lines = freezeLines(v.lines, dmap)
+    const stamp = { lines, printedAt: Date.now(), status: 'done' as const }
+    await db.visits.update(vid, stamp)
+    signal({ kind: 'printed', token: v.token })
+    return { ok: true, slip: slipDataFor({ ...v, ...stamp }, pt, dmap) }
+  }
+
   return { ok: false, why: 'Unknown ask.' }
 }
 
@@ -756,11 +975,25 @@ function startHost(): void {
         send({ t: 'authno', to: m.from, req: m.req, why: 'That role signs in at the clinic machine itself.' })
         return
       }
+      // A doctor signs in AS A ROOM, and the room must be real. With one
+      // active doctor there is nothing to ask; with several, a sign-in that
+      // names no room is refused rather than guessed, because every clinical
+      // answer this sitting will ever get hangs off this one field.
+      let doctorId: string | undefined
+      if (role === 'doctor') {
+        const docs = activeDoctors()
+        const want = m.doctorId ? String(m.doctorId) : (docs.length === 1 ? docs[0].id : '')
+        if (!want || !docs.some(d => d.id === want)) {
+          send({ t: 'authno', to: m.from, req: m.req, why: 'Pick which doctor this screen belongs to.' })
+          return
+        }
+        doctorId = want
+      }
       const ok = await checkRolePin(role, String(m.pin ?? ''))
       if (!ok) { send({ t: 'authno', to: m.from, req: m.req, why: 'That is not right. Try again.' }); return }
       const sid2 = newSid()
-      sittings.set(sid2, { role, fromId: m.from!, at: Date.now() })
-      send({ t: 'authok', to: m.from, req: m.req, sid: sid2, role })
+      sittings.set(sid2, { role, fromId: m.from!, at: Date.now(), doctorId })
+      send({ t: 'authok', to: m.from, req: m.req, sid: sid2, role, doctorId })
       pushState()
       return
     }
@@ -807,7 +1040,7 @@ function startHost(): void {
         return
       }
       let out: Record<string, unknown>
-      try { out = await queuedIntent(() => applyIntent(kind, (m.p ?? {}) as Record<string, unknown>)) }
+      try { out = await queuedIntent(() => applyIntent(kind, (m.p ?? {}) as Record<string, unknown>, sit)) }
       catch { out = { ok: false, why: 'That did not go through. Try again.' } }
       send({ t: 'done', to: m.from, req: m.req, ...out })
       pushState()
@@ -824,7 +1057,12 @@ function startHost(): void {
   setInterval(() => {
     // the heartbeat carries the building's job list so a phone that has never
     // been used can still be offered the right doors
-    send({ t: 'host', staff: staffRoles().filter(r => MIRROR_ROLES.includes(r)) })
+    send({
+      t: 'host', staff: staffRoles().filter(r => MIRROR_ROLES.includes(r)),
+      // the rooms ride along for the door's "which doctor" question: names
+      // and room numbers, the same facts painted on the board outside
+      docs: activeDoctors().map(d => ({ id: d.id, nameEn: d.nameEn, nameSd: d.nameSd, room: d.room })),
+    })
     const old = Date.now() - 12 * 3600 * 1000
     for (const [k, sit] of sittings) if (sit.at < old) sittings.delete(k)
   }, 4000)

@@ -57,10 +57,11 @@ export function setTestFees(f: TestFees): void {
 }
 
 /** What one test costs here, or 0 for free. */
-export const testFee = (key: string): number => testFees()[key] ?? 0
+// testFee() was removed on 12 Aug 2026: exported, never called. chargeTotal
+// and chargesFor are the living API.
 
 /** Has this clinic priced anything at all? Until it has, none of this shows. */
-export const chargesTests = (): boolean => Object.keys(testFees()).length > 0
+// chargesTests() was removed on 12 Aug 2026: exported, never called.
 
 /* ------------------------------------------------------------- on a visit */
 

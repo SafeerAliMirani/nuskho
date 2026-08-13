@@ -193,8 +193,19 @@ async function openSave(name: string): Promise<(text: string) => Promise<SaveRes
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = name
+    // IN the document, not detached: WebKit is entitled to ignore a synthetic
+    // click on an element that is not on the page, and on an iPad that meant
+    // no file was ever created while the screen honestly asked "did it save?"
+    // about a save that never started.
+    document.body.appendChild(a)
     a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+    a.remove()
+    // A full minute, not four seconds. iOS puts a confirmation sheet between
+    // the click and the download, and the careful person who reads that sheet
+    // took longer than the old timer, so the URL was already dead when they
+    // tapped Download. The one careful person must not be the one who loses
+    // the backup.
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000)
     // Deliberately NOT noteExported(). This path genuinely does not know.
     return { saved: true, sure: false, name }
   }

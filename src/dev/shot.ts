@@ -7,10 +7,23 @@ import type { Drug, RxLine, Visit } from '../types'
 const FORMS_DEMO: [string,string,string,string,string,string][] = [
   ['TOBREX eye drops','Tobramycin','ٽوبريڪس','','drop','eye'],
   ['OTOSPORIN ear drops','Polymyxin','اوٽوسپورن','','drop','ear'],
+  // no side, so the pair of eyes prints right under the single one and the two
+  // can be told apart by eye at print size, which is the only test that counts
+  ['GENTICYN eye drops','Gentamicin','','','drop','eye'],
   ['CALPOL drops','Paracetamol','ڪالپول','','drop','mouth'],
   ['FUCIDIN cream','Fusidic acid','فيوسڊن','','cream','skin'],
   ['ORS sachet','Oral rehydration salts','او آر ايس','','sachet','mouth'],
-  ['VENTOLIN inhaler','Salbutamol','وينٽولن','','other','mouth'],
+  // The three that used to sit here as `other` and print a blank cell. They are
+  // on this page so the pictograms can be looked at beside the ones that were
+  // already chosen by looking, at the size they actually print.
+  ['VENTOLIN EVOHALER 100 mcg','Salbutamol','وينٽولن','','inhaler','inhale'],
+  ['PARACETAMOL supp 125 mg','Paracetamol','','','supp','rectal'],
+  ['NITRODERM patch 5 mg','Glyceryl trinitrate','','','patch','skin'],
+  ['CLOTEEN V 2%','Clotrimazole','','','cream','vaginal'],
+  // and one with NO route at all, which is every medicine a doctor types in
+  // himself, because that is the line that used to print "after food" on a
+  // thing that must never be swallowed
+  ['GLYCERIN supp','Glycerin','','','supp',''],
 ]
 
 const NAMES: [string,string,string,string][] = [
@@ -76,8 +89,11 @@ const out = document.getElementById('shots')!
         generic:g, sd, sdReviewed:true, unitSd:u, form:f as Drug['form'],
         route:r as Drug['route'] } as Drug
     })
+    /** Line 1 is ONE eye and line 2 is ONE ear, so the sheet shows the single
+     *  and the pair beside each other and they can be told apart by eye. */
+    const SIDES: (('R'|'L')|undefined)[] = ['R', 'L']
     const lines: RxLine[] = FORMS_DEMO.map((_,i)=>({
-      drugId:'f'+i, dose:{m:1,d:0,n:1}, meal:'after', days:5 } as RxLine))
+      drugId:'f'+i, dose:{m:1,d:0,n:1}, meal:'after', days:5, side: SIDES[i] } as RxLine))
     d = { ...d, visit: { ...d.visit, lines } }
   }
   const plan = await planSheets(d)

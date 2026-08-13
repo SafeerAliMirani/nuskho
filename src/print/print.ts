@@ -76,6 +76,12 @@ function settle(ms: number): Promise<void> {
  * not freeze the queue for the rest of the evening.
  */
 function printAndWait(fallback = 1500): Promise<void> {
+  // No 'onafterprint' means the event will never fire and the timeout is the
+  // ONLY governor. iOS opens an interactive print sheet a person works
+  // through slowly; wiping the print holder at 1.5 s while that sheet is
+  // still reading it prints a blank. Twenty seconds is long enough for a
+  // human and still ends the wait if the sheet was dismissed some odd way.
+  if (!('onafterprint' in window)) fallback = Math.max(fallback, 20000)
   return new Promise(resolve => {
     let done = false
     const finish = () => {
@@ -124,10 +130,6 @@ function useTitle(t: string): () => void {
 }
 
 /** Screen preview — same renderer and same fitting, so what you see is what prints. */
-export async function previewHtml(data: SlipData): Promise<string> {
-  return renderFitted(data)
-}
-
 /** Print the millimetre scale onto one of the doctor's own letterheads. */
 export function printCalibration(): Promise<void> {
   return queued(() => doPrintCalibration())

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { profile, saveProfile, APP, profileComplete } from '../profile'
 import { setRolePin } from '../roles'
+import { whyItFailed } from '../fail'
 import { paper } from '../paper'
 import { IdentityFields, PaperFields, TokenFields, LogoFields, FeeFields, useDraftProfile, useDraftPaper } from './setup/fields'
 import DrugsStep from './setup/DrugsStep'
@@ -65,7 +66,17 @@ export default function Welcome({ onDone }: { onDone: () => void }) {
       if (pin !== pin2) { setPinErr('The two entries do not match.'); setI(STEPS.indexOf('Lock')); return }
       // The wizard sets the DOCTOR's PIN. The counter is left open on purpose:
       // a locked counter on day one is a clinic that cannot issue a token.
-      await setRolePin('doctor', pin)
+      // And a refusal lands in the wizard's own red line, on the Lock step,
+      // instead of the anonymous band: the person is mid-wizard and the fix
+      // is retyping here, not reading a banner about the app in general.
+      try {
+        await setRolePin('doctor', pin)
+      } catch (e) {
+        console.error('[nuskho] the wizard could not save the PIN', e)
+        setPinErr(whyItFailed(e, 'The PIN was not saved'))
+        setI(STEPS.indexOf('Lock'))
+        return
+      }
     }
     // locked from this moment: the machine is about to change hands
     if (admin) await setAdminKey(admin, false)

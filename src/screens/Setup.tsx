@@ -13,6 +13,7 @@ import MarketPaste from './setup/MarketPaste'
 import { Note } from '../ui/Note'
 import { soundOn, setSound, play } from '../ui/sound'
 import { SPECIALTIES, seedDiagnoses, diagnosisSd } from '../data/specialty'
+import { heartbeatOn, setHeartbeatOn } from '../heartbeat'
 import { profile, saveProfile } from '../profile'
 import {
   allDoctors, addDoctor, updateDoctor, setDoctorArchived, FIRST_DOCTOR, type Doctor,
@@ -60,6 +61,26 @@ const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
  */
 const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Staff', 'Lock', 'Wifi', 'Backup']
 const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review', 'Service']
+
+/**
+ * THE PASSPHRASE ALONE USED TO OPEN THESE, AND THAT WAS THE HOLE.
+ *
+ * An engineer unlocks the passphrase on a visit, gets called away, and the
+ * unlock outlives him: whoever reached Setup next, in any role, walked into
+ * You, Doctors and Heading, which is the doctor's name, degrees and
+ * registration number on a printed medical document. Every other tab in this
+ * screen answers to can(); these answered to a flag.
+ *
+ * Now both must hold: the passphrase is open AND the sitting role carries the
+ * tab's own permission. 'identity' and 'review' belong to the Nuskho role
+ * alone, so a counter clerk with a leaked unlock gets the gate, and even a
+ * doctor gets only Doctors (his 'staff'), never his own letterhead, which is
+ * exactly the promise printed on the AdminGate itself.
+ */
+const ADMIN_NEEDS: Record<string, Parameters<typeof can>[0]> = {
+  You: 'identity', Heading: 'identity', Doctors: 'staff',
+  Market: 'review', Review: 'review', Service: 'identity',
+}
 
 export default function Setup({ onBack }: { onBack: () => void }) {
   const mine = CLINIC.filter(t => can(NEEDS[t]))
@@ -141,8 +162,9 @@ export default function Setup({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      {ADMIN.includes(tab) && !open
-        ? <AdminGate onOpen={() => redraw(n => n + 1)} />
+      {ADMIN.includes(tab) && !(open && can(ADMIN_NEEDS[tab]))
+        ? <AdminGate onOpen={() => redraw(n => n + 1)}
+                     roleBlocked={open && !can(ADMIN_NEEDS[tab])} />
         : <>
             {tab === 'Fee' && <FeeFields v={dr.v} on={on(dr.on)} />}
             {tab === 'Paper' && <><PaperFields v={pp.v} on={on(pp.on)} /><TokenFields v={pp.v} on={on(pp.on)} /></>}
@@ -233,6 +255,18 @@ function ServiceTab() {
                  onChange={e => on('clinic', e.target.value.toUpperCase())} />
           <span className="unit">Printed on their setup sheet. The unlock code is tied to
             it, so one clinic&rsquo;s number never opens another.</span>
+          {/* The heartbeat's whole vocabulary is stated in the sentence the
+              clinic reads, and heartbeat.test.ts pins the payload to exactly
+              that. Opt-in, default off, per the decision record. */}
+          <label className="check" style={{ marginTop: 10 }}>
+            <input type="checkbox" defaultChecked={heartbeatOn()}
+                   onChange={e => setHeartbeatOn(e.target.checked)} />
+            <span>Tell Nuskho this clinic is running.
+              <small>Once, when the app opens, and only when the internet happens to be
+                there: it sends this clinic code and the app version. Nothing else, ever.
+                No patient, no prescription, no count of anything. Off means Nuskho only
+                hears from you when you ring.</small></span>
+          </label>
         </div>
         <div className="fld">
           <label>Paid up to</label>
@@ -483,12 +517,27 @@ function StaffTab() {
 
 /* ------------------------------------------------------------------- gate */
 
-function AdminGate({ onOpen }: { onOpen: () => void }) {
+function AdminGate({ onOpen, roleBlocked }: { onOpen: () => void; roleBlocked?: boolean }) {
   const [pass, setPass] = useState('')
   const [bad, setBad] = useState(false)
 
   async function go() {
     if (await unlockAdmin(pass)) { onOpen() } else { setBad(true); setPass('') }
+  }
+  // The passphrase is open but the sitting role may not touch this tab. A
+  // passphrase box here would imply typing it again could help; it could not,
+  // so the honest thing is the sentence.
+  if (roleBlocked) {
+    return (
+      <div className="gate">
+        <h3>Held by Nuskho</h3>
+        <p className="hint">
+          The Nuskho passphrase is open on this machine, but this tab also needs the
+          Nuskho role at the keyboard. Sign in at the front door as <b>Nuskho</b> to
+          change what is here, or press &ldquo;lock&rdquo; above if the engineer has left.
+        </p>
+      </div>
+    )
   }
   return (
     <div className="gate">
@@ -564,6 +613,21 @@ function PinTab() {
         and save to remove that PIN.
       </p>
 
+      {/* Over plain http on a LAN address the browser removes the hashing
+          machinery, and checkRolePin fails OPEN by design (an evening must
+          never end because a hash would not parse). Every lock on this
+          machine therefore opens with any digits. That is survivable only if
+          it is said out loud, here, where the locks are set. The launcher
+          opens localhost, where none of this applies. */}
+      {typeof crypto !== 'undefined' && !crypto.subtle && (
+        <Note tone="stop" title="PINs cannot protect anything at this address">
+          This copy is open at an address where the browser refuses the PIN machinery, so
+          every role opens whatever is typed. Open Nuskho through its own launcher
+          (localhost) and the locks work again. Phones on the wifi are not affected: their
+          PINs are checked on the clinic machine, not on the phone.
+        </Note>
+      )}
+
       {/* A lock that changes shape without telling anybody is how a doctor ends
           up locked out of his own evening. Before roles there was one PIN for
           the whole app; it is the doctor's now, and this says so once. */}
@@ -594,7 +658,12 @@ function PinTab() {
         * where somebody wanted to break it is worth more than a promise on a
         * website.
         */}
-      {ROLES.map(r => {
+      {/* The Nuskho row is not offered at all, because that PIN would guard
+          nothing: the front door opens the Nuskho role with the passphrase,
+          never with checkRolePin. A box that says "saved" for a lock that is
+          never consulted is the exact unearned reassurance this project keeps
+          finding, so the row is gone and the sentence below says why. */}
+      {ROLES.filter(r => r !== 'admin').map(r => {
         const mine = mayPin(role(), r)
         return (
           <div className={'pinrow' + (mine ? '' : ' locked')} key={r}>
@@ -622,6 +691,10 @@ function PinTab() {
           </div>
         )
       })}
+      <p className="hint">
+        The Nuskho role has no PIN here on purpose: it opens with the passphrase on the
+        Lock tab, and a PIN box for it would be a lock that guards nothing.
+      </p>
       {msg && <p className={'usable' + (bad ? ' bad' : '')}>{msg}</p>}
 
       <p className="hint">
@@ -1113,6 +1186,22 @@ function BackupTab() {
           Keep it in the clinic, on a drive that does not leave the room. Do not email it,
           and do not send it to us.
         </p>
+        {/* On iOS there is no save dialog and Safari's default download
+            location is iCloud Drive. Following the instruction above would
+            then upload the whole practice to Apple while the About screen
+            promises records never leave the machine. The sentence below is
+            the difference between a promise kept and a promise quietly
+            broken by a default nobody chose. */}
+        {!('showSaveFilePicker' in window)
+          && (/iPad|iPhone|iPod/.test(navigator.userAgent)
+              || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) && (
+          <p>
+            <b>On this iPad:</b> the file goes to Safari's Downloads folder, which is
+            usually <b>iCloud Drive</b>. That sends the records to Apple's servers. Before
+            saving, change it in Settings, Safari, Downloads to <b>On My iPad</b>, or move
+            the file off iCloud straight away.
+          </p>
+        )}
         <button className="btn wide" onClick={() => save('full')}>
           Save the full backup
         </button>

@@ -159,3 +159,43 @@ export const SACHET = (w: string, h: string) => svg(w, h,
   '<path d="M5.4 6.6h13.2v13.8H5.4z" stroke-width="1.9"/>' +
   '<path d="M5.4 6.6l2.6-2.4 2.6 2.4 2.8-2.4 2.6 2.4 2.6-2.4v2.4z" fill="currentColor" stroke="none"/>' +
   '<path d="M8.6 13.4h6.8" stroke-width="1.9"/>')
+
+/**
+ * THE THREE THAT USED TO PRINT NOTHING.
+ *
+ * Drawn to be told apart by SILHOUETTE at 5 mm on a cheap laser, which is the
+ * only test that matters here: the patient who depends on these cannot read
+ * the line beside them, and a photocopy of a photocopy is what half of them
+ * will be looking at. So each one is a different outline shape rather than a
+ * different detail, and the detail inside is filled solid so it survives.
+ */
+
+/**
+ * A metered dose inhaler: the canister on top, the body, the mouthpiece out to
+ * the side. Drawn from the side rather than head on, because head on it is a
+ * rectangle and a rectangle is already the sachet.
+ */
+export const INHALER = (w: string, h: string) => svg(w, h,
+  '<rect x="9.6" y="1.4" width="5.2" height="4.6" rx="1.2" stroke-width="1.8"/>' +
+  '<rect x="7.8" y="6.4" width="8.8" height="13.4" rx="2" stroke-width="2"/>' +
+  '<path d="M7.8 12.4H3.2a1.7 1.7 0 0 0-1.7 1.7v2.8a1.7 1.7 0 0 0 1.7 1.7h4.6z" ' +
+  'fill="currentColor" stroke="none"/>')
+
+/**
+ * A suppository. A bullet with a FLAT base, and outlined rather than filled,
+ * so that at 5 mm it cannot be mistaken for the drop, which is filled, pointed
+ * at the top and round at the bottom. Those two never share a slip, but the
+ * whole point of a silhouette is that it does not depend on context.
+ */
+export const SUPP = (w: string, h: string) => svg(w, h,
+  '<path d="M12 2.2c3.7 3.4 5.5 6.5 5.5 9.8v5.4c0 2.2-1.2 3.4-5.5 3.4s-5.5-1.2-5.5-3.4v-5.4c0-3.3 1.8-6.4 5.5-9.8z" ' +
+  'stroke-width="2" stroke-linejoin="round"/>')
+
+/**
+ * A skin patch: the backing with rounded corners and the drug pad inside it,
+ * filled. That inner block is what separates it from the sachet, which is a
+ * plain rectangle torn across the top.
+ */
+export const PATCH = (w: string, h: string) => svg(w, h,
+  '<rect x="2.8" y="5" width="18.4" height="14" rx="3" stroke-width="1.9"/>' +
+  '<rect x="7.4" y="9" width="9.2" height="6" rx="1.4" fill="currentColor" stroke="none"/>')

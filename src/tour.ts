@@ -54,7 +54,7 @@ const multi = () => multiRoom()
 const COUNTER: TourStep[] = [
   {
     title: 'This screen is your whole evening',
-    sd: 'قطار',
+    sd: 'لائين',
     body: 'The list at the bottom is tonight. Everything above it is the two ways a patient joins that list.',
     at: '.qlist, .blank',
   },
@@ -79,7 +79,7 @@ const COUNTER: TourStep[] = [
   },
   {
     title: 'The fee, taken now',
-    sd: 'في',
+    sd: 'فيس',
     body: 'Received, not paid yet, or free. If it was promised and paid later, the row keeps saying due until you tap that the money came.',
     at: '.feerow',
   },
@@ -102,7 +102,7 @@ const COUNTER: TourStep[] = [
 const COMPOUNDER: TourStep[] = [
   {
     title: 'The queue, every room',
-    sd: 'قطار',
+    sd: 'لائين',
     body: 'You see the whole evening. Tap any row, in any order. The screen never forces you and it never announces anyone.',
     at: '.qlist, .blank',
   },
@@ -143,7 +143,7 @@ const COMPOUNDER: TourStep[] = [
 const DOCTOR: TourStep[] = [
   {
     title: 'Your queue',
-    sd: 'قطار',
+    sd: 'لائين',
     body: 'Tap any row in any order. The number on the left is his token, the small line under the name says where he is up to.',
     at: '.qlist, .blank',
   },

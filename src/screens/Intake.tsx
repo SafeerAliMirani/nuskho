@@ -9,6 +9,30 @@ import { printToken } from '../print/print'
 import { paper } from '../paper'
 import { can, role, currentDoctorId } from '../roles'
 import {
+/**
+ * THE SINDHI ON THIS SCREEN WAS CHECKED ON 8 AUG 2026.
+ *
+ * Read by a Sindhi speaker on Safeer's side, along with everything else the app
+ * shows or prints. What changed here, and why, because the reasoning is the
+ * useful part:
+ *
+ *   ڏٺو ويو meant only "seen". It dropped the whole point of the button, which
+ *   is that he was seen and needed NO MEDICINE. It says so now.
+ *
+ *   هليو ويو is "he left", and it is masculine, so it was wrong for half the
+ *   people it was tapped for. موٽي ويو is what a clerk actually says about
+ *   somebody who gave up waiting and went home.
+ *
+ *   منسوخ is administrative Urdu-flavoured Sindhi. Nobody at a counter with a
+ *   queue in front of them says it. They say ڪينسل.
+ *
+ *   قطار is correct and لائين is what is spoken, and this screen belongs to the
+ *   staff rather than to a grammarian.
+ *
+ * The rule: a Sindhi string is a claim in a language and does not become true
+ * by being typed carefully. It needs a speaker.
+ */
+
   activeDoctors, sittingDoctors, isSitting, setSitting, doctorById, multiRoom, visitDoctorId,
 } from '../doctors'
 import {
@@ -37,10 +61,10 @@ const NEAR = ['Larkana', 'Naudero', 'Ratodero', 'Dokri', 'Bakrani', 'Warah']
 
 /** Every way a visit can end other than a prescription. */
 const OUTCOMES: { s: VisitStatus; label: string; sd: string }[] = [
-  { s: 'seen', label: 'Seen, no medicine needed', sd: 'ڏٺو ويو' },
+  { s: 'seen', label: 'Seen, no medicine needed', sd: 'بنا دوا جي ڏٺو ويو' },
   { s: 'referred', label: 'Sent on / emergency', sd: 'اڳتي موڪليو' },
-  { s: 'left', label: 'Left without being seen', sd: 'هليو ويو' },
-  { s: 'cancelled', label: 'Cancelled', sd: 'منسوخ' },
+  { s: 'left', label: 'Left without being seen', sd: 'موٽي ويو' },
+  { s: 'cancelled', label: 'Cancelled', sd: 'ڪينسل' },
 ]
 
 const LABEL: Record<VisitStatus, string> = {
@@ -414,7 +438,7 @@ export default function Intake({ visits, onOpen, onChange }: {
       </label>
 
       <div className="fld feerow">
-        <label><IcMoney size={13} /> Fee taken now &nbsp; في</label>
+        <label><IcMoney size={13} /> Fee taken now &nbsp; فيس</label>
         <div className="row">
           <input value={amt} inputMode="numeric" placeholder="Rs"
                  onChange={e => setAmt(e.target.value.replace(/\D/g, '').slice(0, 6))} />
@@ -436,7 +460,7 @@ export default function Intake({ visits, onOpen, onChange }: {
                 try { await guard('add', 'The patient was not added', addNew) }
                 finally { setAdding(false) }
               }}>
-        {adding ? 'Adding…' : <>Add to queue &nbsp; قطار ۾ شامل ڪريو</>}
+        {adding ? 'Adding…' : <>Add to queue &nbsp; لائين ۾ شامل ڪريو</>}
       </button>
       {/* Under the button that refused, not in a corner, and it does not
           disappear on its own: the queue is the record of who paid, and a
