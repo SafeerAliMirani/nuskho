@@ -5,7 +5,7 @@
   // "assets only, no worker script, so a server route cannot quietly appear".
   // Safeer approved the heartbeat middle path (clinic code and app version,
   // opt-in, nothing else) and the super admin panel that reads it, so a
-  // script exists now — and the rule it lives under is narrower and stated at
+  // script exists now â€” and the rule it lives under is narrower and stated at
   // the top of worker/site.mjs: NOTHING ON THIS WORKER MAY EVER CARRY PATIENT
   // DATA. Two routes, a clinic code, a version string, and contract facts
   // Safeer types himself. The clinical app's only network call is pinned to
@@ -24,9 +24,9 @@
   // then paste the id it prints into the block below and remove the comment
   // marks. Until then the site deploys and serves exactly as before; /hb and
   // /sa answer 503 and store nothing.
-  // "kv_namespaces": [
-  //   { "binding": "NKHB", "id": "PASTE-THE-ID-HERE" }
-  // ],
+  "kv_namespaces": [
+    { "binding": "NKHB", "id": "67dfa2ff479840a6813694b48a08eb3f" }
+  ],
   // The WhatsApp number the extension button opens. The same number the
   // website already publishes, so nothing new is disclosed by it.
   "vars": { "WA": "923333368189" },
