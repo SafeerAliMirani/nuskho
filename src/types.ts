@@ -115,6 +115,23 @@ export interface RxLine {
   days: number
   note?: string          // free line for forms that do not fit the grid
   /**
+   * SOS — "when needed". When true the m/d/e/n grid and `days` are ignored: the
+   * slip prints the prefix and reason instead of a schedule, and the total the
+   * pharmacy and chemist read is `supply`, not a perDay x days sum. Absent means
+   * a normal scheduled line, exactly as every prescription before this existed.
+   */
+  sos?: boolean
+  /**
+   * The reason chosen, FROZEN onto the line like the drug snapshot: `en` for the
+   * record, `sd` for the slip. A blank `sd` prints the English, same rule as a
+   * medicine whose Sindhi is unreviewed. Free text goes in `en` with `sd` empty.
+   */
+  sosReason?: { en: string; sd: string }
+  /** how many units to dispense for an SOS line, since there is no days sum */
+  supply?: number
+  /** optional cap, printed as "do not take more than N a day" */
+  sosMax?: number
+  /**
    * WHICH EYE, OR WHICH EAR. Absent means both.
    *
    * On the LINE and not on the medicine, and that distinction is the whole

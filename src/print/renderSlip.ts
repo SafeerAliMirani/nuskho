@@ -17,6 +17,7 @@ import { SUNRISE, SUN, SUNSET, MOON, TAB, HALF, CAP, SPOON, PLATE, CAL, DROP,
          EYE, EAR, NOSE, TUBE, SACHET, adviceIcon } from './icons'
 import { qrSvgSafe } from './qr'
 import { course, courseUnitSd } from '../course'
+import { SOS_PREFIX, sosMaxLine } from '../data/sos'
 import { formSdFor, formEnFor, doseSdFor, doseEnFor1, routeSdFor, routeEnFor, countable,
          swallowed, sideMatters, sideSdFor, sideEnFor, timeSdFor, type TimeKey } from '../data/forms'
 import { filled } from '../data/vitals'
@@ -383,6 +384,26 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean, evening: bool
    * total, with a word above it saying what to do, and it has to be measured
    * for the height it costs first.
    */
+  // SOS / "when needed": no schedule cells and no day count. The reason spans the
+  // dose and food columns (colspan keeps the fixed table grid intact), and the
+  // count cell carries the supply the pharmacy hands over.
+  if (line.sos) {
+    const cols = evening ? 5 : 4
+    const r = line.sosReason
+    const reason = r ? (r.sd || r.en) : ''
+    const maxLine = line.sosMax ? `<div class="sd sosmax">${esc(sosMaxLine(line.sosMax))}</div>` : ''
+    return `<tr>
+      <td class="noc">${i}</td>
+      <td class="nmcell"><div class="nmg">
+        <div class="brand">${esc(m.brand)} ${esc(m.strength)}</div>
+        <div class="gen">${esc(m.generic)}</div>
+        ${nameSdLine(m)}
+      </div></td>
+      <td class="soscell" colspan="${cols}"><div class="sosw sd" dir="rtl">${esc(SOS_PREFIX)}، <bdi>${esc(reason)}</bdi></div>${maxLine}</td>
+      <td class="dycell">${total}</td>
+    </tr>`
+  }
+
   const ticks = ''
 
   /**
@@ -696,7 +717,7 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
           // whole tests-and-advice row; side by side a test costs 3.8mm. The
           // wrapper is what lets them share a line and, when a long test name
           // will not allow it, wrap instead of overflowing the box.
-          return `<div class="tst"><div class="bxk"></div><div class="tstw"><div class="sd">${esc(sd || '')}</div><div class="en">${esc(en)}</div></div></div>`
+          return `<div class="tst"><div class="bxk"></div><div class="tstw">${sd ? `<div class="sd">${esc(sd)}</div>` : ''}<div class="en">${esc(en)}</div></div></div>`
         }).join('')
       + '</div></div>'
     : ''
@@ -765,19 +786,19 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
     </div>` : ''}
   </div>
   <div class="foot">
-    <div class="fbar">
+    <div class="fbar" dir="ltr">
       <div class="keep">
         <span class="sd">هي پرچو ساڻ کڻي اچو.</span>
         <span class="en">Bring this slip next time.</span>
-        ${dr.phone ? `<span class="appt">Appointments <span class="sd">وقت وٺڻ لاءِ</span> ${esc(dr.phone)}</span>` : ''}
+        ${dr.phone ? `<span class="appt">Appointments <span class="sd">وقت وٺڻ لاءِ</span> <bdi>${esc(dr.phone)}</bdi></span>` : ''}
       </div>
-      ${visit.nextVisit ? `<span class="nextv">Next visit <span class="sd">ايندڙ ملاقات</span>: <b>${esc(visit.nextVisit)}</b></span>` : ''}
+      ${visit.nextVisit ? `<span class="nextv">Next visit <span class="sd">ايندڙ ملاقات</span>: <bdi><b>${esc(visit.nextVisit)}</b></bdi></span>` : ''}
       ${dr.showSign ? `<div class="sign">
         <span class="rule"></span>
         <span class="lbl">Signature &amp; stamp <span class="sd">صحيح ۽ مُهر</span></span>
       </div>` : ''}
     </div>
-    <div class="fine">
+    <div class="fine" dir="ltr">
       <div class="sd">سڀ دوائون پوريون ڪريو.</div>
       <div>Finish the full course.</div>
     </div>

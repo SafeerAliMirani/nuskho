@@ -531,7 +531,7 @@ async function buildRx(): Promise<WireRx> {
       const c = course(l)
       return {
         brand: l.snap?.brand ?? '?', strength: l.snap?.strength ?? '',
-        n: c.n, unit: c.unit, days: l.days, given: l.given,
+        n: c.n, unit: c.unit, days: l.sos ? 0 : l.days, given: l.given,
       }
     }),
   }))
@@ -724,7 +724,7 @@ async function applyIntent(
           const c = course(l)
           return {
             brand: l.snap?.brand ?? '?', strength: l.snap?.strength ?? '',
-            n: c.n, unit: c.unit, days: l.days, given: l.given,
+            n: c.n, unit: c.unit, days: l.sos ? 0 : l.days, given: l.given,
           }
         }),
       },
@@ -900,6 +900,18 @@ async function applyIntent(
       const note = clip(rl.note, 160)
       if (note) line.note = note
       if (rl.side === 'R' || rl.side === 'L') line.side = rl.side
+      // SOS crosses the wire too. Same clamping rule as the doses: a phone is
+      // untrusted, so the reason is clipped and the numbers are bounded before
+      // the record holder writes them.
+      if (rl.sos === true) {
+        line.sos = true
+        const sr = (rl.sosReason && typeof rl.sosReason === 'object') ? rl.sosReason as Record<string, unknown> : null
+        if (sr) line.sosReason = { en: clip(sr.en, 60), sd: clip(sr.sd, 80) }
+        const sup = Math.round(Number(rl.supply) || 0)
+        if (sup > 0) line.supply = Math.min(1000, sup)
+        const mx = Math.round(Number(rl.sosMax) || 0)
+        if (mx > 0) line.sosMax = Math.min(99, mx)
+      }
       lines.push(line)
     }
     const list = (x: unknown, n: number, len: number) =>

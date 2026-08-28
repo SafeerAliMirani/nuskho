@@ -39,6 +39,22 @@ export function course(l: RxLine, snap?: RxSnap): { n: number; unit: string } {
   const form = m?.form ?? 'tab'
 
   /**
+   * SOS / "when needed" has no schedule to multiply out. The number the pharmacy
+   * ticks and the chemist reads is the doctor's supply, in the medicine's own
+   * unit. Placed before the syrup and drop branches so it wins for every form.
+   */
+  if (l.sos) {
+    const unit = form === 'cap' ? 'capsules'
+      : form === 'sachet' ? 'sachets'
+      : form === 'supp' ? 'supp'
+      : form === 'patch' ? 'patches'
+      : form === 'syr' ? 'ml'
+      : (form === 'drop' || form === 'cream' || form === 'inhaler' || form === 'other') ? ''
+      : 'tablets'
+    return { n: l.supply ?? 0, unit }
+  }
+
+  /**
    * A SYRUP IS COUNTED IN MILLILITRES, BECAUSE THAT IS HOW BOTTLES ARE SOLD.
    *
    * Safeer chose this over the number of spoons: one spoon twice a day for five

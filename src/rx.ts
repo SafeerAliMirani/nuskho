@@ -29,9 +29,12 @@ import { doctorById } from './doctors'
 import { patientCode } from './code'
 import { destinationEn, destinationSd } from './refer'
 
-/** A line with no dose at all. The screen bumps it; the printer refuses it. */
+/** A line with no dose at all. The screen bumps it; the printer refuses it.
+ *  An SOS line carries no schedule on purpose, so it is judged by its reason
+ *  instead: "when needed, for X" is a complete instruction, an SOS line with no
+ *  reason is the empty one. */
 export const lineIsEmpty = (l: RxLine): boolean =>
-  !l.dose.m && !l.dose.d && !l.dose.e && !l.dose.n
+  l.sos ? !l.sosReason?.en : (!l.dose.m && !l.dose.d && !l.dose.e && !l.dose.n)
 
 /**
  * Is this prescription fit for paper? Returns the index of the first offending

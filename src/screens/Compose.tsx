@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, uid, nextToken, doctorDrugs, usageCounts, lastVisit, patientCode, similarDrugs, grantDiscount, listSets, saveSet, deleteSet } from '../db'
 import { formulary, labTests, adviceList } from '../data/formulary'
+import { sosReasons } from '../data/sos'
 import { seedDiagnoses } from '../data/specialty'
 import Vitals from '../ui/Vitals'
 import { profile } from '../profile'
@@ -638,10 +639,10 @@ export default function Compose({ visitId, onDone, onBack }: {
         {/* Vitals the compounder already took, and anything the doctor runs on a
             strip machine while the patient is sitting there. Both print. */}
         <Vitals which="vital" value={visit.vitals ?? {}}
-                onChange={saveVitals}
+                onChange={saveVitals} startOpen
                 title="Checked before you saw them" />
         <Vitals which="test" value={visit.vitals ?? {}}
-                onChange={saveVitals} />
+                onChange={saveVitals} startOpen />
 
         {/* THE DESK. On a wide screen the prescription grows on the left while
             the picking surface stays put on the right, so adding the fourth
@@ -688,6 +689,7 @@ export default function Compose({ visitId, onDone, onBack }: {
                   printed when a line actually uses it, because there the width
                   is real and measured. */}
               <div className="dosegrid">
+                {!l.sos && <>
                 {TIMES.map(k => (
                   <button key={k} className={`dbtn ${l.dose[k] ? 'on' : ''}`}
                           onClick={() => setLine(i, { dose: { ...l.dose, [k]: cycle(l.dose[k] ?? 0) } })}>
@@ -720,7 +722,35 @@ export default function Compose({ visitId, onDone, onBack }: {
                   <div className="v">{l.days} d</div>
                   <button onClick={() => setLine(i, { days: Math.min(30, l.days + 1) })}>+</button>
                 </div>
+                </>}
+                {l.sos && (
+                  <div className="stp">
+                    <button onClick={() => setLine(i, { supply: Math.max(0, (l.supply ?? 0) - 1) })}>−</button>
+                    <div className="v">{l.supply ?? 0} give</div>
+                    <button onClick={() => setLine(i, { supply: Math.min(200, (l.supply ?? 0) + 1) })}>+</button>
+                  </div>
+                )}
+                <button className={`dbtn sosb ${l.sos ? 'on' : ''}`}
+                        onClick={() => setLine(i, l.sos
+                          ? { sos: false, sosReason: undefined, supply: undefined, sosMax: undefined }
+                          : { sos: true, dose: { m: 0, d: 0, n: 0 }, supply: l.supply ?? 10 })}>
+                  SOS<small>{l.sos ? 'SCHEDULE' : 'WHEN NEEDED'}</small>
+                </button>
               </div>
+              {l.sos && (
+                <div className="chips sosrow">
+                  {sosReasons.map(r => (
+                    <button key={r.key} className={`chip ${l.sosReason?.en === r.en ? 'on' : ''}`}
+                            onClick={() => setLine(i, { sosReason: { en: r.en, sd: r.sd } })}>
+                      {r.en.replace(/^for /, '')}
+                    </button>
+                  ))}
+                  <label className="sosmaxin">max/day&nbsp;
+                    <input inputMode="numeric" maxLength={2} value={l.sosMax ?? ''}
+                           onChange={e => setLine(i, { sosMax: +e.target.value.replace(/\D/g, '') || undefined })} />
+                  </label>
+                </div>
+              )}
               {empty && <div className="badmsg">No dose set. This would print with no instruction.</div>}
               {/* THE SAME MOLECULE UNDER TWO BRANDS.
                   The duplicate check above this one matches on the medicine's

@@ -69,7 +69,13 @@ export const formulary: Drug[] = [
 // feature deliberately not built. The doctor's own saved sets are the real
 // version of this idea and they live in db.ts.
 
-/** stored on the visit as 'en|sd' */
+/**
+ * stored on the visit as 'en|sd'. A blank sd prints the English name only, the
+ * same rule as a medicine whose Sindhi is not reviewed. The imaging and
+ * investigations below were reviewed and translated by Safeer on 20 Aug 2026;
+ * the blank ones are biochemical tests known everywhere by their English
+ * acronyms, so they print English on purpose.
+ */
 export const labTests = [
   { en: 'CBC', sd: 'رت جي مڪمل ٽيسٽ' },
   { en: 'Blood sugar F/R', sd: 'بلڊ شگر' },
@@ -77,6 +83,53 @@ export const labTests = [
   { en: 'LFT', sd: 'جگر جي ٽيسٽ' },
   { en: 'RFT', sd: 'بڪين جي ٽيسٽ' },
   { en: 'Chest X-ray', sd: 'ڇاتيءَ جو ايڪسري' },
+  // Ultrasound
+  { en: 'Ultrasound whole abdomen', sd: 'الٽراسائونڊ پيٽ' },
+  { en: 'Ultrasound KUB (kidneys, ureters, bladder)', sd: 'الٽراسائونڊ گُردا ۽ مثانو' },
+  { en: 'Ultrasound pelvis', sd: 'الٽراسائونڊ پيڙو' },
+  { en: 'Transvaginal ultrasound (TVS)', sd: 'ٽي وي ايس الٽراسائونڊ' },
+  { en: 'Obstetric ultrasound (pregnancy)', sd: 'حمل جو الٽراسائونڊ' },
+  { en: 'Follicular monitoring scan', sd: 'فوليڪيولر مانيٽرنگ' },
+  { en: 'Ultrasound scrotum', sd: 'خصين جو الٽراسائونڊ' },
+  { en: 'Ultrasound thyroid', sd: 'ڳلي جو الٽراسائونڊ' },
+  { en: 'Ultrasound breast', sd: 'ڇاتيءَ جو الٽراسائونڊ' },
+  // X-ray
+  { en: 'X-ray KUB', sd: 'ايڪسري ڪي يو بي' },
+  { en: 'X-ray pelvis', sd: 'پيڙي جو ايڪسري' },
+  { en: 'X-ray lumbar spine', sd: 'چيلهه جو ايڪسري' },
+  { en: 'HSG (hysterosalpingogram)', sd: 'ايڇ ايس جي' },
+  // CT and MRI
+  { en: 'CT brain', sd: 'سي ٽي دماغ' },
+  { en: 'CT abdomen and pelvis', sd: 'سي ٽي پيٽ ۽ پيڙو' },
+  { en: 'CT KUB', sd: 'سي ٽي ڪي يو بي' },
+  { en: 'MRI brain', sd: 'ايم آر آئي دماغ' },
+  { en: 'MRI pelvis', sd: 'ايم آر آئي پيڙو' },
+  { en: 'MRI lumbar spine', sd: 'ايم آر آئي چيلهه' },
+  // Heart and other
+  { en: 'ECG', sd: 'اي سي جي' },
+  { en: 'Echocardiography', sd: 'ايڪو' },
+  // Fertility and hormones (English acronyms print as-is)
+  { en: 'Semen analysis', sd: 'مني جي ٽيسٽ' },
+  { en: 'FSH', sd: '' },
+  { en: 'LH', sd: '' },
+  { en: 'Prolactin', sd: '' },
+  { en: 'TSH', sd: '' },
+  { en: 'AMH', sd: '' },
+  { en: 'Estradiol (E2)', sd: '' },
+  { en: 'Progesterone', sd: '' },
+  { en: 'Testosterone', sd: '' },
+  { en: 'Beta-hCG (pregnancy blood test)', sd: '' },
+  // General labs
+  { en: 'HbA1c', sd: '' },
+  { en: 'Lipid profile', sd: '' },
+  { en: 'Serum creatinine', sd: '' },
+  { en: 'Blood group', sd: 'رت جو گروپ' },
+  { en: 'HBsAg', sd: '' },
+  { en: 'Anti-HCV', sd: '' },
+  { en: 'Thyroid profile (T3 T4 TSH)', sd: '' },
+  { en: 'Serum calcium', sd: '' },
+  { en: 'Vitamin D', sd: '' },
+  { en: 'Stool R/E', sd: 'وڏي پيشاب جي ٽيسٽ' },
 ]
 
 export const adviceList = [

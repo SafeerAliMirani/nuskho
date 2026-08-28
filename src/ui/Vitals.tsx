@@ -24,11 +24,12 @@ import { IcCheck } from './art'
  */
 const MINE_FOR = 1500
 
-export default function Vitals({ which, value, onChange, title }: {
+export default function Vitals({ which, value, onChange, title, startOpen }: {
   which: 'vital' | 'test'
   value: Record<string, string>
   onChange: (v: Record<string, string>) => void
   title?: string
+  startOpen?: boolean
 }) {
   const defs = which === 'vital' ? VITALS : INSTANT
 
@@ -81,9 +82,13 @@ export default function Vitals({ which, value, onChange, title }: {
    * says "+ Add blood pressure, weight, temperature" over a blood pressure that
    * already exists. It was on the paper and nowhere he could see it.
    *
-   * Open by hand OR because there is something in it, checked every render.
+   * Open by default where the doctor works (Safeer, 20 Aug 2026): a section
+   * hidden behind a plus was being missed and left unfilled. The doctor's
+   * screen passes startOpen so both boxes show open; the compact desk queue
+   * leaves it off and keeps the plus. A reading already in it keeps it open
+   * regardless, as before.
    */
-  const [opened, setOpened] = useState(false)
+  const [opened, setOpened] = useState(startOpen ?? false)
   const open = opened || any > 0
 
   if (!open) {

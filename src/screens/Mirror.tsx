@@ -25,6 +25,7 @@ import { searchDictionary, dictLine, type DictEntry } from '../data/dictionary'
 import { sideMatters, TIMES } from '../data/forms'
 import { sameMolecule } from '../data/who'
 import { labTests, adviceList } from '../data/formulary'
+import { sosReasons } from '../data/sos'
 import { lineIsEmpty } from '../rx'
 import type { SlipData } from '../print/renderSlip'
 import type { RxLine } from '../types'
@@ -906,6 +907,7 @@ function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
         <button className="x" onClick={onRemove}>×</button>
       </div>
       <div className="dosegrid">
+        {!l.sos && <>
         {TIMES.map(k => (
           <button key={k} className={`dbtn mdr-dose-${k}${l.dose[k] ? ' on' : ''}`}
                   onClick={() => onChange({ dose: { ...l.dose, [k]: cycle(l.dose[k] ?? 0) } })}>
@@ -932,13 +934,43 @@ function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
           <div className="v">{l.days} d</div>
           <button onClick={() => onChange({ days: Math.min(30, l.days + 1) })}>+</button>
         </div>
+        </>}
+        {l.sos && (
+          <div className="stp">
+            <button onClick={() => onChange({ supply: Math.max(0, (l.supply ?? 0) - 1) })}>−</button>
+            <div className="v">{l.supply ?? 0} give</div>
+            <button onClick={() => onChange({ supply: Math.min(200, (l.supply ?? 0) + 1) })}>+</button>
+          </div>
+        )}
+        <button className={`dbtn sosb${l.sos ? ' on' : ''}`}
+                onClick={() => onChange(l.sos
+                  ? { sos: false, sosReason: undefined, supply: undefined, sosMax: undefined }
+                  : { sos: true, dose: { m: 0, d: 0, n: 0 }, supply: l.supply ?? 10 })}>
+          SOS<small>{l.sos ? 'SCHEDULE' : 'NEEDED'}</small>
+        </button>
       </div>
+      {!l.sos && (
       <div className="chips mdr-dayschips">
         {[3, 5, 7, 10, 15, 30].map(n => (
           <button key={n} className={'chip mdr-dayschip' + (l.days === n ? ' on' : '')}
                   onClick={() => onChange({ days: n })}>{n}</button>
         ))}
       </div>
+      )}
+      {l.sos && (
+        <div className="chips sosrow">
+          {sosReasons.map(r => (
+            <button key={r.key} className={`chip ${l.sosReason?.en === r.en ? 'on' : ''}`}
+                    onClick={() => onChange({ sosReason: { en: r.en, sd: r.sd } })}>
+              {r.en.replace(/^for /, '')}
+            </button>
+          ))}
+          <label className="sosmaxin">max/day&nbsp;
+            <input inputMode="numeric" maxLength={2} value={l.sosMax ?? ''}
+                   onChange={e => onChange({ sosMax: +e.target.value.replace(/\D/g, '') || undefined })} />
+          </label>
+        </div>
+      )}
       <div className="fld" style={{ marginTop: 8, marginBottom: 0 }}>
         <input value={l.note ?? ''} maxLength={160} placeholder="note, optional"
                onChange={e => onChange({ note: e.target.value || undefined })} />
