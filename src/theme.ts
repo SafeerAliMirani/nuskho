@@ -15,13 +15,15 @@
 export type Theme = 'light' | 'dark' | 'device'
 const KEY = 'nk-theme'
 
-/* English only until the three Sindhi words are reviewed; they are queued in
-   the project's sindhi-to-translate list, and nothing here prints. */
-export const THEMES: { id: Theme; en: string }[] = [
-  { id: 'light',  en: 'Light' },
-  { id: 'dark',   en: 'Dark' },
-  { id: 'device', en: 'Device' },
+/* Sindhi reviewed 6 Sep 2026 (Safeer, via the same review that approved the
+   SOS strings). Screen labels only; nothing here prints. */
+export const THEMES: { id: Theme; en: string; sd: string }[] = [
+  { id: 'light',  en: 'Light',  sd: 'روشن' },
+  { id: 'dark',   en: 'Dark',   sd: 'اونداهو' },
+  { id: 'device', en: 'Device', sd: 'ڊوائيس' },
 ]
+/** The heading over the switch in Setup, both scripts. */
+export const THEME_LABEL = { en: 'This screen: light or dark', sd: 'هيءَ اسڪرين: روشن يا اونداهي' }
 
 export function theme(): Theme {
   try {
