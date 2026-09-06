@@ -26,6 +26,7 @@ import { startPresence, onSignal } from './ui/bus'
 import { isDemo } from './version'
 import { clearDemo, touchDemo } from './demo'
 import type { Visit } from './types'
+import { ThemeRow } from './ui/ThemeRow'
 
 export default function App() {
   // A phone in the building never sees the app below: it is a mirror, a door
@@ -320,6 +321,11 @@ function Clinic() {
                   }}>
                     <IcInfo size={16} /> About &amp; help <small>version, what it promises, report a problem</small>
                   </button>
+
+                  {/* The screen's own light. A row, not a button: picking one
+                      does not close the menu, so he sees the change before
+                      he leaves. */}
+                  <ThemeRow />
 
                   <button onClick={() => { setMenu(false); signOut(); setStats(false); setSetup(false); setVisitId(null); setLocked(true) }}>
                     <IcLock size={16} /> Sign out <small>hand this computer to someone else</small>

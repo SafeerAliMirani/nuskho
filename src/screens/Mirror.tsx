@@ -903,7 +903,7 @@ function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
   return (
     <div className="line">
       <div className="hd">
-        <div><b>{i + 1}. {brand} {strength}</b><small>{generic}</small></div>
+        <div><b><span className="ln">{i + 1}</span>{brand} {strength}</b><small>{generic}</small></div>
         <button className="x" onClick={onRemove}>×</button>
       </div>
       <div className="dosegrid">
@@ -1266,12 +1266,15 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
         <>
           <button className="btn ghost mdr-back" onClick={back} style={{ marginBottom: 12 }}>← Queue</button>
 
-          <div className="who">
-            {visit.patient.name}
-            <span>Token {visit.token} · No. {visit.patient.code}
-              {visit.patient.age ? ` · ${visit.patient.age}` : ''}
-              {visit.patient.sex ? ` · ${visit.patient.sex}` : ''}
+          <div className="who ptcard">
+            <span className="tk-badge" aria-label={`Token ${visit.token}`}>{visit.token}</span>
+            <span className="pt-main">{visit.patient.name}
+              <span>No. {visit.patient.code}
+                {visit.patient.age ? ` · ${visit.patient.age}` : ''}
+                {visit.patient.sex ? ` · ${visit.patient.sex}` : ''}
+              </span>
             </span>
+            <IcUser size={22} className="pt-ic" />
           </div>
           {visit.prev && (visit.prev.diagnosis || visit.prev.brands.length > 0) && (
             <div className="prev">

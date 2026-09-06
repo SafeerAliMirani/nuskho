@@ -48,8 +48,13 @@
 
   --line:#e3eae7;
   --line-2:#f0f4f2;
+  --line-3:#c2d5cf;       /* a border under the pointer */
   --bg:#eef2f0;
   --card:#ffffff;
+  --card-2:#f7faf9;       /* the bottom of a card's gradient */
+  --card-hi:rgba(255,255,255,1);  /* the highlight along a card's top edge */
+  --wash:#f2f6f4;
+  --on-g:#ffffff;         /* text on the brand green */
 
   /* Two families doing two jobs. See ui/type.css. */
   --display:'NKDisplay','NKText',-apple-system,'Segoe UI',system-ui,Arial,sans-serif;
@@ -94,6 +99,67 @@
   --spring:cubic-bezier(.34,1.4,.5,1);
 
   --header:56px;
+}
+
+/* ---------------------------------------------------------------- 1b. dark
+   The same tokens, decided again for a room with the lights off. Nothing
+   below this line names a colour that is not a token, so this block is the
+   whole of dark mode: components do not know which one they are in.
+
+   Two ways in. `[data-theme=dark]` is the doctor's own choice, saved on the
+   device; the media query is what applies when he has chosen "follow the
+   device". `[data-theme=light]` wins over the device so the choice sticks.
+   The printed slip is not touched: print.css has its own colours and the
+   slip is rendered into its own document. */
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --g:#1f7f62; --g-700:#0f5c4a; --g-600:#2b8f74; --g-500:#3fa88b;
+  --g-100:#1c3129; --g-50:#16241f;
+  --gold:#d9b23a; --gold-100:#2e2710;
+  --ink:#e8efec; --ink-2:#b9c6c1; --mut:#8fa09a; --faint:#5f6f6a;
+  --line:#27342f; --line-2:#1f2a27; --line-3:#35463f;
+  --bg:#0f1614; --card:#182220; --card-2:#151e1c; --card-hi:rgba(255,255,255,.05);
+  --wash:#131c19; --on-g:#ffffff; --have-ink:#a9dcc9;
+  --warn:#e0b45a; --warn-bg:#2a2210; --warn-line:#4a3b14;
+  --bad:#f08a72;  --bad-bg:#2b1712;  --bad-line:#4d261c;
+  --adm:#b8a6e8;  --adm-bg:#1f1a2e;  --adm-line:#3a2f5a;
+  --sh-1:0 1px 1.5px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.3);
+  --sh-2:0 1px 2px rgba(0,0,0,.35), 0 6px 14px -4px rgba(0,0,0,.5);
+  --sh-3:0 2px 4px rgba(0,0,0,.4), 0 16px 34px -8px rgba(0,0,0,.6);
+  --sh-4:0 4px 10px rgba(0,0,0,.5), 0 34px 70px -14px rgba(0,0,0,.8);
+  --ring:0 0 0 1px rgba(255,255,255,.06);
+  --i-fill:#132132; --i-line:#25405e; --i-text:#9cc4ec; --i-solid:#5b9be0;
+  --k-fill:#12261c; --k-line:#1f4a34; --k-text:#8fd6b0; --k-solid:#3fb27f;
+  --w-fill:#2a2210; --w-line:#4a3b14; --w-text:#e6c46a; --w-solid:#c9a02d;
+  --e-fill:#2b1712; --e-line:#4d261c; --e-text:#f2a48f; --e-solid:#e0654a;
+  --p-fill:#1f1a2e; --p-line:#3a2f5a; --p-text:#c9b8f0; --p-solid:#9a86d6;
+  --n-fill:#1a2422; --n-line:#2b3834; --n-text:#aebbb6;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+  color-scheme:dark;
+  --g:#1f7f62; --g-700:#0f5c4a; --g-600:#2b8f74; --g-500:#3fa88b;
+  --g-100:#1c3129; --g-50:#16241f;
+  --gold:#d9b23a; --gold-100:#2e2710;
+  --ink:#e8efec; --ink-2:#b9c6c1; --mut:#8fa09a; --faint:#5f6f6a;
+  --line:#27342f; --line-2:#1f2a27; --line-3:#35463f;
+  --bg:#0f1614; --card:#182220; --card-2:#151e1c; --card-hi:rgba(255,255,255,.05);
+  --wash:#131c19; --on-g:#ffffff; --have-ink:#a9dcc9;
+  --warn:#e0b45a; --warn-bg:#2a2210; --warn-line:#4a3b14;
+  --bad:#f08a72;  --bad-bg:#2b1712;  --bad-line:#4d261c;
+  --adm:#b8a6e8;  --adm-bg:#1f1a2e;  --adm-line:#3a2f5a;
+  --sh-1:0 1px 1.5px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.3);
+  --sh-2:0 1px 2px rgba(0,0,0,.35), 0 6px 14px -4px rgba(0,0,0,.5);
+  --sh-3:0 2px 4px rgba(0,0,0,.4), 0 16px 34px -8px rgba(0,0,0,.6);
+  --sh-4:0 4px 10px rgba(0,0,0,.5), 0 34px 70px -14px rgba(0,0,0,.8);
+  --ring:0 0 0 1px rgba(255,255,255,.06);
+  --i-fill:#132132; --i-line:#25405e; --i-text:#9cc4ec; --i-solid:#5b9be0;
+  --k-fill:#12261c; --k-line:#1f4a34; --k-text:#8fd6b0; --k-solid:#3fb27f;
+  --w-fill:#2a2210; --w-line:#4a3b14; --w-text:#e6c46a; --w-solid:#c9a02d;
+  --e-fill:#2b1712; --e-line:#4d261c; --e-text:#f2a48f; --e-solid:#e0654a;
+  --p-fill:#1f1a2e; --p-line:#3a2f5a; --p-text:#c9b8f0; --p-solid:#9a86d6;
+  --n-fill:#1a2422; --n-line:#2b3834; --n-text:#aebbb6;
+  }
 }
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -218,12 +284,15 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
    It is feedback, not decoration: a tap that shows nothing gets tapped twice. */
 .btn:active:not(:disabled){transform:translateY(1px) scale(.988);box-shadow:none}
 .btn.ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--line);box-shadow:none}
-.btn.ghost:hover:not(:disabled){background:var(--g-50);border-color:#c2d5cf}
+.btn.ghost:hover:not(:disabled){background:var(--g-50);border-color:var(--line-3)}
 .btn.wide{width:100%}
-.btn:disabled{opacity:.42;cursor:not-allowed}
+/* Disabled is a state to READ, not a ghost: the label stays legible, the
+   colour says "not yet". */
+.btn:disabled{background:var(--line-2);color:var(--mut);box-shadow:none;cursor:not-allowed}
+.btn.ghost:disabled{background:var(--card);color:var(--faint);border-color:var(--line)}
 .btn.warn{background:var(--bad);color:#fff}
 .btn.warn:hover:not(:disabled){background:#8d2815}
-.btn.warn:disabled{background:#d8b3aa}
+.btn.warn:disabled{background:#d8b3aa;color:#fff}
 
 /* These are not decoration. "close without a prescription", "print the token
    again" and "cancel that" are the counter's real actions and they were about
@@ -248,10 +317,10 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
   transition:background var(--fast) var(--ease),border-color var(--fast) var(--ease),
              color var(--fast) var(--ease),transform var(--fast) var(--ease);
 }
-.chip:hover{border-color:#c2d5cf;background:var(--g-50)}
+.chip:hover{border-color:var(--line-3);background:var(--g-50)}
 .chip:active{transform:scale(.97)}
 .chip.on{background:var(--g);border-color:var(--g);color:#fff;box-shadow:var(--sh-2)}
-.chip.have{background:var(--g-100);border-color:#bcd6cd;color:var(--g-700)}
+.chip.have{background:var(--g-100);border-color:var(--line-3);color:var(--have-ink,var(--g-700))}
 .chip.mine{border-color:var(--g);color:var(--g);font-weight:700}
 .chip small{display:block;font-weight:400;font-size:var(--t-xs);opacity:.66;margin-top:1px}
 
@@ -275,7 +344,7 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
              transform var(--fast) var(--ease);
   animation:nk-rise var(--mid) var(--ease) backwards;
 }
-.qrow:hover{border-color:#c2d5cf;box-shadow:var(--sh-2);transform:translateY(-1px)}
+.qrow:hover{border-color:var(--line-3);box-shadow:var(--sh-2);transform:translateY(-1px)}
 .qrow:active{transform:translateY(0) scale(.995)}
 /* the list arrives in order rather than all at once. 30ms apart is felt, not seen */
 .qwrap:nth-child(1) .qrow{animation-delay:0ms}
@@ -365,7 +434,7 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   transition:background var(--fast) var(--ease),border-color var(--fast) var(--ease),
              color var(--fast) var(--ease)}
-.dbtn:hover{border-color:#c2d5cf;background:var(--g-50)}
+.dbtn:hover{border-color:var(--line-3);background:var(--g-50)}
 .dbtn small{font-size:9px;font-weight:700;letter-spacing:.4px}
 .dbtn.on{background:var(--g);border-color:var(--g);color:#fff}
 .stp{display:flex;border:1.5px solid var(--line);border-radius:var(--r2);overflow:hidden;background:var(--card)}
@@ -375,9 +444,28 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .stp .v{min-width:64px;height:48px;line-height:48px;text-align:center;font-weight:700;font-size:15px;
   border-left:1.5px solid var(--line);border-right:1.5px solid var(--line)}
 
+/* SOS on the dose row. One control among the others, the same box and the
+   same height, and the caption is set a hair tighter so WHEN NEEDED fits the
+   button rather than spilling out of it. */
+.dbtn.sosb{min-width:88px;padding:0 var(--s2)}
+.dbtn.sosb small{letter-spacing:.2px;font-size:8.5px}
+.sosrow{margin-top:var(--s2);align-items:center}
+.sosmaxin{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-sm);font-weight:700;
+  color:var(--mut);text-transform:uppercase;letter-spacing:var(--tr-wide)}
+.sosmaxin input{width:64px;height:40px;border:1.5px solid var(--line);border-radius:var(--r2);
+  padding:0 var(--s2);text-align:center;font-size:16px;font-weight:700;background:var(--card);
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.sosmaxin input:focus{outline:0;border-color:var(--g-500);box-shadow:0 0 0 3.5px rgba(43,143,116,.15)}
+/* "save these as a set" is a real text box, not a bare browser default */
+.saveset input{border:1.5px solid var(--line);border-radius:var(--r2);padding:11px var(--s3);
+  font-size:15px;background:var(--card);color:var(--ink);min-width:0}
+.saveset input::placeholder{color:var(--faint)}
+.saveset input:focus{outline:0;border-color:var(--g-500);box-shadow:0 0 0 3.5px rgba(43,143,116,.15)}
+.saveset .btn{white-space:nowrap}
+
 .sticky{position:sticky;bottom:0;z-index:10;
-  background:linear-gradient(180deg,rgba(244,247,246,0),var(--bg) 26%);
-  padding:var(--s4) 0 var(--s2);display:flex;gap:var(--s3);flex-wrap:wrap}
+  background:linear-gradient(180deg,transparent,var(--bg) 14px);
+  padding:var(--s5) 0 var(--s2);display:flex;gap:var(--s3);flex-wrap:wrap}
 /* Anything the bar has to SAY goes above the button on its own full line, not
    beside it. A sentence squeezed into the gap wraps onto two lines and the
    whole bar grows upward over the last medicine, which is the one place on
@@ -565,8 +653,8 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .aware{font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;font-weight:800;
   padding:3px 7px;border-radius:var(--rp);white-space:nowrap}
 .aware.access{background:var(--g-100);color:var(--g-700)}
-.aware.watch{background:#fbecd2;color:#7a5410}
-.aware.reserve{background:#f7dcd8;color:#84271a}
+.aware.watch{background:var(--w-fill);color:var(--w-text)}
+.aware.reserve{background:var(--e-fill);color:var(--e-text)}
 .gen .warnpill{font-style:normal;font-size:10px}
 
 .gpick{position:relative;display:block;min-width:0}
@@ -581,8 +669,8 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .gopt small{color:var(--mut);font-size:var(--t-xs)}
 
 .unvpill,.warnpill{font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;
-  padding:3px var(--s2);border-radius:var(--rp);background:#efe6d0;color:#6b5518;white-space:nowrap;font-weight:700}
-.warnpill{background:#f6ded9;color:#7d2f21;text-transform:none;letter-spacing:0}
+  padding:3px var(--s2);border-radius:var(--rp);background:var(--w-fill);color:var(--w-text);white-space:nowrap;font-weight:700}
+.warnpill{background:var(--e-fill);color:var(--e-text);text-transform:none;letter-spacing:0}
 .unv{color:var(--warn);font-style:italic}
 
 .dict{border:1.5px solid var(--line);border-radius:var(--r2);overflow:hidden;
@@ -612,7 +700,7 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .danger{margin-top:var(--s8);padding:var(--s4);border:1.5px solid var(--bad-line);
   border-radius:var(--r2);background:var(--bad-bg)}
 .danger h3{margin:0 0 var(--s2);color:var(--bad)}
-.danger .drow2{justify-content:space-between;align-items:flex-start;border-top:1px solid #f0d9d3;
+.danger .drow2{justify-content:space-between;align-items:flex-start;border-top:1px solid var(--e-line);
   border-bottom:0;padding:var(--s3) 0;display:flex}
 .danger .drow2 b{display:block;font-size:var(--t-md);margin-bottom:3px}
 .danger .drow2 span{display:block;font-size:var(--t-sm);color:#6b5a56;line-height:1.55;max-width:520px}
@@ -784,6 +872,8 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
     background:var(--card);border-top:1px solid var(--line);
     box-shadow:0 -6px 20px rgba(16,23,21,.09);flex-direction:column}
   .sticky .btn{width:100%}
+  .sticky>.hint{font-size:var(--t-xs);line-height:1.4;margin-bottom:var(--s2)}
+  .sticky>.nt{margin:0 0 var(--s2);padding:var(--s2) var(--s3)}
 
   /* wide data rows become stacked cards rather than a sideways scroll */
   .drow,.drow.rev,.drow.mkt{grid-template-columns:1fr;gap:var(--s1);
@@ -1157,27 +1247,27 @@ body{
   box-shadow:0 1px 0 rgba(255,255,255,.12) inset,0 1px 2px rgba(9,38,31,.3);
 }
 .btn.ghost{
-  background:linear-gradient(180deg,#fff,#f7faf9);
+  background:linear-gradient(180deg,var(--card),var(--card-2));
   border:1px solid var(--line);color:var(--ink-2);
-  box-shadow:0 1px 0 #fff inset,var(--sh-1);
+  box-shadow:0 1px 0 var(--card-hi) inset,var(--sh-1);
 }
-.btn.ghost:hover:not(:disabled){background:linear-gradient(180deg,#fff,var(--g-50));
+.btn.ghost:hover:not(:disabled){background:linear-gradient(180deg,var(--card),var(--g-50));
   border-color:#c6dad4;color:var(--ink)}
 .btn.warn{background:linear-gradient(180deg,#b83b22,var(--bad) 62%,#8d2815)}
 
 /* ---- inputs: a recessed well, so a form reads as something to fill ---- */
 .fld input,.fld select,.bulk,.pinrow input{
-  background:linear-gradient(180deg,#fbfdfc,#fff);
+  background:linear-gradient(180deg,var(--card-2),var(--card));
   box-shadow:0 1px 2px rgba(9,38,31,.05) inset;
-  border-color:#dbe5e1;
+  border-color:var(--line-3);
 }
 .fld input:focus,.bulk:focus,.pinrow input:focus{
-  background:#fff;border-color:var(--g-500);
+  background:var(--card);border-color:var(--g-500);
   box-shadow:0 0 0 3.5px rgba(43,143,116,.15),0 1px 2px rgba(9,38,31,.05) inset;
 }
 
 /* ---- chips ---- */
-.chip{background:linear-gradient(180deg,#fff,#fafcfb);letter-spacing:var(--tr-snug)}
+.chip{background:linear-gradient(180deg,var(--card),var(--card-2));letter-spacing:var(--tr-snug)}
 .chip.on{background:linear-gradient(180deg,var(--g-600),var(--g));
   box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 4px 12px -4px rgba(9,38,31,.4)}
 
@@ -1358,10 +1448,10 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
    with green numbers, which tells a reader that everything is equally
    important, which is the same as telling them nothing is.
    ============================================================================= */
-.tile.i b{color:var(--i-solid)} .tile.i{border-color:var(--i-line);background:linear-gradient(180deg,#fff,var(--i-fill))}
-.tile.k b{color:var(--k-solid)} .tile.k{border-color:var(--k-line);background:linear-gradient(180deg,#fff,var(--k-fill))}
-.tile.w b{color:var(--w-solid)} .tile.w{border-color:var(--w-line);background:linear-gradient(180deg,#fff,var(--w-fill))}
-.tile.e b{color:var(--e-solid)} .tile.e{border-color:var(--e-line);background:linear-gradient(180deg,#fff,var(--e-fill))}
+.tile.i b{color:var(--i-solid)} .tile.i{border-color:var(--i-line);background:linear-gradient(180deg,var(--card),var(--i-fill))}
+.tile.k b{color:var(--k-solid)} .tile.k{border-color:var(--k-line);background:linear-gradient(180deg,var(--card),var(--k-fill))}
+.tile.w b{color:var(--w-solid)} .tile.w{border-color:var(--w-line);background:linear-gradient(180deg,var(--card),var(--w-fill))}
+.tile.e b{color:var(--e-solid)} .tile.e{border-color:var(--e-line);background:linear-gradient(180deg,var(--card),var(--e-fill))}
 .tile .ti{display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s2);
   font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--tr-wide);
   font-weight:800;opacity:.7}
@@ -1373,7 +1463,7 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
   box-shadow:0 0 0 1px rgba(255,255,255,.3) inset}
 
 /* the day bar, which is money, gets money's colours */
-.daybar{background:linear-gradient(180deg,#fff,#fafcfb)}
+.daybar{background:linear-gradient(180deg,var(--card),var(--card-2))}
 .daybar .money b{color:var(--k-solid)}
 .daybar .due b,.daybar .back b{color:var(--e-solid)}
 
@@ -1520,14 +1610,14 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .bellwrap{margin:var(--s4) 0}
 .bell{display:flex;align-items:center;gap:var(--s3);width:100%;
   padding:13px var(--s4);border-radius:var(--r3);border:1px solid var(--line);
-  background:linear-gradient(180deg,#fff,#f8fbfa);box-shadow:var(--ring),var(--sh-1);
+  background:linear-gradient(180deg,var(--card),var(--card-2));box-shadow:var(--ring),var(--sh-1);
   text-align:left;transition:border-color 140ms var(--ease),box-shadow 140ms var(--ease),
                              transform 140ms var(--ease)}
 .bell:hover:not(:disabled){border-color:var(--gold);box-shadow:var(--sh-2);transform:translateY(-1px)}
 .bell:disabled{opacity:1}
 .bellcup{position:relative;width:38px;height:38px;flex:none;border-radius:12px;
   display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(160deg,var(--gold-100),#efe0b4);color:#8a6d16;
+  background:linear-gradient(160deg,var(--gold-100),var(--w-line));color:var(--w-text);
   transform-style:preserve-3d}
 .bellcup svg{width:24px;height:24px;transform-origin:50% 12%}
 .bellcup .clap{position:absolute;bottom:7px;left:50%;width:5px;height:5px;margin-left:-2.5px;
@@ -1593,14 +1683,17 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .vhead{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
   margin-bottom:var(--s3)}
 .vhead b{font-family:var(--display);font-size:var(--t-base);letter-spacing:var(--tr-snug)}
-.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:var(--s3)}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:var(--s3);align-items:end}
+/* A label that wraps to two lines must not push its box below the neighbours':
+   the boxes sit on one line, the labels grow upward from it. */
+.vfld{display:flex;flex-direction:column;justify-content:flex-end}
 .vfld label{display:block;font-size:var(--t-xs);text-transform:uppercase;
   letter-spacing:var(--tr-wide);color:var(--mut);font-weight:700;margin-bottom:5px}
 .vfld label .sd{font-family:'NK',serif;font-style:normal;text-transform:none;
   letter-spacing:0;font-size:13px;color:var(--faint);margin-left:5px}
 .vone,.vpair{display:flex;align-items:center;gap:6px;
   border:1.5px solid var(--line);border-radius:var(--r2);padding:0 var(--s3);
-  background:linear-gradient(180deg,#fbfdfc,#fff);
+  background:linear-gradient(180deg,var(--card-2),var(--card));
   box-shadow:0 1px 2px rgba(9,38,31,.05) inset;
   transition:border-color 140ms var(--ease),box-shadow 140ms var(--ease)}
 .vone:focus-within,.vpair:focus-within{border-color:var(--g-500);
@@ -1716,7 +1809,7 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
   line-height:1.1;color:#fff;margin-top:6px;font-variant-numeric:tabular-nums}
 .mh span{display:block;font-size:12.3px;color:#b9d2c9;margin-top:4px}
 .mh.alt{background:var(--card);box-shadow:var(--ring),0 8px 24px -12px rgba(9,38,31,.16)}
-.mh.alt b{color:#093d33}.mh.alt small{color:var(--faint)}.mh.alt span{color:var(--mut)}
+.mh.alt b{color:var(--g-700)}.mh.alt small{color:var(--faint)}.mh.alt span{color:var(--mut)}
 @media (max-width:760px){.mheroes{grid-template-columns:1fr 1fr}.mh b{font-size:30px}}
 
 .evcols{display:flex;align-items:flex-end;gap:3px;height:92px;background:var(--card);
@@ -1725,10 +1818,15 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .evcols i.mx{background:var(--gold)}
 
 .refuse{margin-top:22px;background:var(--card);border-radius:14px;box-shadow:var(--ring);padding:15px 17px}
-.refuse b{font-size:14px;color:#093d33}
+.refuse b{font-size:14px;color:var(--g-700)}
 .refuse p{font-size:12.8px;color:var(--mut);margin-top:4px;line-height:1.55}
 
-.composegrid{display:grid;grid-template-columns:1.04fr .96fr;gap:0 24px;align-items:start}
+.composegrid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:0 24px;align-items:start}
+/* The picking surface is a sidebar: it stays where the eye left it while the
+   prescription grows underneath the hand. Below this width the two stack and
+   the flow is what it always was. */
+@media (min-width:1081px){.composegrid>.cg-right{position:sticky;top:calc(var(--header) + 12px);
+  max-height:calc(100vh - var(--header) - 24px);overflow-y:auto;overscroll-behavior:contain;padding:2px}}
 @media (max-width:1080px){.composegrid{grid-template-columns:1fr}}
 
 /* ---- the Tonight strip: the building's rooms, at the desk (multi only) ---- */
@@ -1744,7 +1842,7 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
   letter-spacing:.6px;border-radius:7px;padding:2px 8px;margin-bottom:6px}
 .roomcard.off .rc-room{background:#7c8a86}
 .rc-who{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.rc-who b{font-size:14.5px;color:#0c1412}
+.rc-who b{font-size:14.5px;color:var(--ink)}
 .rc-who .sd{font-size:13px;color:var(--mut)}
 .rc-main small{display:block;margin-top:3px;font-size:11.8px;color:var(--mut)}
 .roomcard.on .rc-main small{color:#0f5c4a;font-weight:600}
@@ -1763,15 +1861,21 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
    that hides the Setup link into the menu on the main app */
 .mirror .counts .paper{display:inline-flex !important}
 /* the honest banner when the record holder is off */
-.mirwarn{margin:10px 14px 0;background:#fdf3e4;border:1px solid #ecd9b0;color:#6e5312;
+.mirwarn{margin:10px 14px 0;background:var(--w-fill);border:1px solid var(--w-line);color:var(--w-text);
   border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.5}
-.mirwarn.err{background:#fdeeec;border-color:#eec5bd;color:#8a3325}
+.mirwarn.err{background:var(--e-fill);border-color:var(--e-line);color:var(--e-text)}
 /* the pharmacy phone's medicine line keeps its chip beside the name */
 .mirror .row.pline{flex-direction:row !important;align-items:baseline}
 .mirror .row.pline .chip{flex:0 0 auto}
 /* a row the signed-in doctor may not open reads as not his, at a glance */
 .qrow.notmine{opacity:.55}
 /* the code box shrinks instead of clipping its own placeholder */
+/* The number box and its Open button are one control, so they are one height
+   and share a baseline. The box keeps the big spaced digits a scanner types. */
+.coderow{align-items:stretch}
+.coderow .fld{margin:0}
+.coderow .fld input{height:100%}
+.coderow .btn{align-self:stretch;min-height:64px}
 .codebox{font-size:26px;letter-spacing:6px;font-weight:700}
 @media (max-width:820px){.codebox{font-size:20px;letter-spacing:3px}}
 @media (max-width:460px){.codebox{font-size:17px;letter-spacing:2px}}
@@ -1804,7 +1908,7 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 .tc-n{position:absolute;right:16px;top:14px;font-size:11.5px;font-weight:800;color:var(--gold);
   font-variant-numeric:tabular-nums}
 .tc-n i{font-style:normal;color:var(--faint);font-weight:600}
-.tc-body h3{font-size:16.5px;line-height:1.3;color:#0c1412;margin:0 42px 6px 0}
+.tc-body h3{font-size:16.5px;line-height:1.3;color:var(--ink);margin:0 42px 6px 0}
 .tc-body h3 .sd{color:var(--gold);font-size:15px;font-weight:600;margin-inline-start:8px}
 .tc-body p{font-size:13.6px;line-height:1.62;color:var(--mut);margin:0}
 
@@ -1814,7 +1918,7 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
    thumb hits reliably, and it is transparent so the row still looks like dots. */
 .tc-dot{width:21px;height:26px;padding:0;border:0;background:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
-.tc-dot i{width:7px;height:7px;border-radius:50%;background:#dbe5e1;display:block;transition:.18s}
+.tc-dot i{width:7px;height:7px;border-radius:50%;background:var(--line-3);display:block;transition:.18s}
 .tc-dot:hover i{background:#b9cec6}
 .tc-dot.past i{background:#9fc3b6}
 .tc-dot.on{width:33px}
@@ -1844,8 +1948,8 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
    position on purpose, so it can never sit on top of a control. */
 .billbar{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);align-items:baseline;
   justify-content:space-between;padding:11px var(--s5);
-  background:#fdf6e3;border-bottom:1px solid #eadfbe;color:#6b4e06;font-size:var(--t-sm)}
-.billbar.due{background:#fbeecf;border-bottom-color:#e0cf9c;color:#5c4205}
+  background:var(--w-fill);border-bottom:1px solid var(--w-line);color:var(--w-text);font-size:var(--t-sm)}
+.billbar.due{background:var(--w-line);border-bottom-color:var(--w-solid);color:var(--w-text)}
 .billbar .bb-t{min-width:240px;flex:1 1 340px;line-height:1.5}
 .billbar .bb-s{color:#8a6c1e}
 .billbar.due .bb-s{color:#7a5c14}
@@ -1929,8 +2033,104 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
    down, the suggestion large and right-to-left so it can actually be judged. */
 .bulksd .sdlist{display:flex;flex-direction:column;gap:2px;max-height:52vh;overflow:auto}
 .bulksd .sdrow{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:8px;cursor:pointer}
-.bulksd .sdrow:hover{background:var(--wash,#f2f6f4)}
-.bulksd .sdrow.on{background:#e7f2ec}
+.bulksd .sdrow:hover{background:var(--wash)}
+.bulksd .sdrow.on{background:var(--k-fill)}
 .bulksd .sdrow input{width:20px;height:20px;flex:0 0 auto}
 .bulksd .sdrow .en{flex:1;min-width:0}
 .bulksd .sdrow .sd{font-family:'NK',serif;font-size:21px;color:var(--g);white-space:nowrap}
+
+/* ---- light / dark / device: the screen's own switch ---- */
+.themerow{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
+  padding:10px var(--s4);border-bottom:1px solid var(--line-2)}
+.themerow .tr-l{font-size:var(--t-md);color:var(--ink);font-weight:600}
+.themerow .tr-c{display:flex;background:var(--line-2);border-radius:var(--rp);padding:3px;gap:2px}
+.themerow .tr-b{border:0;background:transparent;border-radius:var(--rp);padding:6px 11px;
+  font-size:var(--t-sm);font-weight:700;color:var(--mut);white-space:nowrap;
+  transition:background var(--fast) var(--ease),color var(--fast) var(--ease)}
+.themerow .tr-b:hover{color:var(--ink)}
+.themerow .tr-b.on{background:var(--card);color:var(--g);box-shadow:var(--sh-1)}
+.menu .themerow{padding:10px var(--s4)}
+.setup .themerow{border:1.5px solid var(--line);border-radius:var(--r2);background:var(--card);margin:var(--s2) 0 var(--s4)}
+/* the green is the brand, and on a dark ground it must not go dull: the
+   header keeps its own gradient in both themes */
+:root[data-theme=dark] .top{background:linear-gradient(112deg,#0a3a2e 0%,#0f5c4a 46%,#17705a 100%)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .top{background:linear-gradient(112deg,#0a3a2e 0%,#0f5c4a 46%,#17705a 100%)}}
+/* paper is paper: whatever the screen, the print preview and the sheet stay white */
+@media print{ :root{color-scheme:light} }
+
+/* =============================================================================
+   THE DOCTOR'S PANEL, WITH SOME LIGHT ON IT (Sept 2026, on the doctors' ask)
+
+   Colour, weight, shadow and a few badges. The dose row, the chips and the
+   print bar keep the geometry they have always had: nothing below changes a
+   width, a height or a position inside the prescribing flow.
+   ============================================================================= */
+
+/* the patient, as a card the room can read from the door */
+.ptcard{display:flex;align-items:center;gap:var(--s4);
+  background:linear-gradient(135deg,var(--card) 0%,var(--g-50) 100%);
+  border:1.5px solid var(--line);border-left:5px solid var(--g);
+  border-radius:var(--r3);padding:var(--s3) var(--s4);margin-bottom:var(--s4);
+  box-shadow:var(--sh-2)}
+.ptcard .tk-badge{flex:none;width:52px;height:52px;border-radius:var(--r2);
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,var(--g-600),var(--g));color:var(--on-g);
+  font-family:var(--display);font-size:24px;font-weight:800;letter-spacing:var(--tr-tight);
+  font-variant-numeric:tabular-nums;box-shadow:0 1px 0 rgba(255,255,255,.18) inset,var(--sh-1);
+  flex-direction:column;line-height:1;gap:2px}
+.ptcard .tk-badge::after{content:'TOKEN';font-family:var(--text);font-size:8px;font-weight:700;
+  letter-spacing:.08em;opacity:.8}
+.ptcard .pt-main{flex:1;min-width:0;color:var(--ink);font-size:var(--t-xl);font-weight:800;line-height:1.15;
+  letter-spacing:var(--tr-tight);overflow-wrap:anywhere}
+.ptcard .pt-main>span{display:block;font-size:var(--t-md);font-weight:500;color:var(--mut);
+  margin-top:3px;letter-spacing:0;font-variant-numeric:tabular-nums}
+.ptcard .pt-ic{color:var(--g);opacity:.45}
+@media (max-width:640px){
+  .ptcard{padding:var(--s3);gap:var(--s3)}
+  .ptcard .tk-badge{width:44px;height:44px;font-size:20px}
+  .ptcard .pt-ic{display:none}
+}
+
+/* section headings: the icon sits in a tinted tile, so the eye finds the
+   section before it reads the word */
+h2 svg{width:26px;height:26px;padding:5px;border-radius:8px;background:var(--g-100);color:var(--g);opacity:1}
+
+/* the medicine's number is a badge, and the card carries a thin green edge on
+   the inside so a stack of five reads as five, not as one long white column */
+.line{box-shadow:inset 4px 0 0 var(--g-100),var(--sh-1)}
+.line:hover{box-shadow:inset 4px 0 0 var(--g-500),var(--sh-2)}
+.line.flash{box-shadow:inset 4px 0 0 var(--g),0 0 0 3px rgba(15,92,74,.16)}
+.line.bad{box-shadow:inset 4px 0 0 var(--bad),var(--sh-1)}
+.line .hd b{display:flex;align-items:center;gap:var(--s2)}
+.ln{flex:none;display:inline-flex;align-items:center;justify-content:center;
+  width:24px;height:24px;border-radius:50%;background:var(--g);color:var(--on-g);
+  font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:0}
+.line.bad .ln{background:var(--bad)}
+
+/* dose buttons: the ones that are ON glow a little, the ones that are OFF
+   are visibly waiting. Same size, same place. */
+.dbtn{box-shadow:var(--sh-1)}
+.dbtn.on{background:linear-gradient(180deg,var(--g-600),var(--g));
+  box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 2px 6px -2px rgba(15,92,74,.5)}
+.dbtn.on small{color:rgba(255,255,255,.78)}
+.dbtn:not(.on){color:var(--mut)}
+.dbtn.sosb.on{background:linear-gradient(180deg,#b1811d,#8a5b00);border-color:#8a5b00}
+.stp{box-shadow:var(--sh-1)}
+.stp .v{color:var(--ink)}
+
+/* the print button is the one thing on the screen that must be found without
+   looking: bigger type, the brand gradient, and a printer on it */
+.sticky .btn.wide{font-size:17px;padding:16px var(--s5);
+  background:linear-gradient(180deg,var(--g-600),var(--g));
+  box-shadow:0 1px 0 rgba(255,255,255,.18) inset,var(--sh-2)}
+.sticky .btn.wide:hover:not(:disabled){background:linear-gradient(180deg,var(--g-500),var(--g-600))}
+.sticky .btn.wide.warn{background:linear-gradient(180deg,#c9452a,var(--bad))}
+.sticky .btn.wide:disabled{background:var(--line-2);color:var(--mut);box-shadow:none}
+.sticky .btn.wide svg{opacity:.95}
+
+/* the vitals cards get a heading rule in the brand colour */
+.vhead b{position:relative;padding-left:var(--s3)}
+.vhead b::before{content:'';position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:2px;background:var(--g)}
+
+/* selected diagnosis and selected medicine chips: a tick they can feel */
+.chip.on{box-shadow:0 1px 0 rgba(255,255,255,.16) inset,0 2px 8px -2px rgba(15,92,74,.45)}

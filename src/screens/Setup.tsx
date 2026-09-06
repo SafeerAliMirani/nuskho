@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ThemeRow } from '../ui/ThemeRow'
 import { adminIsSet, adminUnlocked, unlockAdmin, lockAdmin, setAdminKey } from '../profile'
 import { role, can, ROLE_NAME, ROLE_SD, ROLE_WHAT, ROLES, pinSet, setRolePin,
          pinWasAdopted, notePinAdoption, type Role } from '../roles'
@@ -147,11 +148,15 @@ export default function Setup({ onBack }: { onBack: () => void }) {
         </Note>
       )}
 
+      {/* The screen's light. Per device, no PIN: it changes nothing that prints. */}
+      <ThemeRow label="This screen: light or dark" />
+
       <div className="tabs">
         {mine.map(t => (
           <button key={t} className={'tab' + (tab === t ? ' on' : '')} onClick={() => setTab(t)}>{t}</button>
         ))}
-        <span className="tabsep" />
+        {/* the hairline only earns its place when there is something on its right */}
+        {(role() === 'admin' || adminIsSet()) && <span className="tabsep" />}
         {ADMIN.filter(t => role() === 'admin' || adminIsSet()).map(t => (
           <button key={t} className={'tab adm' + (tab === t ? ' on' : '')} onClick={() => setTab(t)}>
             {open ? '' : '🔒 '}{t}

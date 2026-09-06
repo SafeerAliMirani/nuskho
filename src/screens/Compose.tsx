@@ -11,7 +11,7 @@ import { printSlip } from '../print/print'
 import { doctorById, multiRoom, visitDoctorId } from '../doctors'
 import { sendOn, unsend, incoming, sendTargets, destinationEn, type Incoming } from '../refer'
 import { filled } from '../data/vitals'
-import { IcBook, IcPill } from '../ui/art'
+import { IcBook, IcPill, IcPrint, IcUser } from '../ui/art'
 import { Note } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Bell from '../ui/Bell'
@@ -554,10 +554,19 @@ export default function Compose({ visitId, onDone, onBack }: {
   return (
     <div className="pane">
       <button className="btn ghost" onClick={onBack} style={{ marginBottom: 12 }}>← Queue</button>
-      <div className="who">{pt.name}<span>Token {visit.token} · No. {patientCode(pt.num)}{pt.age ? ` · ${pt.age}` : ''}
-        {multiRoom() && doctorById(visit.doctorId) &&
-          <> · Room {doctorById(visit.doctorId)!.room} · {doctorById(visit.doctorId)!.nameEn}</>}
-      </span></div>
+      {/* THE PATIENT, AS A CARD. The token is the number the room is called
+          by, so it is the one thing on this banner set large enough to read
+          from the door. */}
+      <div className="who ptcard">
+        <span className="tk-badge" aria-label={`Token ${visit.token}`}>{visit.token}</span>
+        <span className="pt-main">{pt.name}
+          <span>No. {patientCode(pt.num)}{pt.age ? ` · ${pt.age}` : ''}{pt.sex ? ` · ${pt.sex}` : ''}
+            {multiRoom() && doctorById(visit.doctorId) &&
+              <> · Room {doctorById(visit.doctorId)!.room} · {doctorById(visit.doctorId)!.nameEn}</>}
+          </span>
+        </span>
+        <IcUser size={22} className="pt-ic" />
+      </div>
 
       {/* Above everything, and not down by the PRINT button, because it is true
           of the whole screen: what he is looking at came back from the disk and
@@ -666,7 +675,7 @@ export default function Compose({ visitId, onDone, onBack }: {
             <div className={`line ${flash === i ? 'flash' : ''} ${empty ? 'bad' : ''}`} key={i}
                  ref={el => { rows.current[i] = el }}>
               <div className="hd">
-                <div><b>{i + 1}. {d.brand} {d.strength}</b>
+                <div><b><span className="ln">{i + 1}</span>{d.brand} {d.strength}</b>
                   {/* THE WHO LABEL THAT USED TO SIT HERE IS GONE.
                       It printed "WHO Watch" beside the stronger antibiotics,
                       taken from the AWaRe list, and it was a true published
@@ -951,6 +960,7 @@ export default function Compose({ visitId, onDone, onBack }: {
           )}
           <button className={`btn wide ${badIdx >= 0 || namelessIdx >= 0 ? 'warn' : ''}`} onClick={print}
                   disabled={busy || visit.lines.length === 0}>
+            {!busy && badIdx < 0 && namelessIdx < 0 && <IcPrint size={20} />}
             {busy ? 'Printing…'
               : namelessIdx >= 0 ? `Line ${namelessIdx + 1} has no medicine name. Remove it and add it again`
               : badIdx >= 0 ? `${drugs[visit.lines[badIdx].drugId]?.brand} has no dose. Tap to fix`

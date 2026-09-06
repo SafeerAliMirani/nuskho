@@ -11,6 +11,14 @@
        PWA setup exists to serve -->
   <link rel="apple-touch-icon" href="./icon-180.png">
   <meta name="theme-color" content="#0f5c4a">
+  <script>
+    // The doctor's light/dark choice, applied before anything paints so a dark
+    // page never flashes white. Mirrors src/theme.ts; keep the two agreeing.
+    try {
+      var t = localStorage.getItem('nk-theme');
+      if (t !== 'device') document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+    } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+  </script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>

@@ -361,7 +361,7 @@ export default function Intake({ visits, onOpen, onChange }: {
       <h2 style={multi && !queueFirst ? { marginTop: 22 } : { marginTop: queueFirst ? 30 : undefined }}>
         <IcScan size={17} /> Been here before? Number from the old slip, or scan it
       </h2>
-      <div className="row">
+      <div className="row coderow">
         <div className="fld" style={{ flex: 2 }}>
           <input value={code} inputMode="numeric" maxLength={13} placeholder="the number on the slip"
                  className="codebox"

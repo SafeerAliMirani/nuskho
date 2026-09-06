@@ -1,7 +1,13 @@
 @page{margin:0;}
 *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-html,body{margin:0;padding:0;background:#e9e9ec;}
-body{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;color:#000;}
+/* SCOPED TO THE SLIP, NOT TO THE DOCUMENT.
+   This sheet is injected into the app's own <head>, after app.css, so an
+   `html,body` rule here is the last word on the whole screen. It was: the
+   grey wash behind the queue was this file's #e9e9ec, and every paragraph in
+   the app was set in Liberation Sans because this line beat the app's own
+   body font. The slip and the measuring host now name their own face and ink
+   and leave the document alone. Same font, same size, same paper. */
+#print-root,#nuskho-measure{font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;color:#000;}
 .page{width:var(--pw,148mm);height:var(--ph,210mm);background:#fff;margin:0 auto 8mm;position:relative;overflow:hidden;}
 /* THE BLANK SECOND PAGE.
    `page-break-after:always` on .page broke after EVERY sheet including the last

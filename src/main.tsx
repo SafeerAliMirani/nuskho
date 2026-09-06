@@ -10,6 +10,11 @@ import { initBuilding, buildingMode, buildingUnknown } from './building'
 import { ensurePrintStyles } from './print/styles'
 import { sendHeartbeat } from './heartbeat'
 import { adoptOldPin } from './roles'
+import { applyTheme, theme } from './theme'
+
+// index.html already set the attribute before paint; this keeps the meta
+// theme-colour honest and covers a build served without that script.
+applyTheme(theme())
 
 /**
  * BEFORE ANY DOOR IS DRAWN: carry across the lock a machine already had.
