@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { daySummary } from '../db'
-import { daysSinceExport, storageReport } from '../safety'
+import { daysSinceExport, storageReport, snapshotTrouble } from '../safety'
 import { activeDoctors, multiRoom, visitDoctorId, type Doctor } from '../doctors'
 import { stamp } from '../version'
 import { IcChart, IcShield, IcClock } from '../ui/art'
@@ -136,6 +136,7 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
                   ? 'The browser may treat the practice as cache. Open the app once as the doctor and accept the storage prompt.'
                   : 'Safari clears a site left unopened for 7 days and offers no way to prevent it. Open Nuskho daily and export weekly.')
               : 'Checked at every start.'}
+            {snapshotTrouble() && <> <b>{snapshotTrouble()}</b></>}
           </small>
         </div></div>
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { readQrPayload } from '../print/qr'
 import { ArtWaiting, IcScan, IcUser, IcMoney, IcQueue } from '../ui/art'
+import { cleanName, cleanPhone, cleanAge, cleanCity } from '../fields'
 import { Note, Tip } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Vitals from '../ui/Vitals'
@@ -234,13 +235,20 @@ export default function Intake({ visits, onOpen, onChange }: {
 
   /** Returning patient: they hand over the old slip, five digits, done. */
   async function lookup() {
+    // the same guard addNew has: a scanner sends its own Enter after the
+    // digits, and a second Enter while the first is still writing gave one
+    // patient two tokens
+    if (adding) return
     const n = parseCode(code)
     if (n === null) { setMsg('That number is not right. Check the slip, or add as new.'); return }
-    const p = await findByCode(code)
-    if (!p) { setMsg('No patient with that number. Add as new.'); return }
-    setMsg('')
-    setCode('')
-    onOpen(await openVisitFor(p.id))
+    setAdding(true)
+    try {
+      const p = await findByCode(code)
+      if (!p) { setMsg('No patient with that number. Add as new.'); return }
+      setMsg('')
+      setCode('')
+      onOpen(await openVisitFor(p.id))
+    } finally { setAdding(false) }
   }
 
   /** The Open button and the scanner's Enter both come through here, so a
@@ -251,10 +259,10 @@ export default function Intake({ visits, onOpen, onChange }: {
     if (!name.trim()) return
     const pid = uid()
     await db.patients.add({
-      id: pid, num: await nextPatientNum(), name: name.trim(),
-      phone: phone.trim() || undefined, age: age.trim() || undefined,
+      id: pid, num: await nextPatientNum(), name: cleanName(name),
+      phone: cleanPhone(phone) || undefined, age: cleanAge(age) || undefined,
       sex: sex || undefined,
-      city: city.trim() || undefined, createdAt: Date.now(),
+      city: cleanCity(city) || undefined, createdAt: Date.now(),
     })
     await openVisitFor(pid)
     setName(''); setPhone(''); setAge(''); setSex(''); setNames({}); setMsg('')
@@ -395,7 +403,7 @@ export default function Intake({ visits, onOpen, onChange }: {
                onKeyDown={e => { if (e.key === 'Enter') addNew() }} /></div>
       <div className="row">
         <div className="fld"><label>Phone — optional</label>
-          <input value={phone} onChange={e => setPhone(e.target.value)} inputMode="numeric" /></div>
+          <input value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+ ]/g, '').slice(0, 15))} inputMode="numeric" /></div>
         <div className="fld"><label>Age — optional</label>
           {/* digits only, and nothing above 120: "231321" printed on a real slip */}
           <input value={age} inputMode="numeric" maxLength={3}

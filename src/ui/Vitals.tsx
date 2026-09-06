@@ -1,3 +1,4 @@
+import { cleanDecimal } from '../fields'
 import { useRef, useState } from 'react'
 import { VITALS, INSTANT, flag, type VitalDef } from '../data/vitals'
 import { IcCheck } from './art'
@@ -192,7 +193,7 @@ function Field({ def, raw, onSet }: { def: VitalDef; raw: string; onSet: (s: str
       <label>{def.en} <i className="sd">{def.sd}</i></label>
       <div className="vone">
         <input inputMode={numeric ? 'decimal' : 'text'} maxLength={def.max} value={raw}
-               onChange={e => onSet(numeric ? e.target.value.replace(/[^0-9.]/g, '') : e.target.value)} />
+               onChange={e => onSet(numeric ? cleanDecimal(e.target.value) : e.target.value)} />
         {def.unit && <em>{def.unit}</em>}
       </div>
       {f && <span className="vmark">{f === 'high' ? 'higher than usual' : 'lower than usual'}</span>}

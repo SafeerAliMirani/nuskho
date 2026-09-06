@@ -23,7 +23,7 @@ import { warmPlan } from '../print/paginate'
 import { notePrinted, printerLikelyCold } from '../safety'
 import { whyItFailed } from '../fail'
 import { sameMolecule } from '../data/who'
-import { lineIsEmpty, linesReady, freezeLines, slipDataFor, drugFromShelf } from '../rx'
+import { lineIsEmpty, linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp } from '../rx'
 import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
 import { sideMatters, TIMES, timeEnFor } from '../data/forms'
 
@@ -485,6 +485,8 @@ export default function Compose({ visitId, onDone, onBack }: {
     if (busy) return                                   // double-tap on a slow printer
     if (badIdx >= 0) { bump(badIdx); return }
     if (namelessIdx >= 0) { bump(namelessIdx); return }
+    const noDoctor = slipDoctorMissing(cur.current!)
+    if (noDoctor) { setErr(noDoctor); return }
     setBusy(true)
     try {
       // Nothing goes on paper that is not on the disk first. If the freeze was
@@ -495,7 +497,7 @@ export default function Compose({ visitId, onDone, onBack }: {
       // status and printedAt are written HERE and only here, as their own
       // targeted patch: they are not in MINE, so no other tap on this screen
       // can drag a stale copy of them over what the desk did meanwhile
-      const stamp = { printedAt: Date.now(), status: 'done' as const }
+      const stamp = printedStamp()
       await db.visits.update(visitId, stamp)
       cur.current = { ...cur.current!, ...stamp }
       setVisit(cur.current)
@@ -536,7 +538,10 @@ export default function Compose({ visitId, onDone, onBack }: {
     // The fee and the token belong to the ORIGINAL visit. Copying them made the
     // clinic show two rows with the same number, and made the evening's cash
     // total count the same rupees twice, every time a slip was corrected.
-    const { fee: _fee, token: _tok, closedAt: _c, closeNote: _n, dispensedAt: _d, ...rest } = v
+    // testsPaidAt is stripped too: the in-room tests were done once and paid
+    // once against the ORIGINAL; the copy carries the readings so they print,
+    // and daySummary skips amendments when it adds up test money.
+    const { fee: _fee, token: _tok, closedAt: _c, closeNote: _n, dispensedAt: _d, testsPaidAt: _t, ...rest } = v
     await db.visits.add({
       // the room's own numbering: an amended slip in Room 2 is a Room 2 token.
       // dispensedAt and per-line given are stripped: the pharmacy has not
@@ -670,7 +675,27 @@ export default function Compose({ visitId, onDone, onBack }: {
 
         <h2><IcPill size={17} /> Medicines, printed in this order</h2>
         {visit.lines.map((l, i) => {
-          const d = drugs[l.drugId]; if (!d) return null
+          /* A LINE WHOSE MEDICINE LEFT THE LIST MUST STILL BE ON THE SCREEN.
+             This used to return null for it, so a medicine archived or merged
+             in Setup vanished from the doctor's view while linesReady still
+             passed it on its snapshot and the printer still printed it: a row
+             the patient receives and the doctor cannot see, edit or remove.
+             The frozen snapshot carries everything the card needs, so the card
+             is drawn from it and says why. A line with neither medicine nor
+             snapshot is shown as the nameless thing it is, with its × button. */
+          const live = drugs[l.drugId]
+          const d = live ?? (l.snap?.brand
+            ? { id: l.drugId, addedAt: 0, ...l.snap } as Drug
+            : undefined)
+          if (!d) return (
+            <div className="line bad" key={i} ref={el => { rows.current[i] = el }}>
+              <div className="hd">
+                <div><b><span className="ln">{i + 1}</span>Medicine not found</b>
+                  <small>This line has no medicine name. Remove it and add the medicine again.</small></div>
+                <button className="x" onClick={() => apply(v => ({ ...v, lines: v.lines.filter((_, k) => k !== i) }))}>×</button>
+              </div>
+            </div>
+          )
           const empty = isEmpty(l)
           return (
             <div className={`line ${flash === i ? 'flash' : ''} ${empty ? 'bad' : ''}`} key={i}
@@ -688,7 +713,8 @@ export default function Compose({ visitId, onDone, onBack }: {
                       one right below, which says he has written the same
                       molecule twice tonight, and that is his own prescription
                       talking back to him. */}
-                  <small>{d.generic || (d.pending ? 'typed in, tidy this up tonight' : '')}</small></div>
+                  <small>{d.generic || (d.pending ? 'typed in, tidy this up tonight' : '')}
+                    {!live && <> · no longer on your list; prints as frozen</>}</small></div>
                 <button className="x" onClick={() => apply(v => ({ ...v, lines: v.lines.filter((_, k) => k !== i) }))}>×</button>
               </div>
               {/* FOUR SLOTS, IN THE ORDER OF THE DAY.
@@ -761,7 +787,14 @@ export default function Compose({ visitId, onDone, onBack }: {
                   </label>
                 </div>
               )}
-              {empty && <div className="badmsg">No dose set. This would print with no instruction.</div>}
+              {/* his own line under the medicine; prints as typed, under the generic */}
+              <div className="fld linenote">
+                <input value={l.note ?? ''} maxLength={160} placeholder="a note under this medicine, optional (prints)"
+                       onChange={e => setLine(i, { note: e.target.value || undefined })} />
+              </div>
+              {empty && <div className="badmsg">{l.sos
+                ? (!l.sosReason?.en ? 'Pick what it is for. This would print with no reason.' : 'Nothing to hand over: set how many to give.')
+                : 'No dose set. This would print with no instruction.'}</div>}
               {/* THE SAME MOLECULE UNDER TWO BRANDS.
                   The duplicate check above this one matches on the medicine's
                   id, so it catches PANADOL written twice and cannot catch
@@ -959,6 +992,13 @@ export default function Compose({ visitId, onDone, onBack }: {
               with no sign that anything is happening. Knowing it is coming is
               most of the fix: a doctor who was told expects it, and a doctor
               who was not presses PRINT again and gets two slips. */}
+          {/* A slip with no diagnosis is legal and sometimes right; it must
+              not be an accident. Said once, above the button, not blocking. */}
+          {!visit.diagnosis && visit.lines.length > 0 && !busy && (
+            <p className="hint" style={{ marginTop: 0 }}>
+              No diagnosis picked. The slip prints without one.
+            </p>
+          )}
           {cold && !busy && (
             <p className="hint" style={{ marginTop: 0 }}>
               The printer has not been used for a while. The first sheet may take a few

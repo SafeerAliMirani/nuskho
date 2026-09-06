@@ -175,7 +175,8 @@ export async function computeStats(forDoctor?: string): Promise<Stats> {
   // What was handed back is not money received. The desk's own summary already
   // subtracts it; this page must not quietly disagree with the drawer.
   received -= refunded
-  const feeUnrecorded = monthAll.filter(v => !v.fee && v.status !== 'waiting').length
+  // an amendment never carries a fee of its own; see daySummary
+  const feeUnrecorded = monthAll.filter(v => !v.fee && !v.amendsId && v.status !== 'waiting').length
 
   /* --- the queue. "Left" paired with the hour it happened is a staffing
          decision; on its own it is only a sad number. --- */

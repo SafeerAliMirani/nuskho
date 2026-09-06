@@ -28,13 +28,16 @@ import { doseSdFor, defaultRoute } from './data/forms'
 import { doctorById } from './doctors'
 import { patientCode } from './code'
 import { destinationEn, destinationSd } from './refer'
+import { profile } from './profile'
 
 /** A line with no dose at all. The screen bumps it; the printer refuses it.
  *  An SOS line carries no schedule on purpose, so it is judged by its reason
  *  instead: "when needed, for X" is a complete instruction, an SOS line with no
  *  reason is the empty one. */
 export const lineIsEmpty = (l: RxLine): boolean =>
-  l.sos ? !l.sosReason?.en : (!l.dose.m && !l.dose.d && !l.dose.e && !l.dose.n)
+  l.sos
+    ? (!l.sosReason?.en || !(l.supply && l.supply > 0))   // a reason AND something to hand over
+    : (!l.dose.m && !l.dose.d && !l.dose.e && !l.dose.n)
 
 /**
  * Is this prescription fit for paper? Returns the index of the first offending
@@ -104,6 +107,35 @@ export function drugFromShelf(e: DictEntry, id: string): Drug {
     unitSd: doseSdFor(e.form), route: e.route ?? defaultRoute(e.form),
   }
 }
+
+/**
+ * WHOSE NAME GOES ON THE PAPER, AND WHETHER THERE IS ONE.
+ *
+ * The setup wizard insists "a name has to print on every slip" and then offers
+ * "skip for now, I am only looking". Nothing after that checked again, so a
+ * doctor who skipped could prescribe all evening under an empty heading: a
+ * sheet with medicines and no doctor is not a prescription any chemist should
+ * fill. Both prescribing paths ask this before they freeze anything. A visit
+ * in a building names its room's doctor; a solo visit names the profile.
+ */
+export function slipDoctorMissing(v: Visit): string | null {
+  const room = doctorById(v.doctorId)
+  if (room) return room.nameEn.trim() ? null : 'This room’s doctor has no name yet. Set it in Setup, Staff.'
+  return profile().doctorEn.trim() ? null : 'No doctor’s name is set, so nothing can print. Open Setup and enter the name that goes on the slip.'
+}
+
+/**
+ * The stamp a visit gets the moment its paper comes out. Both paths write the
+ * same one: printed, done, and any earlier ending cleared, because a token
+ * that was cancelled at the desk and then called in and prescribed for has
+ * ended in a prescription, not in a cancellation, and the day's figures must
+ * not carry both.
+ */
+export const printedStamp = (lines?: RxLine[]) => ({
+  ...(lines ? { lines } : {}),
+  printedAt: Date.now(), status: 'done' as const,
+  closedAt: undefined, closeNote: undefined,
+})
 
 /**
  * Exactly what printSlip is given, assembled the same way for the doctor at

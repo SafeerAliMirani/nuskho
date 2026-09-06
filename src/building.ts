@@ -1,10 +1,11 @@
+import { cleanName, cleanPhone, cleanAge, cleanCity, cleanSex } from './fields'
 import {
-  db, uid, nextToken, nextPatientNum, findByCode, patientCode, closeVisit, markRefunded,
+  db, uid, nextToken, nextPatientNum, findByCode, patientCode, closeVisit, markRefunded, owedRefund,
   daySummary, todaysVisits, markTestsPaid, doctorDrugs, lastVisit,
 } from './db'
 import { formulary } from './data/formulary'
 import { dictionary } from './data/dictionary'
-import { linesReady, freezeLines, slipDataFor, drugFromShelf } from './rx'
+import { linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp } from './rx'
 import { checkRolePin, can, type Role } from './roles'
 import { activeDoctors, isSitting, setSitting, multiRoom, doctorById, visitDoctorId } from './doctors'
 import { course } from './course'
@@ -636,14 +637,15 @@ async function applyIntent(
       if (!found) return { ok: false, why: 'No patient with that number. Add as new.' }
       patientId = found.id
     } else {
-      const name = clip(p.name, 80)
+      const name = cleanName(p.name)
       if (!name) return { ok: false, why: 'A name is needed.' }
       patientId = uid()
       await db.patients.add({
         id: patientId, num: await nextPatientNum(), name,
-        phone: clip(p.phone, 15).replace(/[^0-9+ ]/g, '') || undefined,
-        age: clip(p.age, 3).replace(/\D/g, '') || undefined,
-        city: clip(p.city, 40) || undefined,
+        phone: cleanPhone(p.phone) || undefined,
+        age: cleanAge(p.age) || undefined,
+        sex: cleanSex(p.sex),
+        city: cleanCity(p.city) || undefined,
         createdAt: Date.now(),
       })
     }
@@ -707,8 +709,13 @@ async function applyIntent(
    * one, the previous one, or a person.
    */
   if (kind === 'openSlip') {
+    // a store scans a few slips a minute; sixty misses in a row is a walk
+    // through the day's numbers, and it waits
+    const gate = knock('slip:' + (sit?.fromId ?? '?'), 60, 60_000)
+    if (gate) return { ok: false, why: gate }
     const pt = await findByCode(clip(p.code, 13))
     if (!pt) return { ok: false, why: 'That number is not on any slip from today.' }
+    knockClear('slip:' + (sit?.fromId ?? '?'))
     const today = await todaysVisits()
     const mine = today
       .filter(x => x.patientId === pt.id && x.printedAt && x.lines.length > 0)
@@ -767,6 +774,9 @@ async function applyIntent(
   }
   if (kind === 'markRefunded') {
     if (!v) return { ok: false, why: 'That token is gone.' }
+    // the sibling markTestsPaid checks something is owed; so does this one,
+    // or a counter phone could stamp "handed back" on money never owed
+    if (!owedRefund(v)) return { ok: false, why: v.fee?.refundedAt ? 'That was already handed back.' : 'Nothing is owed back on this one.' }
     // no chime: the 'refund' signal announces money OWED, and this is the
     // moment it stopped being owed
     await markRefunded(vid)
@@ -797,7 +807,11 @@ async function applyIntent(
     return { ok: true }
   }
   if (kind === 'setSitting') {
-    setSitting(String(p.doctorId ?? ''), p.sitting === true)
+    // the same rule addPatient applies to a room: it has to be one this
+    // building has
+    const did = String(p.doctorId ?? '')
+    if (!activeDoctors().some(d => d.id === did)) return { ok: false, why: 'That room is not in this building.' }
+    setSitting(did, p.sitting === true)
     return { ok: true }
   }
 
@@ -894,8 +908,12 @@ async function applyIntent(
       if (e2) dose.e = e2
       const line: RxLine = {
         drugId, dose,
-        meal: rl.meal === 'before' ? 'before' : 'after',
-        days: Math.min(365, Math.max(1, Math.round(Number(rl.days) || 0) || 1)),
+        // all three legal values cross the wire: 'any' is the doctor saying
+        // "no food instruction", and collapsing it to 'after' printed
+        // "after food" on lines he had deliberately left without one
+        meal: rl.meal === 'before' ? 'before' : rl.meal === 'any' ? 'any' : 'after',
+        // the same ceiling the host screen has: a course is at most 30 days
+        days: Math.min(30, Math.max(1, Math.round(Number(rl.days) || 0) || 1)),
       }
       const note = clip(rl.note, 160)
       if (note) line.note = note
@@ -909,6 +927,7 @@ async function applyIntent(
         if (sr) line.sosReason = { en: clip(sr.en, 60), sd: clip(sr.sd, 80) }
         const sup = Math.round(Number(rl.supply) || 0)
         if (sup > 0) line.supply = Math.min(1000, sup)
+        // a cap of 0 a day is not a cap, it is a typo
         const mx = Math.round(Number(rl.sosMax) || 0)
         if (mx > 0) line.sosMax = Math.min(99, mx)
       }
@@ -937,6 +956,8 @@ async function applyIntent(
     // it printed the first time.
     if (v.printedAt) return { ok: true, slip: slipDataFor(v, pt, dmap), again: true }
     if (!v.lines.length) return { ok: false, why: 'Nothing is prescribed yet.' }
+    const noDoctor = slipDoctorMissing(v)
+    if (noDoctor) return { ok: false, why: noDoctor }
     const ready = linesReady(v.lines, dmap)
     if (ready.bad >= 0) return { ok: false, why: 'Line ' + (ready.bad + 1) + ' has no dose yet.' }
     if (ready.nameless >= 0) {
@@ -945,7 +966,7 @@ async function applyIntent(
     // freeze and stamp in one write, so no reload can ever see a printed
     // visit whose lines are not frozen
     const lines = freezeLines(v.lines, dmap)
-    const stamp = { lines, printedAt: Date.now(), status: 'done' as const }
+    const stamp = printedStamp(lines)
     await db.visits.update(vid, stamp)
     signal({ kind: 'printed', token: v.token })
     return { ok: true, slip: slipDataFor({ ...v, ...stamp }, pt, dmap) }
@@ -961,6 +982,34 @@ async function applyIntent(
  * earlier tick. A queue of two is invisible; a lost tick at a busy counter
  * is a patient short a medicine.
  */
+/**
+ * A DOOR THAT CAN BE KNOCKED ON A THOUSAND TIMES A SECOND IS NOT A DOOR.
+ *
+ * PINs are four digits and the wire answered every guess at socket speed, so
+ * any device on the clinic wifi could walk 0000..9999 in under a minute. Five
+ * wrong answers from one device now cost it thirty seconds of "try later",
+ * doubling each time it keeps going, and the count forgets itself after an
+ * hour of quiet. The slip lookup gets the same treatment against walking the
+ * day's numbers: a store scans a few slips a minute, not a hundred.
+ */
+const knocks = new Map<string, { n: number; until: number; at: number }>()
+function knock(key: string, limit: number, penaltyMs: number): string | null {
+  const now = Date.now()
+  const k = knocks.get(key) ?? { n: 0, until: 0, at: now }
+  if (now - k.at > 3600_000) { k.n = 0; k.until = 0 }
+  k.at = now
+  if (k.until > now) { knocks.set(key, k); return `Too many tries. Wait ${Math.ceil((k.until - now) / 1000)} seconds.` }
+  k.n += 1
+  if (k.n >= limit) {
+    const strikes = Math.floor(k.n / limit)
+    k.until = now + penaltyMs * Math.min(8, 2 ** (strikes - 1))
+  }
+  knocks.set(key, k)
+  return null
+}
+/** a right answer clears the slate for that device */
+const knockClear = (key: string) => knocks.delete(key)
+
 let intentChain: Promise<unknown> = Promise.resolve()
 function queuedIntent(job: () => Promise<Record<string, unknown>>): Promise<Record<string, unknown>> {
   const next = intentChain.then(job, job)
@@ -1001,8 +1050,11 @@ function startHost(): void {
         }
         doctorId = want
       }
+      const gate = knock('pin:' + String(m.from ?? '?'), 5, 30_000)
+      if (gate) { send({ t: 'authno', to: m.from, req: m.req, why: gate }); return }
       const ok = await checkRolePin(role, String(m.pin ?? ''))
       if (!ok) { send({ t: 'authno', to: m.from, req: m.req, why: 'That is not right. Try again.' }); return }
+      knockClear('pin:' + String(m.from ?? '?'))
       const sid2 = newSid()
       sittings.set(sid2, { role, fromId: m.from!, at: Date.now(), doctorId })
       send({ t: 'authok', to: m.from, req: m.req, sid: sid2, role, doctorId })

@@ -222,6 +222,9 @@ export type RestoreReport = {
   patients: number
   visits: number
   skipped: number
+  /** patients left out because their printed number already belongs to
+   *  someone else on this machine */
+  numberClashes?: number
 }
 
 export function readBackup(text: string): SetupFile {
@@ -229,6 +232,38 @@ export function readBackup(text: string): SetupFile {
   if (f?.magic !== MAGIC) throw new Error('That is not a Nuskho setup file.')
   if (typeof f.version !== 'number' || f.version > VERSION)
     throw new Error('That file was made by a newer version of Nuskho.')
+  /**
+   * THE SHAPE IS CHECKED BEFORE ANYTHING IS WRITTEN.
+   *
+   * `magic` and `version` said the file was ours; nothing said its rows were
+   * whole. A visit whose `lines` was not an array went straight into the
+   * table and from then on every count, every day summary and the print path
+   * threw on it, permanently, with no way to find which row. doctors.ts
+   * validates its own blob for exactly this reason; the three big tables did
+   * not. A file that fails here writes nothing.
+   */
+  const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)
+  const bad = (what: string) => new Error(`That file is damaged: ${what}. Nothing was changed.`)
+  for (const key of ['drugs', 'patients', 'visits', 'sets'] as const) {
+    if (f[key] !== undefined && !Array.isArray(f[key])) throw bad(`${key} is not a list`)
+  }
+  for (const d of f.drugs ?? []) {
+    if (!isObj(d) || typeof d.id !== 'string' || typeof d.brand !== 'string') throw bad('a medicine has no id or name')
+  }
+  for (const p of f.patients ?? []) {
+    if (!isObj(p) || typeof p.id !== 'string' || typeof p.name !== 'string'
+        || typeof p.num !== 'number' || !Number.isFinite(p.num) || p.num <= 0) throw bad('a patient has no id, name or number')
+  }
+  for (const v of f.visits ?? []) {
+    if (!isObj(v) || typeof v.id !== 'string' || typeof v.patientId !== 'string'
+        || !Array.isArray(v.lines) || typeof v.createdAt !== 'number') throw bad('a visit has no id, patient, lines or date')
+    for (const l of v.lines) {
+      if (!isObj(l) || typeof l.drugId !== 'string' || !isObj(l.dose)) throw bad('a prescription line has no medicine or dose')
+    }
+  }
+  for (const st of f.sets ?? []) {
+    if (!isObj(st) || typeof st.id !== 'string' || !Array.isArray(st.lines)) throw bad('a set has no id or lines')
+  }
   return f as SetupFile
 }
 
@@ -277,11 +312,23 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
     rep.drugs++
   }
 
+  /* ONE NUMBER, ONE PERSON, EVEN ACROSS A RESTORE.
+     The dedupe was by id alone. A file from another install, or from before
+     a factory reset, carries patients whose printed numbers this machine has
+     since issued to other people; putting them in gave two people one number,
+     and the number is what a returning patient hands over. A number already
+     held here by a DIFFERENT id is skipped, and reported. */
+  const numHeld = new Map((await db.patients.toArray()).map(p => [p.num, p.id]))
+  let clashes = 0
   for (const p of f.patients ?? []) {
     if (await db.patients.get(p.id)) { rep.skipped++; continue }
+    const holder = numHeld.get(p.num)
+    if (holder && holder !== p.id) { rep.skipped++; clashes++; continue }
     await db.patients.put(p)
+    numHeld.set(p.num, p.id)
     rep.patients++
   }
+  rep.numberClashes = clashes
   // Numbers issued since this file was made may already be on paper in someone's
   // hand. Jump the counter clear of everything restored rather than risk a
   // collision; a gap in the numbering costs nothing.

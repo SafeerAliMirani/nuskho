@@ -143,8 +143,34 @@ export async function snapshotDaily(): Promise<boolean> {
       await db.table('snapshots').delete(s.at)
     }
     localStorage.setItem(SNAP_KEY, String(Date.now()))
+    try { localStorage.removeItem(SNAP_FAIL_KEY) } catch { /* ignore */ }
     return true
-  } catch { return false }
+  } catch {
+    // The catch used to return false to a caller that threw the answer away,
+    // so a snapshot that had stopped working (a full disk, a broken table)
+    // was reported nowhere. The failure is written down and the screens that
+    // talk about storage read it.
+    try { localStorage.setItem(SNAP_FAIL_KEY, String(Date.now())) } catch { /* ignore */ }
+    return false
+  }
+}
+
+const SNAP_FAIL_KEY = 'nk-snap-fail'
+
+/**
+ * Has the nightly snapshot been failing? Null when the last attempt worked,
+ * else the sentence the storage screens should show. A failure older than the
+ * last success is not trouble.
+ */
+export function snapshotTrouble(): string | null {
+  try {
+    const fail = +(localStorage.getItem(SNAP_FAIL_KEY) ?? 0)
+    const ok = +(localStorage.getItem(SNAP_KEY) ?? 0)
+    if (!fail || fail < ok) return null
+    const days = Math.floor((Date.now() - fail) / DAY)
+    return `The nightly safety copy has been FAILING (last tried ${days === 0 ? 'today' : days + ' days ago'}). `
+      + 'The disk may be full. Export a backup file now and free space on this computer.'
+  } catch { return null }
 }
 
 export function noteExported(): void {

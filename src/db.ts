@@ -258,9 +258,15 @@ export const owedRefund = (v: Visit) => !!v.fee?.refund && !v.fee.refundedAt
 export async function daySummary(visits: Visit[]) {
   const by = (s: VisitStatus) => visits.filter(v => v.status === s).length
   const fees = visits.map(v => v.fee).filter(Boolean) as Fee[]
+  /* AN AMENDED SLIP IS THE SAME PATIENT, NOT A SECOND ONE.
+     Correcting a prescription makes a new visit row that carries the old
+     one's readings so they print again. Counted naively it was a second
+     patient, a second slip, a second set of test money owed, and a standing
+     "no fee recorded" nobody could clear, every time a slip was corrected. */
+  const firsts = visits.filter(v => !v.amendsId)
   return {
-    total: visits.length,
-    printed: visits.filter(v => v.printedAt).length,
+    total: firsts.length,
+    printed: firsts.filter(v => v.printedAt).length,
     waiting: by('waiting'),
     seen: by('seen'),
     left: by('left'),
@@ -272,17 +278,17 @@ export async function daySummary(visits: Visit[]) {
     refundCount: fees.filter(f => f.refund && !f.refundedAt).length,
     waived: fees.filter(f => f.state === 'waived').length,
     due: fees.filter(f => f.state === 'due').reduce((a, f) => a + f.amount, 0),
-    unrecorded: visits.filter(v => !v.fee && v.status !== 'waiting').length,
+    unrecorded: firsts.filter(v => !v.fee && v.status !== 'waiting').length,
 
     /* Tests done in the clinic, kept apart from the consultation fee in every
        figure. A clinic that cannot tell the two apart cannot tell whether the
        strip machine pays for itself. Owed until the compounder marks it taken,
        because money nobody collected must never look collected. */
-    testsTaken: visits.filter(v => v.testsPaidAt)
+    testsTaken: firsts.filter(v => v.testsPaidAt)
                       .reduce((a, v) => a + chargeTotal(chargesFor(v.vitals, INSTANT)), 0),
-    testsOwed: visits.filter(v => !v.testsPaidAt)
+    testsOwed: firsts.filter(v => !v.testsPaidAt)
                      .reduce((a, v) => a + chargeTotal(chargesFor(v.vitals, INSTANT)), 0),
-    testsOwedCount: visits.filter(v => !v.testsPaidAt && chargesFor(v.vitals, INSTANT).length).length,
+    testsOwedCount: firsts.filter(v => !v.testsPaidAt && chargesFor(v.vitals, INSTANT).length).length,
   }
 }
 
@@ -298,7 +304,15 @@ export const listSets = () => db.sets.orderBy('name').toArray()
 
 /** Saved from a prescription he has just written, under a name he types. */
 export async function saveSet(name: string, lines: RxLine[]): Promise<void> {
-  const clean = lines.map(l => ({ drugId: l.drugId, dose: { ...l.dose }, meal: l.meal, days: l.days }))
+  // Everything that makes the line what it is, and nothing about the visit.
+  // SOS, side and the note used to be dropped here, so a set saved from an
+  // SOS prescription came back as a scheduled line with no dose at all.
+  const clean = lines.map(l => ({
+    drugId: l.drugId, dose: { ...l.dose }, meal: l.meal, days: l.days,
+    ...(l.side ? { side: l.side } : {}),
+    ...(l.note ? { note: l.note } : {}),
+    ...(l.sos ? { sos: true, sosReason: l.sosReason, supply: l.supply, sosMax: l.sosMax } : {}),
+  }))
   if (!name.trim() || !clean.length) return
   await db.sets.put({ id: uid(), name: name.trim(), createdAt: Date.now(), lines: clean })
 }

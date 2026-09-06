@@ -25,9 +25,12 @@ describe('SOS / when-needed medicines', () => {
     expect(course(l, snap('tab'))).toEqual({ n: 10, unit: 'tablets' })
   })
 
-  it('judges an SOS line by its reason, not its empty schedule', () => {
-    expect(lineIsEmpty({ ...base, sos: true, sosReason: { en: 'for pain', sd: 'سور لاءِ' } })).toBe(false)
-    expect(lineIsEmpty({ ...base, sos: true })).toBe(true)          // SOS, no reason chosen
+  it('judges an SOS line by its reason and its supply, not its empty schedule', () => {
+    const pain = { en: 'for pain', sd: 'سور لاءِ' }
+    expect(lineIsEmpty({ ...base, sos: true, sosReason: pain, supply: 10 })).toBe(false)
+    expect(lineIsEmpty({ ...base, sos: true, supply: 10 })).toBe(true)      // SOS, no reason chosen
+    expect(lineIsEmpty({ ...base, sos: true, sosReason: pain })).toBe(true) // SOS, nothing to hand over
+    expect(lineIsEmpty({ ...base, sos: true, sosReason: pain, supply: 0 })).toBe(true)
     expect(lineIsEmpty({ ...base })).toBe(true)                     // scheduled, no dose
     expect(lineIsEmpty({ ...base, dose: { m: 1, d: 0, n: 0 } })).toBe(false)
   })
@@ -37,5 +40,28 @@ describe('SOS / when-needed medicines', () => {
     expect(sosReasons.find(r => r.key === 'pain')?.sd).toBe('سور لاءِ')
     expect(sosReasons.length).toBeGreaterThanOrEqual(14)
     expect(sosMaxLine(3)).toContain('3')
+  })
+})
+
+import { cleanAge, cleanPhone, cleanName, cleanDecimal } from './fields'
+describe('one rule for a patient\'s fields at every door', () => {
+  it('refuses an impossible age instead of clipping it into a plausible one', () => {
+    expect(cleanAge('231321')).toBe('')
+    expect(cleanAge('120')).toBe('120')
+    expect(cleanAge('121')).toBe('')
+    expect(cleanAge('045')).toBe('45')
+    expect(cleanAge('7 years')).toBe('7')
+  })
+  it('keeps a phone to digits, plus and space', () => {
+    expect(cleanPhone('0300-123 4567')).toBe('0300123 4567')
+    expect(cleanPhone('+92 300 1234567 ext 9')).toBe('+92 300 1234567')
+  })
+  it('tidies a name without changing it', () => {
+    expect(cleanName('  Wazir   Ali ')).toBe('Wazir Ali')
+  })
+  it('allows one decimal point in a vitals box', () => {
+    expect(cleanDecimal('1.2.3')).toBe('1.23')
+    expect(cleanDecimal('98.6')).toBe('98.6')
+    expect(cleanDecimal('a12')).toBe('12')
   })
 })

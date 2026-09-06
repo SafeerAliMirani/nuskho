@@ -4,7 +4,7 @@ import { profile, APP } from '../profile'
 import { paper } from '../paper'
 import { role, ROLE_NAME } from '../roles'
 import { buildingMode } from '../building'
-import { daysSinceExport, storageReport } from '../safety'
+import { daysSinceExport, storageReport, snapshotTrouble } from '../safety'
 import { Mark, IcShield, IcInfo, IcCheck, IcPrint } from '../ui/art'
 import { Note } from '../ui/Note'
 import { VERSION, BUILT, BUILD, CHANNEL, isDemo } from '../version'
@@ -91,6 +91,7 @@ export default function About({ onBack }: { onBack: () => void }) {
       `Medicines  ${counts.drugs} on the list, ${counts.unchecked} with Sindhi not yet ticked`,
       `Records    ${counts.patients} patients, ${counts.visits} visits`,
       `Backup     ${days === null ? 'never saved' : `${days} days ago`}`,
+      `Snapshot   ${snapshotTrouble() ? 'FAILING' : 'ok'}`,
       '',
       `Browser    ${navigator.userAgent}`,
       `Screen     ${window.innerWidth}x${window.innerHeight}`,

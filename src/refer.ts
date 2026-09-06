@@ -176,7 +176,9 @@ export async function unsend(visitId: string): Promise<SendResult> {
     return { ok: false, why: 'That room has already started. Ask them.' }
   if (other) await db.visits.delete(other.id)
   await db.visits.update(visitId, { sentOn: undefined })
-  if (v.status === 'referred') await closeVisit(visitId, 'waiting')
+  // back in the queue, and not "closed at" anything: closeVisit stamps an
+  // ending, and a token that is waiting again has none
+  if (v.status === 'referred') await db.visits.update(visitId, { status: 'waiting', closedAt: undefined, closeNote: undefined })
   return { ok: true }
 }
 

@@ -1249,6 +1249,9 @@ function BackupTab() {
           {rep.kind === 'full' && <div><span>Patients added</span><b>{rep.patients}</b></div>}
           {rep.kind === 'full' && <div><span>Prescriptions added</span><b>{rep.visits}</b></div>}
           <div><span>Already here, left alone</span><b>{rep.skipped}</b></div>
+          {!!rep.numberClashes && (
+            <div><span>Left out: their patient number already belongs to someone here</span><b>{rep.numberClashes}</b></div>
+          )}
         </div>
       )}
 
@@ -1359,6 +1362,9 @@ function Snapshots() {
           <div><span>Patients added back</span><b>{rep.patients}</b></div>
           <div><span>Prescriptions added back</span><b>{rep.visits}</b></div>
           <div><span>Already here, left alone</span><b>{rep.skipped}</b></div>
+          {!!rep.numberClashes && (
+            <div><span>Left out: their patient number already belongs to someone here</span><b>{rep.numberClashes}</b></div>
+          )}
         </div>
       )}
     </>

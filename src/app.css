@@ -2199,3 +2199,7 @@ h2 svg{width:26px;height:26px;padding:5px;border-radius:8px;background:var(--g-1
 .top .hdav{margin-left:2px}
 @media (max-width:640px){.top .brandwrap .mk{display:none}}
 .blank svg{width:240px}
+
+/* the doctor's own line under a medicine, on the host screen */
+.linenote{margin:var(--s2) 0 0}
+.linenote input{padding:9px var(--s3);font-size:14px;width:100%}

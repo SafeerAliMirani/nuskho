@@ -441,6 +441,7 @@ function MDesk({ s }: { s: WireState }) {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
+  const [sex, setSex] = useState<'' | 'M' | 'F'>('')
   const [city, setCity] = useState('')
   const [urgent, setUrgent] = useState(false)
   const [selDoc, setSelDoc] = useState('')
@@ -460,14 +461,14 @@ function MDesk({ s }: { s: WireState }) {
     if (busy) return
     setBusy(true); setMsg('')
     const r = await intent(kind, {
-      code, name, age, city, urgent,
+      code, name, age, sex: sex || undefined, city, urgent,
       amount: +amt || 0, feeState: fstate, doctorId: sel?.id,
       wantHostPrint: !paper().token,
     })
     setBusy(false)
     if (r.ok === false) { setMsg(String(r.why)); return }
     setMsg(`Token ${r.token} issued${sel ? ` for Room ${sel.room}` : ''}.`)
-    setName(''); setAge(''); setCode(''); setUrgent(false)
+    setName(''); setAge(''); setSex(''); setCode(''); setUrgent(false)
     setAmt(String(rate || '')); setFstate('paid')
     if (r.slip && paper().token) printToken(r.slip as TokenSlip)
   }
@@ -494,9 +495,22 @@ function MDesk({ s }: { s: WireState }) {
       <div className="row">
         <div className="fld"><label>Age — optional</label>
           <input value={age} inputMode="numeric" maxLength={3}
-                 onChange={e => setAge(e.target.value.replace(/\D/g, '').slice(0, 3))} /></div>
+                 onChange={e => {
+                   const v = e.target.value.replace(/\D/g, '').slice(0, 3)
+                   if (v === '' || +v <= 120) setAge(v)
+                 }} /></div>
         <div className="fld"><label>City — optional</label>
           <input value={city} onChange={e => setCity(e.target.value)} /></div>
+      </div>
+      {/* the desk collects this; the phone at the door did not, so every
+          phone-registered patient printed with a blank beside the age */}
+      <div className="fld"><label>Man or woman — optional</label>
+        <div className="chips">
+          {([['M', 'Man'], ['F', 'Woman']] as const).map(([k, l]) => (
+            <button key={k} className={'chip' + (sex === k ? ' have' : '')}
+                    onClick={() => setSex(sex === k ? '' : k)}>{l}</button>
+          ))}
+        </div>
       </div>
       <label className="check urgentbox">
         <input type="checkbox" checked={urgent} onChange={e => setUrgent(e.target.checked)} />
@@ -925,8 +939,8 @@ function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
           </button>
         ) : (
           <button className="dbtn on" style={{ minWidth: 96 }}
-                  onClick={() => onChange({ meal: l.meal === 'after' ? 'before' : 'after' })}>
-            {l.meal === 'before' ? 'before' : 'after'}<small>FOOD</small>
+                  onClick={() => onChange({ meal: l.meal === 'after' ? 'before' : l.meal === 'before' ? 'any' : 'after' })}>
+            {l.meal === 'after' ? 'after' : l.meal === 'before' ? 'before' : '—'}<small>FOOD</small>
           </button>
         )}
         <div className="stp">
@@ -975,7 +989,9 @@ function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
         <input value={l.note ?? ''} maxLength={160} placeholder="note, optional"
                onChange={e => onChange({ note: e.target.value || undefined })} />
       </div>
-      {empty && <div className="badmsg">No dose set. This would print with no instruction.</div>}
+      {empty && <div className="badmsg">{l.sos
+                ? (!l.sosReason?.en ? 'Pick what it is for. This would print with no reason.' : 'Nothing to hand over: set how many to give.')
+                : 'No dose set. This would print with no instruction.'}</div>}
       {twin && (
         <div className="badmsg warn">
           Same medicine as line {twin.map(k => k + 1).join(' and ')}:

@@ -387,6 +387,16 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean, evening: bool
   // SOS / "when needed": no schedule cells and no day count. The reason spans the
   // dose and food columns (colspan keeps the fixed table grid intact), and the
   // count cell carries the supply the pharmacy hands over.
+  /**
+   * THE DOCTOR'S OWN LINE UNDER A MEDICINE.
+   *
+   * The phone offered a per-line note for months and the printer never drew
+   * it: a doctor typed "dissolve in half a glass of water" and the patient
+   * got a row with nothing under the name. It is his own words in his own
+   * script, so it prints as he typed it, under the generic, in the name cell,
+   * where the fitter measures it like any other line.
+   */
+  const noteLine = line.note ? `<div class="rxnote">${esc(line.note)}</div>` : ''
   if (line.sos) {
     const cols = evening ? 5 : 4
     const r = line.sosReason
@@ -397,7 +407,7 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean, evening: bool
       <td class="nmcell"><div class="nmg">
         <div class="brand">${esc(m.brand)} ${esc(m.strength)}</div>
         <div class="gen">${esc(m.generic)}</div>
-        ${nameSdLine(m)}
+        ${nameSdLine(m)}${noteLine}
       </div></td>
       <td class="soscell" colspan="${cols}"><div class="sosw sd" dir="rtl">${esc(SOS_PREFIX)}، <bdi>${esc(reason)}</bdi></div>${maxLine}</td>
       <td class="dycell">${total}</td>
@@ -432,7 +442,7 @@ function row(i: number, line: RxLine, m: RxSnap, compact: boolean, evening: bool
       <td class="nmcell"><div class="nmg">
         <div class="brand">${esc(m.brand)} ${esc(m.strength)}</div>
         <div class="gen">${esc(m.generic)}</div>
-        ${nameSdLine(m)}
+        ${nameSdLine(m)}${noteLine}
       </div></td>
       ${doseCell(m, line.dose.m, sz)}${doseCell(m, line.dose.d, sz)}${
         evening ? doseCell(m, line.dose.e ?? 0, sz) : ''}${doseCell(m, line.dose.n, sz)}
