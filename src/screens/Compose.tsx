@@ -11,7 +11,8 @@ import { printSlip } from '../print/print'
 import { doctorById, multiRoom, visitDoctorId } from '../doctors'
 import { sendOn, unsend, incoming, sendTargets, destinationEn, type Incoming } from '../refer'
 import { filled } from '../data/vitals'
-import { IcBook, IcPill, IcPrint, IcUser } from '../ui/art'
+import { IcBook, IcPill, IcPrint, IcUser, FormIcon } from '../ui/art'
+import { SlipPreview } from '../ui/SlipPreview'
 import { Note } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Bell from '../ui/Bell'
@@ -675,7 +676,7 @@ export default function Compose({ visitId, onDone, onBack }: {
             <div className={`line ${flash === i ? 'flash' : ''} ${empty ? 'bad' : ''}`} key={i}
                  ref={el => { rows.current[i] = el }}>
               <div className="hd">
-                <div><b><span className="ln">{i + 1}</span>{d.brand} {d.strength}</b>
+                <div><b><span className="ln">{i + 1}</span><FormIcon form={l.snap?.form ?? d.form} route={l.snap?.route ?? d.route} className="fi" />{d.brand} {d.strength}</b>
                   {/* THE WHO LABEL THAT USED TO SIT HERE IS GONE.
                       It printed "WHO Watch" beside the stronger antibiotics,
                       taken from the AWaRe list, and it was a true published
@@ -822,6 +823,7 @@ export default function Compose({ visitId, onDone, onBack }: {
           {grid.slice(0, 24).map(d => {
             const on = visit.lines.some(l => l.drugId === d.id)
             return <button key={d.id} className={`chip ${on ? 'have' : ''}`} onClick={() => addDrug(d.id)}>
+              <FormIcon form={d.form} route={d.route} size={16} className="fi" />
               {on ? '✓' : '+'} {d.brand}{d.strength ? ' ' + d.strength : ''}</button>
           })}
         </div>
@@ -888,6 +890,11 @@ export default function Compose({ visitId, onDone, onBack }: {
               </span>
             ))}
           </p>
+        )}
+
+        {/* The paper itself, while it is being written. Laptop only. */}
+        {visit.lines.length > 0 && (
+          <SlipPreview data={slipData} deps={visit} />
         )}
 
         </div>
@@ -961,6 +968,7 @@ export default function Compose({ visitId, onDone, onBack }: {
           <button className={`btn wide ${badIdx >= 0 || namelessIdx >= 0 ? 'warn' : ''}`} onClick={print}
                   disabled={busy || visit.lines.length === 0}>
             {!busy && badIdx < 0 && namelessIdx < 0 && <IcPrint size={20} />}
+            {busy && <span className="sheetout" aria-hidden><i /></span>}
             {busy ? 'Printing…'
               : namelessIdx >= 0 ? `Line ${namelessIdx + 1} has no medicine name. Remove it and add it again`
               : badIdx >= 0 ? `${drugs[visit.lines[badIdx].drugId]?.brand} has no dose. Tap to fix`

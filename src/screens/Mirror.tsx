@@ -12,7 +12,7 @@ import { tourFor, tourSeen } from '../tour'
 import { readQrPayload } from '../print/qr'
 import { printToken, printSlip } from '../print/print'
 import { paper } from '../paper'
-import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn } from '../ui/art'
+import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn, FormIcon } from '../ui/art'
 import { APP } from '../profile'
 import Broke from '../ui/Broke'
 import Toasts from '../ui/Toasts'
@@ -903,7 +903,7 @@ function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
   return (
     <div className="line">
       <div className="hd">
-        <div><b><span className="ln">{i + 1}</span>{brand} {strength}</b><small>{generic}</small></div>
+        <div><b><span className="ln">{i + 1}</span><FormIcon form={l.snap?.form ?? med?.form ?? 'other'} route={route} className="fi" />{brand} {strength}</b><small>{generic}</small></div>
         <button className="x" onClick={onRemove}>×</button>
       </div>
       <div className="dosegrid">
@@ -1329,6 +1329,7 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
                 {ownHits.length > 0 && <div className="dhead">Your list</div>}
                 {ownHits.map(m => (
                   <button key={m.id} className="drow2 mdr-ownhit" onClick={() => addOwn(m)}>
+                    <FormIcon form={m.form} route={m.route} size={16} className="fi" />
                     <span className="dl">{m.brand}{m.strength ? ' ' + m.strength : ''} · {m.generic}</span>
                     <span className="add">add</span>
                   </button>
@@ -1338,6 +1339,7 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
                   <button key={e.brand + '|' + e.strength} className="drow2 mdr-shelfhit"
                           disabled={busy === 'take:' + e.brand + '|' + e.strength}
                           onClick={() => addFromShelf(e)}>
+                    <FormIcon form={e.form} route={e.route} size={16} className="fi" />
                     <span className="dl">{dictLine(e)}</span>
                     <span className="add">add</span>
                   </button>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readQrPayload } from '../print/qr'
-import { ArtEmpty, IcScan, IcUser, IcMoney, IcQueue } from '../ui/art'
+import { ArtWaiting, IcScan, IcUser, IcMoney, IcQueue } from '../ui/art'
 import { Note, Tip } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Vitals from '../ui/Vitals'
@@ -551,7 +551,7 @@ export default function Intake({ visits, onOpen, onChange }: {
       )}
       {!visits.length && (
         <div className="blank">
-          <ArtEmpty />
+          <ArtWaiting />
           <b>Nobody waiting yet</b>
           {/* The form is above for the desk and below for the doctor, so the
               empty state cannot say "above" to everyone. For the doctor it

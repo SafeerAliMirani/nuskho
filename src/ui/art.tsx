@@ -20,6 +20,8 @@
  * green line drawing has lost nothing at all.
  */
 
+import type { Form, Route } from '../types'
+
 type P = { size?: number; className?: string }
 
 const box = (size: number, className?: string) => ({
@@ -60,7 +62,7 @@ export const IcLock = ({ size = 20, className }: P) => (
 export const IcPrint = ({ size = 20, className }: P) => (
   <svg {...box(size, className)}>
     <path d="M7 9V3.5h10V9" /><rect x="3.5" y="9" width="17" height="7.5" rx="2" />
-    <rect x="7" y="14" width="10" height="6.5" rx="1.2" fill="#fff" />
+    <rect x="7" y="14" width="10" height="6.5" rx="1.2" fill="var(--card)" />
     <circle cx="17.2" cy="11.8" r=".9" fill="currentColor" stroke="none" />
   </svg>
 )
@@ -166,11 +168,11 @@ export const ArtSlip = ({ className }: { className?: string }) => (
         another patient. It sits BEHIND an opaque front sheet: a translucent
         slip lets the one underneath show through its own rows, which reads as a
         printing fault rather than as a stack. */}
-    <rect x="50" y="26" width="146" height="152" rx="9" fill="#fff" fillOpacity=".55"
+    <rect x="50" y="26" width="146" height="152" rx="9" fill="var(--card)" fillOpacity=".55"
           stroke="var(--g)" strokeOpacity=".3" strokeWidth="2" transform="rotate(-7 123 102)" />
 
     {/* the slip */}
-    <rect x="62" y="12" width="152" height="164" rx="9" fill="#fff" />
+    <rect x="62" y="12" width="152" height="164" rx="9" fill="var(--card)" />
     <rect x="62" y="12" width="152" height="164" rx="9" fill="url(#nk-g1)" />
     <rect x="62" y="12" width="152" height="164" rx="9" fill="none"
           stroke="var(--g)" strokeWidth="2.4" />
@@ -227,7 +229,7 @@ export const ArtPrinter = ({ className }: { className?: string }) => (
     <rect x="40" y="48" width="120" height="42" rx="8" fill="currentColor" fillOpacity=".07"
           stroke="currentColor" strokeOpacity=".45" strokeWidth="2.6" />
     <circle cx="142" cy="60" r="3.6" fill="currentColor" opacity=".55" />
-    <rect x="62" y="86" width="76" height="34" rx="4" fill="#fff" stroke="currentColor" strokeWidth="2.6" />
+    <rect x="62" y="86" width="76" height="34" rx="4" fill="var(--card)" stroke="currentColor" strokeWidth="2.6" />
     <path d="M76 98h48M76 108h32" stroke="currentColor" strokeOpacity=".35" strokeWidth="3" strokeLinecap="round" />
   </svg>
 )
@@ -386,7 +388,7 @@ export const ArtDone = ({ className }: { className?: string }) => (
     <rect x="46" y="66" width="108" height="40" rx="9" fill="currentColor" fillOpacity=".1"
           stroke="currentColor" strokeWidth="2.6" />
     <circle cx="136" cy="80" r="3.4" fill="currentColor" />
-    <rect x="62" y="96" width="76" height="40" rx="5" fill="#fff" stroke="currentColor" strokeWidth="2.6" />
+    <rect x="62" y="96" width="76" height="40" rx="5" fill="var(--card)" stroke="currentColor" strokeWidth="2.6" />
     <path d="M74 110h34M74 121h22" stroke="currentColor" strokeOpacity=".4" strokeWidth="3" strokeLinecap="round" />
     <circle cx="100" cy="34" r="20" fill="currentColor" fillOpacity=".12" />
     <circle cx="100" cy="34" r="20" stroke="currentColor" strokeWidth="2.6" />
@@ -436,3 +438,131 @@ export const ArtBackup = ({ className }: { className?: string }) => (
     <circle cx="168" cy="61" r="5" stroke="currentColor" strokeWidth="2.6" />
   </svg>
 )
+
+/* ==========================================================================
+   THE MEDICINE'S SHAPE (Sept 2026, on the doctors' ask for pictures)
+
+   One small drawing per form, on the medicine card and on the shelf chip, so
+   the doctor knows a syrup from a tablet before he has read the name. Drawn to
+   the same 24-box as the icons above, all currentColor, all decoration: the
+   form is always also written, on screen and on paper.
+   ========================================================================== */
+
+
+export const FormIcon = ({ form, route, size = 18, className }:
+  { form: Form; route?: Route; size?: number; className?: string }) => {
+  const b = box(size, className)
+  switch (form) {
+    case 'tab': return (
+      <svg {...b}><circle cx="12" cy="12" r="8.2" /><path d="M4.6 12h14.8" strokeOpacity=".5" /><path d="M8 7.4a5.4 5.4 0 0 1 4-1.6" strokeOpacity=".35" /></svg>)
+    case 'cap': return (
+      <svg {...b}>
+        <rect x="2.6" y="8.6" width="18.8" height="6.8" rx="3.4" transform="rotate(-40 12 12)" />
+        <path d="M9.2 6.6 17.4 14.8" />
+        <path d="M14.2 7.6c1.6-.5 3.2.3 3.8 1.6" strokeOpacity=".45" />
+      </svg>)
+    case 'syr': return (
+      <svg {...b}>
+        <path d="M9 3.5h6M10 3.5v3.2L7.2 10.4a2 2 0 0 0-.4 1.2V19a1.8 1.8 0 0 0 1.8 1.8h6.8A1.8 1.8 0 0 0 17.2 19v-7.4a2 2 0 0 0-.4-1.2L14 6.7V3.5" />
+        <path d="M7 14.2h10.2" strokeOpacity=".45" />
+      </svg>)
+    case 'drop': return route === 'eye' ? (
+      <svg {...b}>
+        <path d="M2.8 12c2.6-4.1 5.7-6.2 9.2-6.2s6.6 2.1 9.2 6.2c-2.6 4.1-5.7 6.2-9.2 6.2S5.4 16.1 2.8 12Z" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M18.6 3.2c0 1.4-1 2.2-1.6 3.2-.6-1-1.6-1.8-1.6-3.2a1.6 1.6 0 0 1 3.2 0Z" fill="currentColor" stroke="none" opacity=".7" />
+      </svg>) : route === 'ear' ? (
+      <svg {...b}>
+        <path d="M7.4 9.6a5.2 5.2 0 0 1 10.4.4c0 2.6-2 3.4-2.6 5-.5 1.4-.6 3.6-2.8 3.9-1.6.2-2.6-1-2.8-2.2" />
+        <path d="M10.6 10.2a2.2 2.2 0 0 1 4.2.6c0 1.2-1 1.6-1.4 2.6" strokeOpacity=".5" />
+        <path d="M6 3.4c0 1.3-.9 2-1.5 3-.6-1-1.5-1.7-1.5-3a1.5 1.5 0 0 1 3 0Z" fill="currentColor" stroke="none" opacity=".7" />
+      </svg>) : route === 'nose' ? (
+      <svg {...b}>
+        <path d="M11.4 4.4c-.6 3.6-3.6 8-3.6 10.6a3.6 3.6 0 0 0 3.6 3.6h2a3.6 3.6 0 0 0 3.6-3.6c0-1.6-.8-2.4-1.6-3.2" />
+        <path d="M9.4 14.6a1.6 1.6 0 1 0 3.2 0M13.8 15.4a1.4 1.4 0 1 0 2.8 0" strokeOpacity=".5" />
+        <path d="M19.6 3.2c0 1.4-1 2.2-1.6 3.2-.6-1-1.6-1.8-1.6-3.2a1.6 1.6 0 0 1 3.2 0Z" fill="currentColor" stroke="none" opacity=".7" />
+      </svg>) : (
+      <svg {...b}>
+        <path d="M12 3.4c2.4 3.8 6 7.2 6 11.2a6 6 0 0 1-12 0c0-4 3.6-7.4 6-11.2Z" />
+        <path d="M8.8 14.6a3.2 3.2 0 0 0 2.2 3" strokeOpacity=".45" />
+      </svg>)
+    case 'cream': return (
+      <svg {...b}>
+        <path d="M8 6.2h8v2.2H8zM7 8.4h10l2.4 10.6a1.4 1.4 0 0 1-1.4 1.6H6a1.4 1.4 0 0 1-1.4-1.6L7 8.4Z" />
+        <path d="M10.6 3.6h2.8v2.6h-2.8z" />
+        <path d="M8.2 15.4c1.4-1.2 2.6-1.2 4 0s2.4 1.2 3.6 0" strokeOpacity=".45" />
+      </svg>)
+    case 'sachet': return (
+      <svg {...b}>
+        <path d="M6.4 4.6h11.2l.8 2.2v12a1.6 1.6 0 0 1-1.6 1.6H7.2a1.6 1.6 0 0 1-1.6-1.6v-12l.8-2.2Z" />
+        <path d="M5.6 7.4h12.8" strokeOpacity=".5" />
+        <path d="M9 12.4h6M9 15.6h4" strokeOpacity=".4" />
+      </svg>)
+    case 'inhaler': return (
+      <svg {...b}>
+        <path d="M9.4 3.6h4.2v8.2l3.2 5.4a1.4 1.4 0 0 1-1.2 2.1H8.2a1.4 1.4 0 0 1-1.2-2.1l2.4-4V3.6Z" />
+        <path d="M13.6 6.4h2.6" strokeOpacity=".5" />
+        <path d="M17.4 12.4c1.2-.8 2-1.8 2.2-3.2M18.6 15.2c1.4-1 2.4-2.4 2.8-4.2" strokeOpacity=".45" />
+      </svg>)
+    case 'supp': return (
+      <svg {...b}>
+        <path d="M12 3.6c2.6 0 4.2 1.8 4.2 4.6v6.4c0 3.4-1.8 5.8-4.2 5.8s-4.2-2.4-4.2-5.8V8.2c0-2.8 1.6-4.6 4.2-4.6Z" />
+        <path d="M8 10.8h8" strokeOpacity=".45" />
+      </svg>)
+    case 'patch': return (
+      <svg {...b}>
+        <rect x="3.2" y="8.2" width="17.6" height="7.6" rx="3.8" transform="rotate(-30 12 12)" />
+        <path d="M10 10.2h4M10 12h4M10 13.8h4" strokeOpacity=".45" transform="rotate(-30 12 12)" />
+      </svg>)
+    default: return (
+      <svg {...b}>
+        <rect x="5" y="3.4" width="14" height="17.2" rx="2.2" />
+        <path d="M8.6 8.4h6.8M8.6 12h6.8M8.6 15.6h4" strokeOpacity=".45" />
+      </svg>)
+  }
+}
+
+
+/**
+ * THE WAITING ROOM WITH NOBODY IN IT. Two chairs, a clock, the door: the
+ * scene the queue screen describes when it is empty. Same line language as
+ * the rest, so it reads as the same hand.
+ */
+export const ArtWaiting = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 240 130" className={className} fill="none" aria-hidden>
+    <ellipse cx="120" cy="116" rx="86" ry="7" fill="currentColor" opacity=".07" />
+    {/* the door, ajar */}
+    <rect x="164" y="22" width="40" height="86" rx="3" stroke="currentColor" strokeOpacity=".32" strokeWidth="2.4" />
+    <path d="M170 22v86l26-8V30l-26-8Z" fill="currentColor" fillOpacity=".06" stroke="currentColor" strokeOpacity=".4" strokeWidth="2.2" strokeLinejoin="round" />
+    <circle cx="190" cy="66" r="2.2" fill="currentColor" opacity=".5" />
+    {/* the clock */}
+    <circle cx="60" cy="34" r="13" fill="var(--card)" stroke="currentColor" strokeOpacity=".35" strokeWidth="2.4" />
+    <path d="M60 26v8.6l5.4 3.2" stroke="currentColor" strokeOpacity=".55" strokeWidth="2.2" strokeLinecap="round" />
+    {/* two chairs, empty */}
+    {[38, 92].map(x => (
+      <g key={x} stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <rect x={x} y="60" width="30" height="24" rx="5" fill="currentColor" fillOpacity=".08" strokeOpacity=".4" />
+        <path d={`M${x + 2} 84v10h26V84`} strokeOpacity=".4" />
+        <path d={`M${x + 6} 94v14M${x + 24} 94v14`} strokeOpacity=".3" />
+        <path d={`M${x} 92h30`} strokeOpacity=".2" />
+      </g>
+    ))}
+    {/* a plant, because every waiting room has one */}
+    <path d="M140 108c0-14 6-22 6-30M146 78c-6 2-10 8-9 16M146 78c6 2 10 8 9 16" stroke="currentColor" strokeOpacity=".45" strokeWidth="2.2" strokeLinecap="round" />
+    <path d="M134 108h24l-3 8h-18l-3-8Z" fill="currentColor" fillOpacity=".1" stroke="currentColor" strokeOpacity=".4" strokeWidth="2.2" strokeLinejoin="round" />
+  </svg>
+)
+
+/** The doctor's initials in a disc, for the header. Text, not a photo: it
+ *  is true of this clinic and it never dates. */
+export const Avatar = ({ name, size = 34, className }: { name: string; size?: number; className?: string }) => {
+  const parts = name.replace(/^dr\.?\s+/i, '').split(/\s+/).filter(Boolean)
+  const ini = (parts.length > 1
+    ? parts[0][0] + parts[parts.length - 1][0]
+    : (parts[0] ?? '?').slice(0, 2)).toUpperCase()
+  return (
+    <span className={'avatar ' + (className ?? '')} style={{ width: size, height: size, fontSize: size * .4 }} aria-hidden>
+      {ini}
+    </span>
+  )
+}

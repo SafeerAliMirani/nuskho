@@ -16,7 +16,7 @@ import Mirror from './screens/Mirror'
 import Tour from './ui/Tour'
 import { tourFor, tourSeen } from './tour'
 import { todaysVisits } from './db'
-import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo, IcBook } from './ui/art'
+import { Mark, IcChart, IcCog, IcLock, IcUser, IcQueue, IcInfo, IcBook, Avatar } from './ui/art'
 import Toasts from './ui/Toasts'
 import Broke from './ui/Broke'
 import Bill from './ui/Bill'
@@ -234,6 +234,10 @@ function Clinic() {
       <header className="top">
         <div className="brandwrap">
           <Mark size={30} className="mk" />
+          {/* the person at the keyboard, as initials: a face for the panel
+              that is true of this clinic */}
+          {(me?.nameEn || profile().doctorEn) &&
+            <Avatar name={me?.nameEn ?? profile().doctorEn} className="hdav" />}
           <div className="who2">
             {/* In a building with rooms this said the FIRST doctor's name to
                 whoever was signed in, so Dr Soomro worked all evening under a
@@ -252,7 +256,7 @@ function Clinic() {
               such a counter must never be handed. A role without the queue has
               no use for either number. */}
           {can('queue') && <>
-            <span><IcQueue size={15} /> {today.length} waiting</span>
+            <span key={today.length} className="cnt"><IcQueue size={15} /> {today.length} waiting</span>
             <span className="pr">{printed} printed</span>
           </>}
 

@@ -2138,3 +2138,64 @@ h2 svg{width:26px;height:26px;padding:5px;border-radius:8px;background:var(--g-1
 
 /* selected diagnosis and selected medicine chips: a tick they can feel */
 .chip.on{box-shadow:0 1px 0 rgba(255,255,255,.16) inset,0 2px 8px -2px rgba(15,92,74,.45)}
+
+/* the medicine's shape, beside its name */
+.line .hd b .fi{color:var(--g);flex:none;opacity:.9}
+.chip .fi{vertical-align:-3px;margin-right:6px;color:var(--g);opacity:.85}
+.chip.on .fi,.chip.have .fi{color:inherit}
+.drow2 .fi{color:var(--g);margin-right:8px;flex:none;vertical-align:-3px}
+
+/* the slip as it will print, small, in the laptop's right column */
+.slippv{display:none;margin-top:var(--s4)}
+@media (min-width:1081px){.slippv{display:block}}
+.slippv-cap{font-size:var(--t-xs);font-weight:700;letter-spacing:var(--tr-wide);text-transform:uppercase;
+  color:var(--mut);margin-bottom:var(--s2)}
+.slippv-box{position:relative;overflow:hidden;border-radius:var(--r2);background:var(--wash);
+  border:1.5px solid var(--line);box-shadow:var(--ring),var(--sh-1)}
+.slippv-in{position:absolute;left:1px;top:2px;transform-origin:top left;pointer-events:none;
+  font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif;color:#000}
+.slippv-in .page{margin:0;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.slippv-empty{padding:var(--s6) var(--s4);color:var(--faint);font-size:var(--t-sm);text-align:center}
+
+/* =============================================================================
+   MOTION IN THE FLOW (Sept 2026, on the doctors' ask)
+
+   Every one of these is feedback for a tap or an arrival, none is decoration
+   that plays on its own, and every one is a transform or an opacity so nothing
+   reflows. The reduced-motion rule at the top of this file already turns them
+   off; the block below only runs when the device has not asked for quiet.
+   ============================================================================= */
+@media (prefers-reduced-motion:no-preference){
+  /* a dose that just switched on pops, once */
+  @keyframes nk-dpop{0%{transform:scale(.92)}55%{transform:scale(1.06)}100%{transform:scale(1)}}
+  .dbtn.on,.chip.on,.chip.have{animation:nk-dpop 200ms var(--spring)}
+  .dbtn:active,.chip:active,.stp button:active{transform:scale(.94);transition:transform 60ms}
+  /* the stepper's number nudges when it changes */
+  .stp .v{transition:transform var(--fast) var(--ease)}
+  /* a new patient card announces itself once */
+  .ptcard .tk-badge{animation:nk-pulse 900ms var(--ease) 1}
+  /* a queue row arriving, and the count in the header ticking */
+  .qrow{animation:nk-rise var(--slow) var(--ease)}
+  @keyframes nk-tick{0%{transform:translateY(-6px);opacity:0}100%{transform:none;opacity:1}}
+  .counts .cnt{display:inline-flex;animation:nk-tick var(--mid) var(--ease)}
+  /* the sheet coming out of the printer while PRINT is busy */
+  @keyframes nk-sheet{0%{transform:translateY(0);opacity:0}30%{opacity:1}100%{transform:translateY(-12px);opacity:0}}
+  .sheetout{position:relative;width:20px;height:20px;display:inline-block;flex:none}
+  .sheetout::before{content:'';position:absolute;left:2px;right:2px;bottom:0;height:8px;border-radius:2px;
+    background:rgba(255,255,255,.35)}
+  .sheetout i{position:absolute;left:5px;right:5px;bottom:5px;height:12px;border-radius:1.5px;
+    background:#fff;animation:nk-sheet 900ms var(--ease) infinite}
+  /* the slip preview breathes in when it changes */
+  .slippv-in{animation:nk-fade var(--mid) var(--ease)}
+  /* section cards lift a hair under the pointer */
+  .vitals,.ptcard{transition:box-shadow var(--fast) var(--ease),transform var(--fast) var(--ease)}
+  .vitals:hover{box-shadow:var(--ring),var(--sh-2)}
+}
+
+/* the doctor's initials in the header and elsewhere */
+.avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;flex:none;
+  background:linear-gradient(160deg,var(--gold),#a8841c);color:#1d1600;font-family:var(--display);
+  font-weight:800;letter-spacing:.02em;box-shadow:0 1px 0 rgba(255,255,255,.35) inset,var(--sh-1)}
+.top .hdav{margin-left:2px}
+@media (max-width:640px){.top .brandwrap .mk{display:none}}
+.blank svg{width:240px}
