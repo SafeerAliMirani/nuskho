@@ -60,6 +60,9 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
               <small>People served <i className="sd">ماڻهو</i></small>
               <b>{s.month.toLocaleString('en-GB')}</b>
               <span>in {s.monthLabel} · {s.today} today</span>
+              {/* the shape of the month behind the number it belongs to: the
+                  stat-tile-with-trend pattern, not a second chart */}
+              <Spark rows={s.byEvening} />
             </div>
             <div className="mh">
               <small>People who came back</small>
@@ -122,18 +125,9 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
           {s.byEvening.length > 1 && (
             <>
               <h2><IcCalendar size={17} /> Patients per evening</h2>
-              <div className="evcols">
-                {(() => {
-                  const max = Math.max(...s.byEvening.map(z => z.n)) || 1
-                  return s.byEvening.map(e => (
-                    <i key={e.day} className={e.n === max ? 'mx' : ''}
-                       style={{ height: `${Math.max(8, (e.n / max) * 100)}%` }}
-                       title={`${new Date(e.day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: ${e.n}`} />
-                  ))
-                })()}
-              </div>
+              <Columns rows={s.byEvening} />
               <p className="hint">This month, day by day. Counts only: no projections, no
-                smoothing, no trend arrows. The gold column is the busiest evening.</p>
+                smoothing, no trend arrows. The busiest evening carries its number.</p>
             </>
           )}
 
@@ -261,7 +255,18 @@ function Tile({ big, lab, sd, sub, hero, warn, tone, icon: I, cap }: {
   )
 }
 
-/** Horizontal bars with the count printed on them. No pies, no legends. */
+/**
+ * RANKED BARS: ONE MEASURE, ONE HUE, THE NUMBER AT THE TIP.
+ *
+ * Magnitude low-to-high is the plainest job a chart has, and the plainest form
+ * answers it: a single hue, a recessive track, the value beside the end of the
+ * bar rather than a number floating on every gridline. No pie, because a pie
+ * asks the reader to compare angles; no legend, because one series needs none —
+ * the heading above already says what is being counted.
+ *
+ * The bar is capped in thickness rather than filling its row: the leftover is
+ * air, and air is what stops a list of bars reading as a solid block.
+ */
 function Bars({ rows }: { rows: Bar[] }) {
   if (!rows.length) return <p className="hint">Nothing recorded yet.</p>
   const max = Math.max(...rows.map(r => r.n)) || 1
@@ -269,12 +274,82 @@ function Bars({ rows }: { rows: Bar[] }) {
     <div className="bars">
       {rows.map(r => (
         <div className="brow" key={r.label}>
-          <span className="bl">{r.label}</span>
-          <span className="bt"><i style={{ width: `${(r.n / max) * 100}%` }} /></span>
-          <span className="bn">{r.n} <small>{r.pct}%</small></span>
+          <span className="bl" title={r.label}>{r.label}</span>
+          <span className="bt">
+            <i style={{ width: `${Math.max(1.5, (r.n / max) * 100)}%` }} />
+          </span>
+          <span className="bn">{r.n.toLocaleString('en-GB')} <small>{r.pct}%</small></span>
         </div>
       ))}
     </div>
+  )
+}
+
+/**
+ * PATIENTS PER EVENING: A COLUMN PER DAY, AND NOTHING ELSE ON THE CANVAS.
+ *
+ * A month is at most 31 columns, which is exactly the width a phone can hold
+ * without a scroll, so this is drawn as columns and not as a line: a count on a
+ * particular evening is a thing that happened, and a line between two evenings
+ * draws a path through a night when the clinic was shut.
+ *
+ * What is deliberately absent: a trend line, a moving average, a projection, a
+ * comparison with last month. Ten patients on Tuesday and fourteen on Wednesday
+ * is weather. The page says so in its own words a few lines above this, and a
+ * chart that quietly implied otherwise would be arguing with it.
+ *
+ * ONE number is printed, on the busiest column, because a label on all
+ * thirty-one is noise and the reader can hover for the rest. The top rule is
+ * the month's maximum: a single hairline, so the columns are measurable without
+ * a grid drawn behind them.
+ */
+function Columns({ rows }: { rows: { day: number; n: number }[] }) {
+  const max = Math.max(...rows.map(r => r.n)) || 1
+  const peak = rows.reduce((a, b) => (b.n > a.n ? b : a), rows[0])
+  const fmt = (d: number) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return (
+    <div className="cols">
+      <div className="cols-y">
+        <span className="cols-max">{max}</span>
+        <span className="cols-zero">0</span>
+      </div>
+      <div className="cols-plot">
+        <div className="cols-rule" />
+        <div className="cols-bars">
+          {rows.map(e => (
+            <div className="colw" key={e.day}
+                 data-tip={`${fmt(e.day)} · ${e.n} ${e.n === 1 ? 'patient' : 'patients'}`}>
+              {e.day === peak.day && e.n > 0 && <b className="colcap">{e.n}</b>}
+              <i style={{ height: `${e.n ? Math.max(3, (e.n / max) * 100) : 0}%` }} />
+            </div>
+          ))}
+        </div>
+        <div className="cols-x">
+          <span>{fmt(rows[0].day)}</span>
+          <span>{fmt(rows[rows.length - 1].day)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The month's shape, at the size of a word, inside the tile whose number it
+ * explains. It carries no axis and no labels on purpose: it is not a chart the
+ * reader measures, it is the difference between "132" and "132, and the last
+ * week was the quiet one". The real chart is below, with its numbers.
+ */
+function Spark({ rows }: { rows: { day: number; n: number }[] }) {
+  if (rows.length < 3) return null
+  const max = Math.max(...rows.map(r => r.n)) || 1
+  const W = 100, H = 24
+  const step = W / Math.max(1, rows.length - 1)
+  const pts = rows.map((r, i) => `${(i * step).toFixed(1)},${(H - (r.n / max) * (H - 3) - 1.5).toFixed(1)}`)
+  return (
+    <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
+      <polyline points={`0,${H} ${pts.join(' ')} ${W},${H}`} className="spark-fill" />
+      <polyline points={pts.join(' ')} className="spark-line" vectorEffect="non-scaling-stroke" />
+    </svg>
   )
 }
 

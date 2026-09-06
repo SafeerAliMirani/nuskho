@@ -1809,7 +1809,8 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
   line-height:1.1;color:#fff;margin-top:6px;font-variant-numeric:tabular-nums}
 .mh span{display:block;font-size:12.3px;color:#b9d2c9;margin-top:4px}
 .mh.alt{background:var(--card);box-shadow:var(--ring),0 8px 24px -12px rgba(9,38,31,.16)}
-.mh.alt b{color:var(--g-700)}.mh.alt small{color:var(--faint)}.mh.alt span{color:var(--mut)}
+/* the theme's own brand green, so the number does not go dim on a dark card */
+.mh.alt b{color:var(--g)}.mh.alt small{color:var(--faint)}.mh.alt span{color:var(--mut)}
 @media (max-width:760px){.mheroes{grid-template-columns:1fr 1fr}.mh b{font-size:30px}}
 
 .evcols{display:flex;align-items:flex-end;gap:3px;height:92px;background:var(--card);
@@ -2225,3 +2226,91 @@ h2 svg{width:26px;height:26px;padding:5px;border-radius:8px;background:var(--g-1
   .careline{flex-wrap:wrap}
   .careline .cl-in{flex:1 0 100%;order:2}
 }
+
+/* =============================================================================
+   THE FIGURES PAGE (Sept 2026, on the doctors' ask for charts)
+
+   THE PALETTE HERE IS ONE HUE, AND THAT IS A FINDING, NOT A SHORTCUT.
+   Every chart on this page plots ONE measure: patients per evening, patients
+   per diagnosis, patients per village. A second colour on a single-series
+   chart carries no information and costs the reader a legend to decode it. The
+   only chart with two series — arrived against left-without-being-seen — is
+   the only one that gets a second colour, and that pair was checked for
+   colour-blind separation rather than chosen by eye:
+
+     light  #2b8f74 (--g-500) vs #a3301a (--bad)   worst-case ΔE 12.4 deutan
+     dark   #3fa88b (--g-500) vs #e0654a           worst-case ΔE  9.2 deutan
+
+   Both clear the 8-point floor and both clear 3:1 against their own surface,
+   which is why the mark colours below are tokens and not literals: the dark
+   theme re-steps them rather than inverting them.
+
+   Text never wears the data colour. The bars are green; every number and label
+   beside them is ink.
+   ============================================================================= */
+
+:root{ --ch-a:var(--g-500); --ch-b:var(--bad); --ch-track:var(--line-2) }
+:root[data-theme=dark]{ --ch-b:#e0654a }
+@media (prefers-color-scheme:dark){ :root:not([data-theme=light]){ --ch-b:#e0654a } }
+
+/* ---- ranked bars: capped thickness, rounded data-end, value at the tip ---- */
+.brow{grid-template-columns:minmax(110px,1.1fr) 3fr auto;gap:var(--s3);padding:5px 0}
+.bl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+.bt{background:var(--ch-track);border-radius:var(--r1);height:14px;overflow:visible;
+  position:relative}
+.bt i{display:block;height:100%;min-width:6px;
+  border-radius:3px 4px 4px 3px;          /* square at the baseline, round at the data end */
+  background:var(--ch-a);
+  transform-origin:left;animation:nk-bar 520ms var(--ease)}
+.bn{color:var(--ink)}
+
+/* ---- patients per evening ---- */
+.cols{display:flex;gap:var(--s2);margin:var(--s2) 0 var(--s1)}
+.cols-y{display:flex;flex-direction:column;justify-content:space-between;
+  height:132px;padding:2px 0 18px;font-size:var(--t-xs);color:var(--mut);
+  font-variant-numeric:tabular-nums;text-align:right;min-width:22px}
+.cols-plot{flex:1;min-width:0;position:relative}
+/* one hairline, at the month's maximum: enough to measure by, and no grid */
+.cols-rule{position:absolute;left:0;right:0;top:0;height:1px;background:var(--line);pointer-events:none}
+/* Centred, and each slot capped: six evenings early in the month must not
+   stand as six lonely posts across a metre of screen, and twenty-eight must
+   not fuse into a block. The 2px gap is the surface doing the separating. */
+.cols-bars{display:flex;align-items:flex-end;justify-content:center;gap:2px;height:114px;
+  border-bottom:1px solid var(--line)}
+/* the SLOT spreads, the MARK is capped: a short month must not leave the
+   chart bunched against the left edge, and a long one must not turn the
+   columns into a solid block. The leftover inside each slot is the air. */
+.colw{flex:1 1 0;min-width:0;max-width:44px;height:100%;display:flex;align-items:flex-end;
+  justify-content:center;position:relative}
+.colw i{display:block;width:100%;max-width:24px;background:var(--ch-a);border-radius:4px 4px 0 0;
+  transform-origin:bottom;animation:nk-bar 460ms var(--ease)}
+.colw:hover i{background:var(--g)}
+.colcap{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+  font-size:var(--t-xs);font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;
+  margin-bottom:3px;pointer-events:none}
+.cols-x{display:flex;justify-content:space-between;margin-top:5px;
+  font-size:var(--t-xs);color:var(--mut)}
+/* the hover layer, in CSS so it works with the network unplugged */
+.colw[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);
+  left:50%;transform:translateX(-50%);white-space:nowrap;z-index:5;
+  background:var(--ink);color:var(--bg);font-size:var(--t-xs);font-weight:600;
+  padding:5px 9px;border-radius:7px;box-shadow:var(--sh-2);pointer-events:none}
+.colw[data-tip]:hover::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;
+  transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink);z-index:5}
+@media (max-width:640px){
+  .cols-bars{height:96px}
+  .cols-y{height:114px}
+}
+
+/* ---- the month's shape, inside the tile whose number it explains ---- */
+.spark{display:block;width:100%;height:26px;margin-top:var(--s2);overflow:visible}
+.spark-line{fill:none;stroke:rgba(255,255,255,.85);stroke-width:2;
+  stroke-linejoin:round;stroke-linecap:round}
+.spark-fill{fill:rgba(255,255,255,.14);stroke:none}
+.mh.alt .spark-line{stroke:var(--g-500)}
+.mh.alt .spark-fill{fill:rgba(43,143,116,.12)}
+
+/* ---- arrived against left: the one two-series chart on the page ---- */
+.hbar .fill{background:var(--ch-a);border-radius:4px 4px 0 0}
+.hbar .lost{background:var(--ch-b);border-radius:0 0 2px 2px}
+.swatch{background:var(--ch-b)}

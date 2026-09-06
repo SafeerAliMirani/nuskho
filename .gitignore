@@ -23,3 +23,6 @@ tools/nuskho-wifi.exe
 # wrangler local simulation state, never shipped
 .wrangler/
 dist-drive
+
+# the desktop app drops screenshots and files it sends you in here
+Claude outputs/
