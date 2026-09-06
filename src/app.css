@@ -2203,3 +2203,25 @@ h2 svg{width:26px;height:26px;padding:5px;border-radius:8px;background:var(--g-1
 /* the doctor's own line under a medicine, on the host screen */
 .linenote{margin:var(--s2) 0 0}
 .linenote input{padding:9px var(--s3);font-size:14px;width:100%}
+
+/* A reading that is not a reading. Not the amber of "unusual": this one stops
+   the slip, so it is the same red the empty-dose line uses. */
+.vfld.f-imp .vone,.vfld.f-imp .vpair{border-color:var(--bad);background:var(--bad-bg)}
+.vfld.f-imp .vmark{color:var(--bad);font-weight:700}
+
+/* the care line: allergies and pregnancy, under the patient's name */
+.careline{display:flex;align-items:center;gap:var(--s2);margin:0 0 var(--s4);
+  padding:var(--s2) var(--s3);border:1.5px dashed var(--line);border-radius:var(--r2);
+  background:var(--card)}
+.careline.on{border-style:solid;border-color:var(--w-line);background:var(--w-fill)}
+.careline .cl-i{display:flex;color:var(--faint);flex:none}
+.careline.on .cl-i{color:var(--w-solid)}
+.careline .cl-in{flex:1;min-width:0;border:0;background:none;outline:none;
+  font-size:15px;font-weight:600;color:var(--ink);padding:6px 0}
+.careline .cl-in::placeholder{color:var(--faint);font-weight:400}
+.careline.on .cl-in{color:var(--w-text)}
+.careline .cl-pg{flex:none;padding:7px var(--s3);font-size:var(--t-sm)}
+@media (max-width:640px){
+  .careline{flex-wrap:wrap}
+  .careline .cl-in{flex:1 0 100%;order:2}
+}

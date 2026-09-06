@@ -209,9 +209,41 @@ export async function unarchiveDrug(id: string) {
 
 /* ------------------------------------------------------------------- visits */
 
-/** End a visit without a prescription. The token stops waiting; nothing is deleted. */
-export async function closeVisit(id: string, status: VisitStatus, note?: string) {
+/**
+ * WHICH ENDINGS CAN FOLLOW WHICH, IN ONE PLACE.
+ *
+ * There was no such place. `mayOpen` let any row be opened whatever its
+ * status, the print path stamped `done` unconditionally, and the desk could
+ * close a token that had already been prescribed for as "left" — so a patient
+ * who walked out holding a slip appeared in the evening's figures as one who
+ * gave up waiting, and the paper in his hand said otherwise.
+ *
+ * The rules, and the reasoning for each:
+ *
+ *   'done' is FINAL. A prescription was printed and is in somebody's hand;
+ *   nothing said at the desk afterwards can unprint it. (Correcting one is
+ *   what amend() is for: a new visit, not a rewritten ending.)
+ *
+ *   Every other ending can be undone back to 'waiting', because all of them
+ *   are somebody's reading of a room and a person can misread a room: a
+ *   patient marked 'left' who was in the toilet comes back and is called.
+ *
+ *   'seen' can still become any ending, including 'done' — being seen is not
+ *   an ending at all, it is the middle.
+ */
+export function canBecome(from: VisitStatus, to: VisitStatus): boolean {
+  if (from === to) return true
+  if (from === 'done') return false
+  return true
+}
+
+/** End a visit without a prescription. The token stops waiting; nothing is
+ *  deleted. A visit that already printed is refused: see canBecome. */
+export async function closeVisit(id: string, status: VisitStatus, note?: string): Promise<boolean> {
+  const v = await db.visits.get(id)
+  if (!v || !canBecome(v.status, status)) return false
   await db.visits.update(id, { status, closedAt: Date.now(), closeNote: note?.trim() || undefined })
+  return true
 }
 
 export async function setFee(id: string, fee: Fee | undefined) {

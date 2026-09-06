@@ -98,6 +98,7 @@ export default function Intake({ visits, onOpen, onChange }: {
   const [city, setCity] = useState(NEAR[0])
   const [msg, setMsg] = useState('')
   const [names, setNames] = useState<Record<string, string>>({})
+  const [ages, setAges] = useState<Record<string, string>>({})
   const [closing, setClosing] = useState<string | null>(null)
   const [closeNote, setCloseNote] = useState('')
 
@@ -173,8 +174,15 @@ export default function Intake({ visits, onOpen, onChange }: {
   if (visits.length && Object.keys(names).length !== visits.length) {
     db.patients.bulkGet(visits.map(v => v.patientId)).then(ps => {
       const m: Record<string, string> = {}
-      visits.forEach((v, i) => { m[v.id] = ps[i] ? `${ps[i]!.name} · ${patientCode(ps[i]!.num)}` : '—' })
+      // the age travels with the name, so the compounder's own pad can stop
+      // judging a child's pulse by an adult's range
+      const a: Record<string, string> = {}
+      visits.forEach((v, i) => {
+        m[v.id] = ps[i] ? `${ps[i]!.name} · ${patientCode(ps[i]!.num)}` : '—'
+        if (ps[i]?.age) a[v.id] = ps[i]!.age!
+      })
       setNames(m)
+      setAges(a)
     })
   }
 
@@ -272,7 +280,10 @@ export default function Intake({ visits, onOpen, onChange }: {
 
   async function close(id: string, s: VisitStatus) {
     await guard('queue', 'The token was not closed', async () => {
-      await closeVisit(id, s, closeNote)
+      if (!await closeVisit(id, s, closeNote)) {
+        // canBecome refused it: a printed slip is in somebody's hand
+        throw new Error('That token has already been prescribed for. Its slip is printed, so it cannot be closed as something else.')
+      }
       setClosing(null)
       setCloseNote('')
       onChange()
@@ -618,6 +629,7 @@ export default function Intake({ visits, onOpen, onChange }: {
                 not in the room. Only what he fills is printed. */}
             {v.status === 'waiting' && (
               <Vitals which="vital" value={v.vitals ?? {}}
+                      age={ages[v.id]}
                       onChange={nv => saveVitals(v, nv)} />
             )}
 

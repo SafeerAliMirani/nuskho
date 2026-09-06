@@ -28,6 +28,7 @@ import { doseSdFor, defaultRoute } from './data/forms'
 import { doctorById } from './doctors'
 import { patientCode } from './code'
 import { destinationEn, destinationSd } from './refer'
+import { firstImpossible } from './data/vitals'
 import { profile } from './profile'
 
 /** A line with no dose at all. The screen bumps it; the printer refuses it.
@@ -109,6 +110,24 @@ export function drugFromShelf(e: DictEntry, id: string): Drug {
 }
 
 /**
+ * A READING THAT CANNOT BE A READING MUST NOT REACH PAPER.
+ *
+ * The vitals boxes took any well-formed number and printed it. 999/999 was
+ * accepted, marked "higher than usual" like a real abnormal reading, and put
+ * on the slip a chemist reads. The marking was the whole defence and it says
+ * the same thing about a true emergency and a slipped thumb.
+ *
+ * This is the same gate `linesReady` is for a dose: not a judgement about the
+ * patient, just a refusal to print a number no body produces. Emptying the box
+ * clears it, and every number inside the generous bounds prints exactly as it
+ * always did.
+ */
+export function vitalsBlocker(v: Visit): string | null {
+  const bad = firstImpossible(v.vitals)
+  return bad ? `${bad.en} reads "${(v.vitals ?? {})[bad.key]}", which is not a possible reading. Correct it or clear the box.` : null
+}
+
+/**
  * WHOSE NAME GOES ON THE PAPER, AND WHETHER THERE IS ONE.
  *
  * The setup wizard insists "a name has to print on every slip" and then offers
@@ -149,6 +168,7 @@ export function slipDataFor(v: Visit, pt: Patient, drugs: Record<string, Drug>):
   const room = doctorById(v.doctorId)
   return {
     visit: v, patientName: pt.name, patientAge: pt.age, patientSex: pt.sex,
+    patientAlert: pt.alert,
     patientCode: patientCode(pt.num), drugs, rxId: v.id.slice(-6),
     doctor: room ? {
       nameEn: room.nameEn, nameSd: room.nameSd,

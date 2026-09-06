@@ -86,6 +86,23 @@ export interface VitalDef {
   /** for a pair, the range of the second number */
   lo2?: number
   hi2?: number
+  /**
+   * THE BOUNDS OF A POSSIBLE READING, WHICH IS NOT THE SAME AS A NORMAL ONE.
+   *
+   * `lo`/`hi` are the ordinary adult range: outside them the number is marked
+   * and printed, because an abnormal reading is exactly what the doctor needs
+   * to see. `pmin`/`pmax` are wider and mean something else entirely — outside
+   * them there is no patient, only a typo. A blood pressure of 999/999 was
+   * accepted, marked "higher than usual" and printed on the slip.
+   *
+   * They are deliberately generous. A number inside them is the compounder's
+   * business; a number outside them is arithmetic, and the app may say so.
+   */
+  pmin?: number
+  pmax?: number
+  /** for a pair, the possible range of the second number */
+  pmin2?: number
+  pmax2?: number
   /** shown under the field so nobody has to remember the units */
   hint?: string
 }
@@ -93,11 +110,12 @@ export interface VitalDef {
 /** Taken by the compounder, before the doctor. */
 export const VITALS: VitalDef[] = [
   { key: 'bp', short: 'BP', en: 'Blood pressure', sd: 'بلڊ پريشر', unit: 'mmHg', kind: 'vital',
-    max: 3, pair: true, lo: 90, hi: 140, lo2: 60, hi2: 90, hint: 'upper / lower' },
-  { key: 'pulse', short: 'Pulse', en: 'Pulse', sd: 'نبض', unit: '/min', kind: 'vital', max: 3, lo: 60, hi: 100 },
-  { key: 'temp', short: 'Temp', en: 'Temperature', sd: 'حرارت', unit: '°F', kind: 'vital', max: 5, lo: 97, hi: 99.5 },
-  { key: 'weight', short: 'Weight', en: 'Weight', sd: 'وزن', unit: 'kg', kind: 'vital', max: 5, lo: 2, hi: 200 },
-  { key: 'spo2', short: 'SpO₂', en: 'Oxygen', sd: 'آڪسيجن', unit: '%', kind: 'vital', max: 3, lo: 94, hi: 100 },
+    max: 3, pair: true, lo: 90, hi: 140, lo2: 60, hi2: 90,
+    pmin: 40, pmax: 300, pmin2: 20, pmax2: 200, hint: 'upper / lower' },
+  { key: 'pulse', short: 'Pulse', en: 'Pulse', sd: 'نبض', unit: '/min', kind: 'vital', max: 3, lo: 60, hi: 100, pmin: 20, pmax: 300 },
+  { key: 'temp', short: 'Temp', en: 'Temperature', sd: 'حرارت', unit: '°F', kind: 'vital', max: 5, lo: 97, hi: 99.5, pmin: 80, pmax: 115 },
+  { key: 'weight', short: 'Weight', en: 'Weight', sd: 'وزن', unit: 'kg', kind: 'vital', max: 5, lo: 2, hi: 200, pmin: 0.5, pmax: 400 },
+  { key: 'spo2', short: 'SpO₂', en: 'Oxygen', sd: 'آڪسيجن', unit: '%', kind: 'vital', max: 3, lo: 94, hi: 100, pmin: 40, pmax: 100 },
 ]
 
 /**
@@ -108,11 +126,11 @@ export const VITALS: VitalDef[] = [
  * their own place on the slip.
  */
 export const INSTANT: VitalDef[] = [
-  { key: 'rbs', short: 'Sugar R', en: 'Random sugar', sd: 'شگر', unit: 'mg/dL', kind: 'test', max: 3, lo: 70, hi: 140 },
-  { key: 'fbs', short: 'Sugar F', en: 'Fasting sugar', sd: 'خالي پيٽ شگر', unit: 'mg/dL', kind: 'test', max: 3, lo: 70, hi: 100 },
-  { key: 'hba1c', short: 'HbA1c', en: 'HbA1c', sd: 'ايڇ بي اي', unit: '%', kind: 'test', max: 4, lo: 4, hi: 5.7 },
-  { key: 'hb', short: 'Hb', en: 'Haemoglobin', sd: 'هيموگلوبن', unit: 'g/dL', kind: 'test', max: 4, lo: 11, hi: 16 },
-  { key: 'chol', short: 'Chol', en: 'Cholesterol', sd: 'ڪوليسٽرول', unit: 'mg/dL', kind: 'test', max: 3, lo: 125, hi: 200 },
+  { key: 'rbs', short: 'Sugar R', en: 'Random sugar', sd: 'شگر', unit: 'mg/dL', kind: 'test', max: 3, lo: 70, hi: 140, pmin: 10, pmax: 1500 },
+  { key: 'fbs', short: 'Sugar F', en: 'Fasting sugar', sd: 'خالي پيٽ شگر', unit: 'mg/dL', kind: 'test', max: 3, lo: 70, hi: 100, pmin: 10, pmax: 1500 },
+  { key: 'hba1c', short: 'HbA1c', en: 'HbA1c', sd: 'ايڇ بي اي', unit: '%', kind: 'test', max: 4, lo: 4, hi: 5.7, pmin: 2, pmax: 25 },
+  { key: 'hb', short: 'Hb', en: 'Haemoglobin', sd: 'هيموگلوبن', unit: 'g/dL', kind: 'test', max: 4, lo: 11, hi: 16, pmin: 1, pmax: 30 },
+  { key: 'chol', short: 'Chol', en: 'Cholesterol', sd: 'ڪوليسٽرول', unit: 'mg/dL', kind: 'test', max: 3, lo: 125, hi: 200, pmin: 20, pmax: 1000 },
   { key: 'urine', short: 'Urine', en: 'Urine strip', sd: 'پيشاب', unit: '', kind: 'test', max: 14 },
 ]
 
@@ -129,8 +147,63 @@ export type Flag = 'low' | 'high' | null
  * mistyped vital on a slip is believed by whoever reads it next, and a person
  * checking their own typing is the cheapest safety net there is.
  */
-export function flag(def: VitalDef, raw: string): Flag {
+/**
+ * IS THIS A CHILD, AS FAR AS THE ADULT RANGES ARE CONCERNED?
+ *
+ * The ranges in this file are an ordinary adult's, and were applied to
+ * everybody: a two-year-old's perfectly normal pulse of 120 came back "higher
+ * than usual", and a doctor who is shown a false alarm twice stops reading the
+ * true one. This app has no paediatric ranges of its own and will not invent
+ * any (see clinical-decisions-needed.md); until a doctor supplies them, a
+ * child's reading is simply not judged. Saying nothing is honest. Saying the
+ * wrong thing is not.
+ *
+ * The age is free text, so anything unparseable is treated as an adult, which
+ * is what the app did before this existed.
+ */
+export const isChild = (age?: string): boolean => {
+  const n = parseFloat(String(age ?? ''))
+  return Number.isFinite(n) && n < 12
+}
+
+/**
+ * A reading no human body produces: a typo, not a patient. Returns true only
+ * when the number is outside the generous pmin/pmax, so a genuinely alarming
+ * reading is never called impossible. A box with nothing in it is not
+ * impossible, it is empty.
+ */
+export function impossible(def: VitalDef, raw: string): boolean {
+  const t = (raw ?? '').trim()
+  if (!t) return false
+  const out = (n: number, lo?: number, hi?: number) =>
+    Number.isFinite(n) && ((lo != null && n < lo) || (hi != null && n > hi))
+  if (def.pair) {
+    const [a, b] = t.split('/').map(x => parseFloat(x))
+    // a pair needs both halves: "180/" is half a reading, and half a blood
+    // pressure on a slip is worse than none
+    if (t.includes('/') && (!Number.isFinite(a) || !Number.isFinite(b))) return true
+    return out(a, def.pmin, def.pmax) || out(b, def.pmin2, def.pmax2)
+  }
+  if (!def.pmin && !def.pmax) return false      // a text box, like the urine strip
+  const n = parseFloat(t)
+  if (!Number.isFinite(n)) return true
+  return out(n, def.pmin, def.pmax)
+}
+
+/** The first box whose reading cannot be a reading, or null. Both print paths
+ *  ask this, so neither can put a typo on a patient's paper. */
+export function firstImpossible(v: Record<string, string> | undefined): VitalDef | null {
+  if (!v) return null
+  for (const d of ALL_VITALS) {
+    if (impossible(d, v[d.key] ?? '')) return d
+  }
+  return null
+}
+
+export function flag(def: VitalDef, raw: string, age?: string): Flag {
   if (!raw) return null
+  // a child is not judged by an adult's numbers; see isChild
+  if (isChild(age)) return null
   if (def.pair) {
     const [a, b] = raw.split('/').map(x => parseFloat(x))
     if (Number.isFinite(a) && def.lo != null && def.hi != null) {

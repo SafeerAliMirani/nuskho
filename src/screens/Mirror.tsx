@@ -13,6 +13,9 @@ import { readQrPayload } from '../print/qr'
 import { printToken, printSlip } from '../print/print'
 import { paper } from '../paper'
 import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn, FormIcon } from '../ui/art'
+import { CareLine } from '../ui/CareLine'
+import { courseCheck } from '../course'
+import { isChild } from '../data/vitals'
 import { APP } from '../profile'
 import Broke from '../ui/Broke'
 import Toasts from '../ui/Toasts'
@@ -998,6 +1001,8 @@ function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
           {' '}both are {generic}. Check the total dose is what you mean.
         </div>
       )}
+      {/* the same arithmetic the clinic machine shows */}
+      {courseCheck(l, l.snap) && <div className="badmsg warn">{courseCheck(l, l.snap)}</div>}
     </div>
   )
 }
@@ -1292,6 +1297,21 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
             </span>
             <IcUser size={22} className="pt-ic" />
           </div>
+
+          {/* the same two facts, and the same silence about what they mean */}
+          <CareLine alert={visit.patient.alert} pregnant={visit.pregnant}
+                    sex={visit.patient.sex} disabled={locked || !!busy}
+                    onAlert={a => {
+                      // shown at once, then sent: the record holder is the
+                      // truth, but a toggle that waits for a round trip on a
+                      // phone in a corridor reads as a broken button
+                      setVisit(v => (v ? { ...v, patient: { ...v.patient, alert: a } } : v))
+                      void intent('setCare', { visitId: visit.id, alert: a ?? '' })
+                    }}
+                    onPregnant={b => {
+                      setVisit(v => (v ? { ...v, pregnant: b } : v))
+                      void intent('setCare', { visitId: visit.id, pregnant: b })
+                    }} />
           {visit.prev && (visit.prev.diagnosis || visit.prev.brands.length > 0) && (
             <div className="prev">
               Last time: {[visit.prev.diagnosis, visit.prev.brands.join(', ')].filter(Boolean).join(', ')}
@@ -1335,6 +1355,11 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
             </div>
 
             <h2><IcPill size={17} /> Medicines</h2>
+            {isChild(visit.patient.age) && (
+              <p className="hint" style={{ marginTop: -6 }}>
+                {visit.patient.name} is {visit.patient.age}. Nuskho does not check doses by age or weight.
+              </p>
+            )}
             <div className="fld">
               <input className="mdr-search" value={q} placeholder="Type two letters to find a medicine…"
                      onChange={e => setQ(e.target.value)} />

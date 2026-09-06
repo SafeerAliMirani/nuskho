@@ -5,7 +5,7 @@ import {
 } from './db'
 import { formulary } from './data/formulary'
 import { dictionary } from './data/dictionary'
-import { linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp } from './rx'
+import { linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp, vitalsBlocker } from './rx'
 import { checkRolePin, can, type Role } from './roles'
 import { activeDoctors, isSitting, setSitting, multiRoom, doctorById, visitDoctorId } from './doctors'
 import { course } from './course'
@@ -131,8 +131,9 @@ export type WireMed = {
 export type WireOpenVisit = {
   id: string; token: number; status: VisitStatus; urgent?: boolean
   printedAt?: number
-  patient: { name: string; age?: string; sex?: 'M' | 'F'; code: string }
+  patient: { name: string; age?: string; sex?: 'M' | 'F'; code: string; alert?: string }
   diagnosis?: string
+  pregnant?: boolean
   vitals?: Record<string, string>
   lines: RxLine[]
   tests: string[]
@@ -142,7 +143,7 @@ export type WireOpenVisit = {
 }
 
 export type IntentKind =
-  | 'addPatient' | 'openByCode' | 'closeVisit' | 'setVitals' | 'markRefunded'
+  | 'addPatient' | 'openByCode' | 'closeVisit' | 'setVitals' | 'markRefunded' | 'setCare'
   | 'setGiven' | 'giveAll' | 'reopen' | 'reprint' | 'setSitting' | 'openSlip'
   | 'markTestsPaid'
   | 'openVisit' | 'saveRx' | 'printRx' | 'myMeds' | 'takeMed'
@@ -159,7 +160,7 @@ const NEED: Record<IntentKind, Parameters<typeof can>[0]> = {
   // the second doctor's screen. All of these ALSO pass the room check inside
   // applyIntent: 'prescribe' says he is a doctor, the doctorId on his sitting
   // says which one, and another room's patient answers as if it did not exist.
-  openVisit: 'prescribe', saveRx: 'prescribe', printRx: 'prescribe',
+  openVisit: 'prescribe', saveRx: 'prescribe', printRx: 'prescribe', setCare: 'prescribe',
   myMeds: 'prescribe', takeMed: 'medicines',
 }
 
@@ -716,6 +717,23 @@ async function applyIntent(
     const pt = await findByCode(clip(p.code, 13))
     if (!pt) return { ok: false, why: 'That number is not on any slip from today.' }
     knockClear('slip:' + (sit?.fromId ?? '?'))
+    /* AND A CEILING ON THE HITS, NOT ONLY ON THE MISSES.
+       The throttle above stops a walk through the numbering, because a walk is
+       mostly misses. It does nothing about a device that already knows the
+       codes. A counter serves the patients who come to it — a few dozen in an
+       evening, each one looked up once or twice — so a device asking for its
+       fortieth DIFFERENT patient within the hour is not dispensing, and waits.
+       Looking the same slip up again, which is what ticking medicines off
+       does, costs nothing. */
+    const seenKey = 'slipseen:' + (sit?.fromId ?? '?')
+    const seen = distinct.get(seenKey) ?? { ids: new Set<string>(), at: Date.now() }
+    if (Date.now() - seen.at > 3600_000) { seen.ids.clear(); seen.at = Date.now() }
+    if (!seen.ids.has(pt.id) && seen.ids.size >= 40) {
+      distinct.set(seenKey, seen)
+      return { ok: false, why: 'That is a lot of different slips in one hour. Wait a while, or ask the clinic desk.' }
+    }
+    seen.ids.add(pt.id)
+    distinct.set(seenKey, seen)
     const today = await todaysVisits()
     const mine = today
       .filter(x => x.patientId === pt.id && x.printedAt && x.lines.length > 0)
@@ -741,7 +759,10 @@ async function applyIntent(
     if (!v || v.printedAt) return { ok: false, why: 'That one cannot be closed.' }
     const s = String(p.status)
     if (!['seen', 'left', 'cancelled', 'referred'].includes(s)) return { ok: false, why: 'Not an ending.' }
-    await closeVisit(vid, s as VisitStatus)
+    // canBecome is the rule; this reports it rather than failing silently
+    if (!await closeVisit(vid, s as VisitStatus)) {
+      return { ok: false, why: 'That token has already been prescribed for. It cannot be closed as something else.' }
+    }
     return { ok: true }
   }
   if (kind === 'setVitals') {
@@ -878,8 +899,8 @@ async function applyIntent(
     const prev = await lastVisit(pt.id, v.id)
     const o: WireOpenVisit = {
       id: v.id, token: v.token, status: v.status, urgent: v.urgent, printedAt: v.printedAt,
-      patient: { name: pt.name, age: pt.age, sex: pt.sex, code: patientCode(pt.num) },
-      diagnosis: v.diagnosis, vitals: v.vitals,
+      patient: { name: pt.name, age: pt.age, sex: pt.sex, code: patientCode(pt.num), alert: pt.alert },
+      diagnosis: v.diagnosis, pregnant: v.pregnant, vitals: v.vitals,
       lines: v.lines, tests: v.tests, advice: v.advice, nextVisit: v.nextVisit,
       prev: prev ? {
         at: prev.createdAt, diagnosis: prev.diagnosis,
@@ -945,6 +966,20 @@ async function applyIntent(
     return { ok: true }
   }
 
+  /* THE CARE LINE: what this patient reacts to, and whether she is pregnant.
+     The app attaches no rule to either — see clinical-decisions-needed.md — it
+     carries what a person wrote to the people who need to read it. The alert
+     belongs to the patient and outlives the token; the pregnancy belongs to
+     this visit and does not. */
+  if (kind === 'setCare') {
+    if (!v || !mineToo(v)) return { ok: false, why: 'That patient is another room\u2019s.' }
+    if (v.printedAt) return { ok: false, why: 'That slip is printed. Amend it at the clinic machine.' }
+    if (p.pregnant !== undefined) await db.visits.update(vid, { pregnant: p.pregnant === true })
+    if (p.alert !== undefined) {
+      await db.patients.update(v.patientId, { alert: clip(p.alert, 120) || undefined })
+    }
+    return { ok: true }
+  }
   if (kind === 'printRx') {
     if (!v || !mineToo(v)) return { ok: false, why: 'That patient is another room\u2019s.' }
     const pt = await db.patients.get(v.patientId)
@@ -958,6 +993,8 @@ async function applyIntent(
     if (!v.lines.length) return { ok: false, why: 'Nothing is prescribed yet.' }
     const noDoctor = slipDoctorMissing(v)
     if (noDoctor) return { ok: false, why: noDoctor }
+    const badVital = vitalsBlocker(v)
+    if (badVital) return { ok: false, why: badVital }
     const ready = linesReady(v.lines, dmap)
     if (ready.bad >= 0) return { ok: false, why: 'Line ' + (ready.bad + 1) + ' has no dose yet.' }
     if (ready.nameless >= 0) {
@@ -1009,6 +1046,10 @@ function knock(key: string, limit: number, penaltyMs: number): string | null {
 }
 /** a right answer clears the slate for that device */
 const knockClear = (key: string) => knocks.delete(key)
+
+/** how many DIFFERENT patients one device has opened, and when it started
+ *  counting. Emptied after an hour of quiet, like the knocks above. */
+const distinct = new Map<string, { ids: Set<string>; at: number }>()
 
 let intentChain: Promise<unknown> = Promise.resolve()
 function queuedIntent(job: () => Promise<Record<string, unknown>>): Promise<Record<string, unknown>> {

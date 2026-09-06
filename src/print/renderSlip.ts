@@ -488,6 +488,9 @@ export interface SlipData {
   patientSex?: string
   /** printed large — the slip is the patient's card, so this is how we know them next time */
   patientCode: string
+  /** allergies or conditions, in the doctor's own words. Printed exactly as
+   *  typed, on its own band, because a chemist reads this slip too. */
+  patientAlert?: string
   drugs: Record<string, Drug>
   rxId: string
   /**
@@ -646,6 +649,25 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
 </div>`
 
   /**
+   * THE CARE BAND: what this patient reacts to, and whether she is pregnant.
+   *
+   * Its own band under the patient row, in the heaviest type on the sheet that
+   * is not a medicine name, because the two people who most need it are the
+   * one who reads the slip at a counter and the one who picks it up next
+   * month. It is printed in black with a rule rather than in colour: this has
+   * to survive a black and white laser and a photocopy.
+   *
+   * The words are the doctor's own, printed as typed and never interpreted.
+   * The Sindhi for "pregnant" is not reviewed yet, so the band prints English
+   * until it is, exactly like every other unreviewed string in this app.
+   */
+  const alertText = (d.patientAlert ?? '').trim()
+  const care = (alertText || visit.pregnant) ? `<div class="care">
+    ${visit.pregnant ? '<b class="care-pg">PREGNANT</b>' : ''}
+    ${alertText ? `<span class="care-t">${esc(alertText)}</span>` : ''}
+  </div>` : ''
+
+  /**
    * The numbers the compounder and the doctor took, printed with their proper
    * names and units instead of whatever key happened to be in the object.
    *
@@ -783,6 +805,7 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
   ${hdr}
   <div class="pad">
     ${pt}
+    ${care}
     ${vt}
     ${table}
     ${last ? legend : ''}

@@ -13,6 +13,7 @@ import { sendOn, unsend, incoming, sendTargets, destinationEn, type Incoming } f
 import { filled } from '../data/vitals'
 import { IcBook, IcPill, IcPrint, IcUser, FormIcon } from '../ui/art'
 import { SlipPreview } from '../ui/SlipPreview'
+import { CareLine } from '../ui/CareLine'
 import { Note } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Bell from '../ui/Bell'
@@ -23,7 +24,9 @@ import { warmPlan } from '../print/paginate'
 import { notePrinted, printerLikelyCold } from '../safety'
 import { whyItFailed } from '../fail'
 import { sameMolecule } from '../data/who'
-import { lineIsEmpty, linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp } from '../rx'
+import { lineIsEmpty, linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp, vitalsBlocker, snapFor } from '../rx'
+import { courseCheck } from '../course'
+import { isChild } from '../data/vitals'
 import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
 import { sideMatters, TIMES, timeEnFor } from '../data/forms'
 
@@ -311,6 +314,20 @@ export default function Compose({ visitId, onDone, onBack }: {
     })
   }
 
+  /* THE CARE LINE. The allergy is the patient's and outlives this token; the
+     pregnancy is this visit's and does not. Both are written straight through
+     rather than into the visit draft, because neither is part of what MINE
+     owns and a stale copy of the prescription must never drag them back. */
+  async function saveAlert(a: string | undefined) {
+    if (!pt) return
+    await db.patients.update(pt.id, { alert: a })
+    setPt({ ...pt, alert: a })
+  }
+  async function savePregnant(b: boolean) {
+    await db.visits.update(visitId, { pregnant: b || undefined })
+    if (cur.current) { cur.current = { ...cur.current, pregnant: b || undefined }; setVisit(cur.current) }
+  }
+
   const setLine = (i: number, patch: Partial<RxLine>) =>
     apply(v => ({ ...v, lines: v.lines.map((l, k) => (k === i ? { ...l, ...patch } : l)) }))
 
@@ -487,6 +504,8 @@ export default function Compose({ visitId, onDone, onBack }: {
     if (namelessIdx >= 0) { bump(namelessIdx); return }
     const noDoctor = slipDoctorMissing(cur.current!)
     if (noDoctor) { setErr(noDoctor); return }
+    const badVital = vitalsBlocker(cur.current!)
+    if (badVital) { setErr(badVital); return }
     setBusy(true)
     try {
       // Nothing goes on paper that is not on the disk first. If the freeze was
@@ -574,6 +593,11 @@ export default function Compose({ visitId, onDone, onBack }: {
         <IcUser size={22} className="pt-ic" />
       </div>
 
+      {/* Directly under the name, above everything he is about to write. */}
+      <CareLine alert={pt.alert} pregnant={visit.pregnant} sex={pt.sex}
+                disabled={locked}
+                onAlert={saveAlert} onPregnant={savePregnant} />
+
       {/* Above everything, and not down by the PRINT button, because it is true
           of the whole screen: what he is looking at came back from the disk and
           the tap he just made is not in it. */}
@@ -653,10 +677,10 @@ export default function Compose({ visitId, onDone, onBack }: {
       <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0, opacity: locked ? .55 : 1 }}>
         {/* Vitals the compounder already took, and anything the doctor runs on a
             strip machine while the patient is sitting there. Both print. */}
-        <Vitals which="vital" value={visit.vitals ?? {}}
+        <Vitals which="vital" value={visit.vitals ?? {}} age={pt.age}
                 onChange={saveVitals} startOpen
                 title="Checked before you saw them" />
-        <Vitals which="test" value={visit.vitals ?? {}}
+        <Vitals which="test" value={visit.vitals ?? {}} age={pt.age}
                 onChange={saveVitals} startOpen />
 
         {/* THE DESK. On a wide screen the prescription grows on the left while
@@ -674,6 +698,15 @@ export default function Compose({ visitId, onDone, onBack }: {
         </div>
 
         <h2><IcPill size={17} /> Medicines, printed in this order</h2>
+        {/* A REMINDER, AND DELIBERATELY NOT A RULE. Nothing in this app knows a
+            child's dose, and it is not going to pretend to: it says who is in
+            the chair and leaves the arithmetic to the person qualified to do
+            it. See clinical-decisions-needed.md. */}
+        {isChild(pt.age) && (
+          <p className="hint" style={{ marginTop: -6 }}>
+            {pt.name} is {pt.age}. Nuskho does not check doses by age or weight.
+          </p>
+        )}
         {visit.lines.map((l, i) => {
           /* A LINE WHOSE MEDICINE LEFT THE LIST MUST STILL BE ON THE SCREEN.
              This used to return null for it, so a medicine archived or merged
@@ -807,6 +840,11 @@ export default function Compose({ visitId, onDone, onBack }: {
                   Same medicine as line {twins.get(i)!.map(k => k + 1).join(' and ')}:
                   {' '}both are {drugs[l.drugId]?.generic}. Check the total dose is what you mean.
                 </div>
+              )}
+              {/* Arithmetic, not advice: what the buttons he just pressed add
+                  up to. See courseCheck. */}
+              {courseCheck(l, l.snap ?? snapFor(d)) && (
+                <div className="badmsg warn">{courseCheck(l, l.snap ?? snapFor(d))}</div>
               )}
               {flash === i && <div className="badmsg ok">Already on this prescription.
                 <button className="lnk" onClick={() => addDrug(l.drugId, true)}>Add a second line anyway</button></div>}

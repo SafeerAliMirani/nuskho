@@ -163,6 +163,18 @@ export interface Patient {
   /** city or village. Patients travel in from all around Larkana, and where
    *  they came from is one of the few things worth counting. */
   city?: string
+  /**
+   * ALLERGIES AND STANDING CONDITIONS, IN THE DOCTOR'S OWN WORDS.
+   *
+   * The app has never known that a patient reacts to penicillin, and it is not
+   * going to start deciding that for itself: there is no drug database here
+   * worth trusting with that judgement, and a wrong warning is worse than
+   * none. So this is a line a person writes and a person reads. It belongs to
+   * the PATIENT, not the visit — an allergy does not expire when the token
+   * does — it sits at the top of the prescription screen every single time,
+   * and it prints on the slip so the chemist sees it too.
+   */
+  alert?: string
   createdAt: number
 }
 
@@ -226,6 +238,16 @@ export interface Visit {
    * patient stood up. Absent means still owed, and the day's figures say so.
    */
   testsPaidAt?: number
+  /**
+   * Pregnant, as recorded in this room today.
+   *
+   * On the VISIT and not on the patient, because it is true for a while and
+   * then it is not, and a flag that stays on for ever is a flag nobody reads.
+   * The app attaches no rule to it: it prints, so the chemist and the next
+   * doctor see it, and it is the doctor who knows what that means for what he
+   * is writing. See clinical-decisions-needed.md.
+   */
+  pregnant?: boolean
   printedAt?: number     // set on every successful print — this is the audit trail
   /** when the visit stopped being open, whatever the outcome */
   closedAt?: number

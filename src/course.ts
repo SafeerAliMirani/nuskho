@@ -132,3 +132,41 @@ export const courseUnitSd = (l: RxLine, snap?: RxSnap): string => {
   if (!sd) return ''
   return m?.unitSd || sd
 }
+
+/**
+ * ARITHMETIC A DOCTOR MIGHT WANT TO SEE, WHICH IS NOT MEDICAL ADVICE.
+ *
+ * Nothing in this app knows a safe dose. It has no drug database worth
+ * trusting with that, and a wrong ceiling printed beside a medicine is worse
+ * than no ceiling at all. What it CAN do is read back the sum the doctor has
+ * just built, because the commonest way a dose goes wrong here is not
+ * judgement, it is a thumb: 2 in every box for 30 days is 240 tablets, and the
+ * screen used to show that as four green buttons and the number 30.
+ *
+ * So these are sentences of arithmetic, shown beside the line, never blocking,
+ * and they say what was entered rather than what ought to be. The thresholds
+ * are deliberately far out — six doses a day and 120 units are both ordinary
+ * prescriptions somewhere — so this stays a thing that almost never fires, and
+ * is therefore worth reading when it does.
+ */
+export function courseCheck(l: RxLine, snap?: RxSnap): string | null {
+  if (l.sos) {
+    // "no more than 6 a day" on 4 tablets handed over is not a cap, it is a
+    // contradiction, and the patient is holding the paper that says both
+    const sup = l.supply ?? 0
+    if (l.sosMax && sup && l.sosMax > sup) {
+      return `The cap is ${l.sosMax} a day but only ${sup} are given: that is less than one day's worth. Check both numbers.`
+    }
+    return null
+  }
+  const perDay = (l.dose.m || 0) + (l.dose.d || 0) + (l.dose.e || 0) + (l.dose.n || 0)
+  if (!perDay) return null
+  const { n, unit } = course(l, snap)
+  if (perDay >= 6) {
+    return `That is ${perDay} a day${n ? `, ${n} ${unit} over ${l.days} days` : ''}. Check this is what you mean.`
+  }
+  if (n >= 120) {
+    return `That comes to ${n} ${unit} over ${l.days} days. Check this is what you mean.`
+  }
+  return null
+}

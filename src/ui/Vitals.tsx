@@ -1,6 +1,6 @@
 import { cleanDecimal } from '../fields'
 import { useRef, useState } from 'react'
-import { VITALS, INSTANT, flag, type VitalDef } from '../data/vitals'
+import { VITALS, INSTANT, flag, impossible, isChild, type VitalDef } from '../data/vitals'
 import { IcCheck } from './art'
 
 /**
@@ -25,12 +25,15 @@ import { IcCheck } from './art'
  */
 const MINE_FOR = 1500
 
-export default function Vitals({ which, value, onChange, title, startOpen }: {
+export default function Vitals({ which, value, onChange, title, startOpen, age }: {
   which: 'vital' | 'test'
   value: Record<string, string>
   onChange: (v: Record<string, string>) => void
   title?: string
   startOpen?: boolean
+  /** the patient's age, so a child is not judged by an adult's ranges. See
+   *  isChild in data/vitals.ts. */
+  age?: string
 }) {
   const defs = which === 'vital' ? VITALS : INSTANT
 
@@ -109,12 +112,13 @@ export default function Vitals({ which, value, onChange, title, startOpen }: {
       </div>
       <div className="vgrid">
         {defs.map(d => (
-          <Field key={d.key} def={d} raw={draft[d.key] ?? ''}
+          <Field key={d.key} def={d} raw={draft[d.key] ?? ''} age={age}
                  onSet={s => set(d.key, s)} />
         ))}
       </div>
       <p className="hint">
         Only the boxes you fill are printed. Anything left blank never appears on the slip.
+        {isChild(age) && <> This patient is a child, so the ordinary adult ranges are not applied to these numbers.</>}
       </p>
     </div>
   )
@@ -145,8 +149,8 @@ export default function Vitals({ which, value, onChange, title, startOpen }: {
  * somewhere else (the desk typing while the room has the visit open), it is
  * taken, and `sent` is what tells the two apart.
  */
-function Pair({ def, raw, onSet, flag: f }: {
-  def: VitalDef; raw: string; onSet: (s: string) => void; flag: string | null
+function Pair({ def, raw, onSet, flag: f, imp }: {
+  def: VitalDef; raw: string; onSet: (s: string) => void; flag: string | null; imp?: boolean
 }) {
   const split = (s: string): [string, string] => {
     const [x = '', y = ''] = s.split('/')
@@ -164,7 +168,7 @@ function Pair({ def, raw, onSet, flag: f }: {
   const clean = (v: string) => v.replace(/\D/g, '')
 
   return (
-    <div className={'vfld pair' + (f ? ' f-' + f : '')}>
+    <div className={'vfld pair' + (imp ? ' f-imp' : f ? ' f-' + f : '')}>
       <label>{def.en} <i className="sd">{def.sd}</i></label>
       <div className="vpair">
         <input inputMode="numeric" maxLength={def.max} value={a} placeholder="120"
@@ -174,29 +178,39 @@ function Pair({ def, raw, onSet, flag: f }: {
                onChange={e => put(a, clean(e.target.value))} />
         <em>{def.unit}</em>
       </div>
-      {f && <span className="vmark">{f === 'high' ? 'higher than usual' : 'lower than usual'}</span>}
+      {imp
+        ? <span className="vmark">not a possible reading — the slip will not print</span>
+        : f && <span className="vmark">{f === 'high' ? 'higher than usual' : 'lower than usual'}</span>}
     </div>
   )
 }
 
-function Field({ def, raw, onSet }: { def: VitalDef; raw: string; onSet: (s: string) => void }) {
-  const f = flag(def, raw)
+function Field({ def, raw, onSet, age }: {
+  def: VitalDef; raw: string; onSet: (s: string) => void; age?: string
+}) {
+  const f = flag(def, raw, age)
+  /* Not "unusual" — impossible. A number outside the physical bounds is a
+     typo, and the slip refuses to print until it is corrected or cleared, so
+     the box has to say so rather than mark it like an abnormal reading. */
+  const imp = impossible(def, raw)
 
   // A blood pressure is one reading written as two numbers, and it is typed as
   // two numbers. Two boxes with a slash between them beats one box that has to
   // be taught what a slash is.
-  if (def.pair) return <Pair def={def} raw={raw} onSet={onSet} flag={f} />
+  if (def.pair) return <Pair def={def} raw={raw} onSet={onSet} flag={f} imp={imp} />
 
   const numeric = def.key !== 'urine'
   return (
-    <div className={'vfld' + (f ? ' f-' + f : '')}>
+    <div className={'vfld' + (imp ? ' f-imp' : f ? ' f-' + f : '')}>
       <label>{def.en} <i className="sd">{def.sd}</i></label>
       <div className="vone">
         <input inputMode={numeric ? 'decimal' : 'text'} maxLength={def.max} value={raw}
                onChange={e => onSet(numeric ? cleanDecimal(e.target.value) : e.target.value)} />
         {def.unit && <em>{def.unit}</em>}
       </div>
-      {f && <span className="vmark">{f === 'high' ? 'higher than usual' : 'lower than usual'}</span>}
+      {imp
+        ? <span className="vmark">not a possible reading — the slip will not print</span>
+        : f && <span className="vmark">{f === 'high' ? 'higher than usual' : 'lower than usual'}</span>}
     </div>
   )
 }

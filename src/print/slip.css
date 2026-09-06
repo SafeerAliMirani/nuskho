@@ -26,6 +26,13 @@
 .sosw bdi{unicode-bidi:isolate}
 .sosmax{font-size:7pt;font-weight:700;color:#333;margin-top:.3mm}
 /* the doctor's own line under a medicine, printed as typed */
+/* THE CARE BAND. Black on a hairline box, not colour: it has to survive a
+   black and white laser, a photocopy and a fax in a bazaar. */
+.care{display:flex;align-items:baseline;gap:2mm;margin:.8mm 0 0;padding:.8mm 2mm;
+  border:.8pt solid #000;border-radius:.6mm;}
+.care-pg{font-size:8pt;font-weight:700;letter-spacing:.4px;white-space:nowrap;}
+.care-t{font-size:8pt;font-weight:700;line-height:1.2;unicode-bidi:plaintext;}
+
 .rxnote{grid-column:1/-1;font-size:7pt;font-weight:700;color:#222;margin-top:.4mm;line-height:1.2;unicode-bidi:plaintext}
 .pad{padding:0 7mm;}
 
