@@ -37,10 +37,17 @@ export interface TokenSlip {
   token: number
   patientName: string
   patientCode: string
-  /** what the counter actually took, in rupees. 0 prints as free, not as blank. */
-  fee: number
+  /**
+   * What the counter actually took, in rupees. 0 prints as free, not as blank.
+   *
+   * ABSENT MEANS THIS CLINIC DOES NOT CHARGE, which is not the same as a fee of
+   * zero: the fee row is left off the receipt entirely rather than printing
+   * "FREE" on a token from a clinic where nothing was ever asked for. See
+   * profile.noFee.
+   */
+  fee?: number
   /** free means the doctor waived it in advance; due means he is being seen first */
-  feeState: 'paid' | 'waived' | 'due'
+  feeState?: 'paid' | 'waived' | 'due'
   at: number
   /**
    * Whose room this token is for, in a building with several doctors. The
@@ -73,10 +80,10 @@ export function renderToken(t: TokenSlip, width: TokenWidth = 58): string {
   const nameEn = t.doctorEn ?? (dr.doctorEn || APP.en)
   const nameSd = t.doctorSd ?? dr.doctorSd
   const degrees = t.degreesEn ?? dr.degreesEn
-  const money =
-    t.feeState === 'waived' ? 'FREE &nbsp; مفت'
+  const money = t.feeState === undefined ? ''
+    : t.feeState === 'waived' ? 'FREE &nbsp; مفت'
     : t.feeState === 'due' ? 'TO PAY &nbsp; ادا ڪرڻي آهي'
-    : `Rs ${t.fee.toLocaleString('en-PK')}`
+    : `Rs ${(t.fee ?? 0).toLocaleString('en-PK')}`
 
   // No phone number and no address: a receipt travels further than a slip, and
   // the standing rule is that a number we do not control never gets printed.
@@ -100,10 +107,10 @@ export function renderToken(t: TokenSlip, width: TokenWidth = 58): string {
     <div><span>Date <i class="sd">تاريخ</i></span><b>${when(t.at)}</b></div>
   </div>
 
-  <div class="tk-fee">
+  ${money ? `<div class="tk-fee">
     <span>FEE &nbsp; <i class="sd">فيس</i></span>
     <b>${money}</b>
-  </div>
+  </div>` : ''}
 
   ${t.patientCode ? `<div class="tk-qr">${qrSvgSafe(t.patientCode, width === 80 ? 20 : 16)}</div>` : ''}
 

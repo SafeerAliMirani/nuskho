@@ -519,6 +519,8 @@ function MDesk({ s }: { s: WireState }) {
         <input type="checkbox" checked={urgent} onChange={e => setUrgent(e.target.checked)} />
         <span><IcWarn size={15} /> <b>Cannot wait</b></span>
       </label>
+      {/* no fee box in a clinic that does not charge; the record holder says so */}
+      {s.fees !== false && (
       <div className="fld feerow">
         <label><IcMoney size={13} /> Fee taken now &nbsp; فيس</label>
         <div className="row">
@@ -530,6 +532,7 @@ function MDesk({ s }: { s: WireState }) {
           ))}
         </div>
       </div>
+      )}
       <button className="btn wide" disabled={!name.trim() || busy} onClick={() => fire('addPatient')}>
         {busy ? 'Asking the clinic machine…' : <>Add to queue &nbsp; لائين ۾ شامل ڪريو</>}
       </button>
@@ -539,7 +542,7 @@ function MDesk({ s }: { s: WireState }) {
       <div className="daybar">
         <span><b>{s.sums.printed}</b> printed</span>
         <span><b>{s.sums.waiting}</b> waiting</span>
-        <span className="money"><b>Rs {s.sums.collected}</b> in hand</span>
+        {s.fees !== false && <span className="money"><b>Rs {s.sums.collected}</b> in hand</span>}
         {s.sums.toRefund > 0 && <span className="money back"><b>Rs {s.sums.toRefund}</b> to give back</span>}
       </div>
       {[...s.visits].sort(byUrgent).map(v => (
@@ -1652,7 +1655,7 @@ function MOps({ s }: { s: WireState }) {
         <span><b>{s.sums.total}</b> token{s.sums.total === 1 ? '' : 's'}</span>
         <span><b>{s.sums.printed}</b> printed</span>
         <span><b>{s.sums.waiting}</b> waiting</span>
-        <span className="money"><b>Rs {s.sums.collected}</b> in hand</span>
+        {s.fees !== false && <span className="money"><b>Rs {s.sums.collected}</b> in hand</span>}
         {s.sums.toRefund > 0 && <span className="money back"><b>Rs {s.sums.toRefund}</b> to give back</span>}
         {s.sums.due > 0 && <span className="money due"><b>Rs {s.sums.due}</b> due</span>}
       </div>
@@ -1660,7 +1663,8 @@ function MOps({ s }: { s: WireState }) {
         <div className="line" key={d.id}>
           <div className="hd"><div>
             <b>Room {d.room} · {d.nameEn}</b>
-            <small>{n} token{n === 1 ? '' : 's'} · {printed} printed · Rs {collected} taken</small>
+            <small>{n} token{n === 1 ? '' : 's'} · {printed} printed
+              {s.fees !== false && <> · Rs {collected} taken</>}</small>
           </div></div>
         </div>
       ))}

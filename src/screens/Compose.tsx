@@ -4,7 +4,7 @@ import { formulary, labTests, adviceList } from '../data/formulary'
 import { sosReasons } from '../data/sos'
 import { seedDiagnoses } from '../data/specialty'
 import Vitals from '../ui/Vitals'
-import { profile } from '../profile'
+import { profile, chargesFee } from '../profile'
 import { toSindhi, splitBrand } from '../data/translit'
 import { searchDictionary, dictLine, type DictEntry } from '../data/dictionary'
 import { printSlip } from '../print/print'
@@ -672,7 +672,7 @@ export default function Compose({ visitId, onDone, onBack }: {
       {/* The money was already taken at the door. All the doctor does here is
           decide that this one pays less, or nothing, and send him back to the
           counter for it. */}
-      <FeeBar visit={visit} onChange={reload} />
+      {chargesFee() && <FeeBar visit={visit} onChange={reload} />}
 
       <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0, opacity: locked ? .55 : 1 }}>
         {/* Vitals the compounder already took, and anything the doctor runs on a

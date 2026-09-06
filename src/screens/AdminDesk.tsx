@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { daySummary } from '../db'
+import { chargesFee } from '../profile'
 import { daysSinceExport, storageReport, snapshotTrouble } from '../safety'
 import { activeDoctors, multiRoom, visitDoctorId, type Doctor } from '../doctors'
 import { stamp } from '../version'
@@ -49,6 +50,9 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
     <div className="pane">
       <h2><IcChart size={17} /> Today, as the desk counted it</h2>
 
+      {/* nothing was taken, nothing is owed and nothing is waiting to go back
+          in a clinic that does not charge: see profile.noFee */}
+      {chargesFee() && (
       <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
         <div className="feebar" style={{ flexDirection: 'column', alignItems: 'flex-start', flex: 1, minWidth: 160 }}>
           <label>Taken at the desk</label>
@@ -64,9 +68,11 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
           <b style={{ fontSize: 24 }}>Rs {sum?.due ?? 0}</b>
         </div>
       </div>
+      )}
 
       <p className="hint">
-        {sum ? `${sum.total} tokens · ${sum.printed} printed · ${sum.seen} seen · ${sum.left} left · ${sum.waived} free on the doctor's word` : '…'}
+        {sum ? `${sum.total} tokens · ${sum.printed} printed · ${sum.seen} seen · ${sum.left} left`
+          + (chargesFee() ? ` · ${sum.waived} free on the doctor's word` : '') : '…'}
       </p>
 
       {byRoom && byRoom.length > 1 && (
@@ -78,20 +84,25 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
                 <b>Room {d.room} · {d.nameEn}</b>
                 <small>
                   {s.total} tokens · {s.printed} printed · {s.waiting} waiting
-                  &nbsp;·&nbsp; Rs {s.collected} taken
-                  {s.toRefund > 0 ? ` · Rs ${s.toRefund} to give back` : ''}
-                  {s.due > 0 ? ` · Rs ${s.due} due` : ''}
+                  {chargesFee() && <>
+                    &nbsp;·&nbsp; Rs {s.collected} taken
+                    {s.toRefund > 0 ? ` · Rs ${s.toRefund} to give back` : ''}
+                    {s.due > 0 ? ` · Rs ${s.due} due` : ''}
+                  </>}
                 </small>
               </div></div>
             </div>
           ))}
           <p className="hint">
-            This is the drawer's arithmetic for settling with each doctor at closing,
-            and that is all it is. No patients per hour, no rates, nothing clinical.
+            {chargesFee()
+              ? "This is the drawer's arithmetic for settling with each doctor at closing, and that is all it is."
+              : 'Tokens only: this clinic does not charge, so there is nothing to settle.'}
+            {' '}No patients per hour, no rates, nothing clinical.
           </p>
         </>
       )}
 
+      {chargesFee() && (<>
       <h2 style={{ marginTop: 18 }}>Closing the drawer</h2>
       <div className="row">
         <div className="fld" style={{ maxWidth: 220 }}>
@@ -107,6 +118,7 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
           </p>
         )}
       </div>
+      </>)}
 
       <h2 style={{ marginTop: 18 }}><IcClock size={17} /> The day's close</h2>
       <p className="hint">

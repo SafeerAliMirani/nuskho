@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { IcClock, IcCalendar, IcHeart, IcMoney, ArtNoFigures } from '../ui/art'
+import { chargesFee } from '../profile'
 import { Note } from '../ui/Note'
 import { computeStats, MIN_CELL, MIN_TREND, type Stats, type Bar } from '../stats'
 import { cardData, drawCard, downloadCard, printCard, CARD_W, CARD_H } from '../print/card'
@@ -84,7 +85,11 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
             </Note>
           )}
 
-          {/* ---- money. Private. Never on the card, never in an export. ---- */}
+          {/* ---- money. Private. Never on the card, never in an export.
+                 A clinic that does not charge is shown none of it: three empty
+                 rupee tiles are not a smaller version of this section, they are
+                 a page telling a charity evening it earned nothing. ---- */}
+          {chargesFee() && (<>
           <h2><IcMoney size={17} /> Fees this month</h2>
           <div className="tiles money">
             <Tile big={`Rs ${s.received.toLocaleString('en-GB')}`} lab="received"
@@ -120,6 +125,8 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
               same as free, and the figures above do not include them.
             </p>
           )}
+
+          </>)}
 
           {/* ---- the rhythm: plain counts per evening, nothing cleverer ---- */}
           {s.byEvening.length > 1 && (

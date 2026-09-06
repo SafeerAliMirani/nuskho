@@ -1,3 +1,4 @@
+import { chargesFee } from './profile'
 import { cleanName, cleanPhone, cleanAge, cleanCity, cleanSex } from './fields'
 import {
   db, uid, nextToken, nextPatientNum, findByCode, patientCode, closeVisit, markRefunded, owedRefund,
@@ -102,6 +103,10 @@ export type WireState = {
   multi: boolean
   /** whether the medical store is the clinic's own or a shop renting space */
   store: Store
+  /** false in a clinic that does not charge for the consultation, so a phone
+   *  at the door draws no fee box either. The setting lives on the record
+   *  holder; a mirror is told, never asked. */
+  fees: boolean
   sums: { total: number; printed: number; waiting: number; collected: number; toRefund: number; due: number }
 }
 
@@ -511,6 +516,7 @@ async function buildState(): Promise<WireState> {
       tests: chargesFor(v.vitals, INSTANT).map(c => ({ key: c.key, en: c.en, amount: c.amount })),
       testsPaid: !!v.testsPaidAt,
     })),
+    fees: chargesFee(),
     doctors: activeDoctors().map(d => ({
       id: d.id, nameEn: d.nameEn, nameSd: d.nameSd, room: d.room, fee: d.fee,
       sitting: isSitting(d.id),
@@ -655,20 +661,29 @@ async function applyIntent(
     const doctorId = wantDoc && activeDoctors().some(d => d.id === wantDoc) ? wantDoc : undefined
     if (wantDoc && !doctorId) return { ok: false, why: 'That room is not in this building.' }
     const token = await nextToken(doctorId)
+    /* THE RECORD HOLDER DECIDES WHETHER THERE IS A FEE, NOT THE PHONE.
+       A clinic that does not charge writes no fee at all, whatever a device at
+       the door sends: the setting is the clinic's and it is held here. */
     const amount = Math.min(100000, Math.max(0, Math.round(+(p.amount ?? 0) || 0)))
     const state = (['paid', 'due', 'waived'].includes(String(p.feeState)) ? p.feeState : 'paid') as FeeState
-    const fee = { amount: state === 'waived' ? 0 : amount, state: (amount === 0 ? 'waived' : state) as FeeState, at: Date.now() }
+    const fee = chargesFee()
+      ? { amount: state === 'waived' ? 0 : amount, state: (amount === 0 ? 'waived' : state) as FeeState, at: Date.now() }
+      : undefined
     const vid = uid()
     await db.visits.add({
       id: vid, patientId, token, status: 'waiting', createdAt: Date.now(),
-      lines: [], tests: [], advice: [], fee, urgent: p.urgent === true || undefined, doctorId,
+      lines: [], tests: [], advice: [], ...(fee ? { fee } : {}),
+      urgent: p.urgent === true || undefined, doctorId,
     })
     const pt = await db.patients.get(patientId)
     const d = doctorById(doctorId)
     const slip = pt ? {
       token, patientName: pt.name, patientCode: patientCode(pt.num),
-      fee: fee.amount, feeState: (fee.state === 'due' ? 'due' : fee.state === 'waived' ? 'waived' : 'paid') as 'paid' | 'waived' | 'due',
-      at: fee.at,
+      ...(fee ? {
+        fee: fee.amount,
+        feeState: (fee.state === 'due' ? 'due' : fee.state === 'waived' ? 'waived' : 'paid') as 'paid' | 'waived' | 'due',
+      } : {}),
+      at: Date.now(),
       doctorEn: d?.nameEn, doctorSd: d?.nameSd, degreesEn: d?.degreesEn, room: d?.room,
     } : null
     if (pt) {
@@ -693,8 +708,10 @@ async function applyIntent(
     const d = doctorById(visitDoctorId(v.doctorId))
     const slip = {
       token: v.token, patientName: pt.name, patientCode: patientCode(pt.num),
-      fee: v.fee?.amount ?? 0,
-      feeState: (v.fee?.state === 'due' ? 'due' : v.fee?.state === 'waived' ? 'waived' : 'paid') as 'paid' | 'waived' | 'due',
+      ...(v.fee ? {
+        fee: v.fee.amount,
+        feeState: (v.fee.state === 'due' ? 'due' : v.fee.state === 'waived' ? 'waived' : 'paid') as 'paid' | 'waived' | 'due',
+      } : {}),
       at: v.fee?.at ?? v.createdAt,
       doctorEn: d?.nameEn, doctorSd: d?.nameSd, degreesEn: d?.degreesEn, room: d?.room,
     }

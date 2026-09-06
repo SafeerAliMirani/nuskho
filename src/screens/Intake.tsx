@@ -47,7 +47,7 @@ import { INSTANT } from '../data/vitals'
 import type { Visit, VisitStatus, FeeState } from '../types'
 import { isDemo } from '../version'
 import { daysSinceExport } from '../safety'
-import { profile } from '../profile'
+import { profile, chargesFee } from '../profile'
 
 // The compounder's whole screen. A code box, a name box, a list.
 //
@@ -156,7 +156,9 @@ export default function Intake({ visits, onOpen, onChange }: {
 
   // The money comes first here. The counter takes it and hands over a token;
   // the doctor decides later whether any of it goes back.
-  const rate = sel ? sel.fee : profile().fee
+  // A clinic that does not charge is shown no fee anywhere: see profile.noFee.
+  const takesFee = chargesFee()
+  const rate = takesFee ? (sel ? sel.fee : profile().fee) : 0
   const [amt, setAmt] = useState(String(rate || ''))
   // Switching rooms re-arms the fee box with that room's rate: the desk's next
   // motion is taking that money, not remembering to retype it.
@@ -190,10 +192,16 @@ export default function Intake({ visits, onOpen, onChange }: {
     const token = await nextToken(sel?.id)
     const id = uid()
     const n = +amt || 0
-    const fee = { amount: fstate === 'waived' ? 0 : n, state: (n === 0 ? 'waived' : fstate) as FeeState, at: Date.now() }
+    /* NO FEE OBJECT AT ALL IN A CLINIC THAT DOES NOT CHARGE — not a waived
+       zero. "Waived" says a fee existed and was forgiven, which would put every
+       patient of a charity evening under a heading about the doctor's mercy and
+       would be a lie about what happened at the door. */
+    const fee = takesFee
+      ? { amount: fstate === 'waived' ? 0 : n, state: (n === 0 ? 'waived' : fstate) as FeeState, at: Date.now() }
+      : undefined
     await db.visits.add({
       id, patientId, token, status: 'waiting', createdAt: Date.now(),
-      lines: [], tests: [], advice: [], fee, urgent: urgent || undefined,
+      lines: [], tests: [], advice: [], ...(fee ? { fee } : {}), urgent: urgent || undefined,
       doctorId: sel?.id,
     })
     setAmt(String(rate || ''))
@@ -216,8 +224,11 @@ export default function Intake({ visits, onOpen, onChange }: {
         : { kind: 'patient', token, name: said })
       printToken({
         token, patientName: pt.name, patientCode: patientCode(pt.num),
-        fee: fee.amount, feeState: fee.state === 'due' ? 'due' : fee.state === 'waived' ? 'waived' : 'paid',
-        at: fee.at,
+        ...(fee ? {
+          fee: fee.amount,
+          feeState: (fee.state === 'due' ? 'due' : fee.state === 'waived' ? 'waived' : 'paid') as 'due' | 'waived' | 'paid',
+        } : {}),
+        at: Date.now(),
         doctorEn: sel?.nameEn, doctorSd: sel?.nameSd, degreesEn: sel?.degreesEn, room: sel?.room,
       }).then(ok => { if (ok) setMsg(`Token ${token} printed.`) })
     }
@@ -233,8 +244,12 @@ export default function Intake({ visits, onOpen, onChange }: {
     const d = multi ? doctorById(visitDoctorId(v.doctorId)) : undefined
     const ok = await printToken({
       token: v.token, patientName: pt.name, patientCode: patientCode(pt.num),
-      fee: f?.amount ?? 0,
-      feeState: f?.state === 'due' ? 'due' : f?.state === 'waived' ? 'waived' : 'paid',
+      // a token issued in a clinic with no fee carries no fee row on the reprint
+      // either: the visit simply has no fee, and the receipt says nothing
+      ...(f ? {
+        fee: f.amount,
+        feeState: (f.state === 'due' ? 'due' : f.state === 'waived' ? 'waived' : 'paid') as 'due' | 'waived' | 'paid',
+      } : {}),
       at: f?.at ?? v.createdAt,
       doctorEn: d?.nameEn, doctorSd: d?.nameSd, degreesEn: d?.degreesEn, room: d?.room,
     })
@@ -456,6 +471,8 @@ export default function Intake({ visits, onOpen, onChange }: {
             Use it for the patient in front of you, not as a guess about how ill somebody is.</small></span>
       </label>
 
+      {/* the fee at the door, only in a clinic that charges one */}
+      {takesFee && (
       <div className="fld feerow">
         <label><IcMoney size={13} /> Fee taken now &nbsp; فيس</label>
         <div className="row">
@@ -471,6 +488,7 @@ export default function Intake({ visits, onOpen, onChange }: {
             <button className="lnk" onClick={() => setAmt(String(rate))}>use it</button></span>
         )}
       </div>
+      )}
 
       <button className="btn wide" disabled={!name.trim() || adding}
               onClick={async () => {
@@ -558,14 +576,14 @@ export default function Intake({ visits, onOpen, onChange }: {
           {sum.seen > 0 && <span><b>{sum.seen}</b> seen only</span>}
           {sum.left + sum.cancelled > 0 && <span><b>{sum.left + sum.cancelled}</b> left / cancelled</span>}
           {sum.referred > 0 && <span><b>{sum.referred}</b> sent on</span>}
-          <span className="money"><b>Rs {sum.collected}</b> in hand</span>
+          {takesFee && <span className="money"><b>Rs {sum.collected}</b> in hand</span>}
           {sum.toRefund > 0 && <span className="money back"><b>Rs {sum.toRefund}</b> to give back
             <small> ({sum.refundCount})</small></span>}
           {sum.due > 0 && <span className="money due"><b>Rs {sum.due}</b> due</span>}
           {sum.testsTaken > 0 && <span className="money"><b>Rs {sum.testsTaken}</b> tests</span>}
           {sum.testsOwed > 0 && <span className="money due"><b>Rs {sum.testsOwed}</b> tests to collect
             <small> ({sum.testsOwedCount})</small></span>}
-          {sum.unrecorded > 0 && <span className="soft">{sum.unrecorded} with no fee recorded</span>}
+          {takesFee && sum.unrecorded > 0 && <span className="soft">{sum.unrecorded} with no fee recorded</span>}
         </div>
       )}
       {!visits.length && (

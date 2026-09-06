@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type { Patient, Visit, Drug, VisitStatus, Fee, RxSet, RxLine } from './types'
-import { profile } from './profile'
+import { profile, chargesFee } from './profile'
 import { FIRST_DOCTOR } from './doctors'
 import { highWater, noteIssued, tokenHighWater, noteToken, CLINIC_DAY_SHIFT } from './safety'
 import { isDemo } from './version'
@@ -310,7 +310,10 @@ export async function daySummary(visits: Visit[]) {
     refundCount: fees.filter(f => f.refund && !f.refundedAt).length,
     waived: fees.filter(f => f.state === 'waived').length,
     due: fees.filter(f => f.state === 'due').reduce((a, f) => a + f.amount, 0),
-    unrecorded: firsts.filter(v => !v.fee && v.status !== 'waiting').length,
+    /* A visit with no fee is "unrecorded" only where a fee was expected. In a
+       clinic that does not charge, every visit has no fee and that is the
+       correct state, not a hundred pieces of missing paperwork. */
+    unrecorded: chargesFee() ? firsts.filter(v => !v.fee && v.status !== 'waiting').length : 0,
 
     /* Tests done in the clinic, kept apart from the consultation fee in every
        figure. A clinic that cannot tell the two apart cannot tell whether the

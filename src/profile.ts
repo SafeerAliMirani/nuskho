@@ -53,6 +53,27 @@ export type Profile = {
   /** the consultation fee the counter charges, in rupees. The doctor changes it
    *  whenever he likes; it is only ever a default the counter can override. */
   fee: number
+  /**
+   * THIS CLINIC DOES NOT CHARGE FOR THE CONSULTATION.
+   *
+   * A charity evening, a dispensary, a doctor who sees people free two nights a
+   * week. The app worked for them already — a rate of zero writes every visit
+   * as waived and nothing breaks — but it kept showing them the furniture of
+   * money they do not handle: a fee box at the door, "Rs 0 taken at the
+   * counter" with two dead buttons on every prescription, and a page of empty
+   * rupee tiles. And "61 seen free" is not what happened either: a fee was
+   * never waived, because a fee was never asked for.
+   *
+   * So this is a switch and not an inference. A doctor who has not set his fee
+   * yet is not the same as a doctor who never charges, and guessing between
+   * them from a zero would be wrong on the first evening of every new clinic.
+   *
+   * It hides the consultation fee and nothing else. Tests done in the room keep
+   * their own prices (testfees.ts): a free clinic that still charges 150 for a
+   * sugar strip is an ordinary arrangement here, and those prices are already
+   * blank until somebody enters them.
+   */
+  noFee?: boolean
   /** which list of diagnoses he starts from. See data/specialty.ts. */
   specialty: string
   /**
@@ -122,6 +143,10 @@ export function saveProfile(p: Partial<Profile>): Profile {
  * So it stays, it is optional, and it prints only when a doctor has actually
  * entered it.
  */
+/** Does this clinic handle consultation money at all? Asked by every screen
+ *  that would otherwise draw a rupee box. */
+export const chargesFee = (p = profile()): boolean => p.noFee !== true
+
 export function profileComplete(p = profile()): boolean {
   return !!p.doctorEn.trim()
 }

@@ -1,3 +1,4 @@
+import { chargesFee } from './profile'
 import { db } from './db'
 import { FIRST_DOCTOR } from './doctors'
 import type { Visit } from './types'
@@ -175,8 +176,10 @@ export async function computeStats(forDoctor?: string): Promise<Stats> {
   // What was handed back is not money received. The desk's own summary already
   // subtracts it; this page must not quietly disagree with the drawer.
   received -= refunded
-  // an amendment never carries a fee of its own; see daySummary
-  const feeUnrecorded = monthAll.filter(v => !v.fee && !v.amendsId && v.status !== 'waiting').length
+  // an amendment never carries a fee of its own; see daySummary. And a clinic
+  // that does not charge has nothing to record, so nothing is missing.
+  const feeUnrecorded = chargesFee()
+    ? monthAll.filter(v => !v.fee && !v.amendsId && v.status !== 'waiting').length : 0
 
   /* --- the queue. "Left" paired with the hour it happened is a staffing
          decision; on its own it is only a sad number. --- */

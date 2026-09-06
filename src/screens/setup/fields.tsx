@@ -364,9 +364,29 @@ export function useDraftPaper() {
 /* --------------------------------------------------------------------- fee */
 
 export function FeeFields({ v, on }: { v: Profile; on: (p: Partial<Profile>) => void }) {
+  const free = v.noFee === true
   return (
     <>
+      {/* A SWITCH, NOT A GUESS. A rate of zero on the first evening means the
+          fee is not set yet; a clinic that never charges is a different fact
+          and only the clinic can state it. */}
       <div className="fld">
+        <label>Does this clinic charge for the consultation?</label>
+        <div className="chips">
+          <button className={'chip' + (!free ? ' have' : '')} onClick={() => on({ noFee: false })}>
+            Yes, there is a fee
+          </button>
+          <button className={'chip' + (free ? ' have' : '')} onClick={() => on({ noFee: true })}>
+            No, we see people free
+          </button>
+        </div>
+        <span className="unit">
+          {free
+            ? 'The fee box at the door, the fee line in the room and the money figures are all hidden. Tests done in the room keep their own prices below.'
+            : 'The counter can charge something different for any patient, and you can reduce or waive it in the room afterwards.'}
+        </span>
+      </div>
+      {!free && <div className="fld">
         <label>Consultation fee &nbsp; فيس</label>
         <div className="chips">
           {[100, 200, 300, 500, 1000].map(n => (
@@ -377,12 +397,12 @@ export function FeeFields({ v, on }: { v: Profile; on: (p: Partial<Profile>) => 
         <input value={v.fee || ''} inputMode="numeric" placeholder="or type it"
                onChange={e => on({ fee: +e.target.value.replace(/[^0-9]/g, '').slice(0, 6) || 0 })} />
         <span className="unit">Rupees. This is what the counter charges by default.</span>
-      </div>
-      <p className="hint">
-        The counter can charge something different for any patient, and you can reduce or
-        waive it in the room afterwards. Change this whenever you like, it only sets what
-        the desk sees first.
-      </p>
+      </div>}
+      {!free && (
+        <p className="hint">
+          Change this whenever you like; it only sets what the desk sees first.
+        </p>
+      )}
       <TestFeeFields />
     </>
   )

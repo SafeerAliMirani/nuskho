@@ -43,3 +43,40 @@ describe('a backup file is checked before a single row is written', () => {
     expect(() => readBackup(text(f))).not.toThrow()
   })
 })
+
+import { chargesFee, type Profile } from './profile'
+import { renderToken } from './print/token'
+
+/**
+ * A CLINIC THAT DOES NOT CHARGE. Batch 25.
+ *
+ * The app worked for one already — a rate of zero writes every visit as waived
+ * and nothing breaks — but it showed them a fee box at the door, "Rs 0 taken at
+ * the counter" on every prescription, and a page of empty rupee tiles. And
+ * "waived" was a lie about what happened: a fee was never asked for.
+ */
+describe('a clinic that does not charge', () => {
+  const p = (noFee?: boolean) => ({ noFee } as Profile)
+
+  it('charges by default, because an unset fee is not a free clinic', () => {
+    expect(chargesFee(p(undefined))).toBe(true)
+    expect(chargesFee(p(false))).toBe(true)
+  })
+
+  it('knows when it has been told', () => {
+    expect(chargesFee(p(true))).toBe(false)
+  })
+
+  it('leaves the fee row off the token receipt entirely, rather than printing FREE', () => {
+    const base = { token: 4, patientName: 'Wazir Ali', patientCode: '00185', at: Date.now() }
+    const free = renderToken({ ...base })
+    expect(free).not.toContain('tk-fee')
+    expect(free).not.toContain('FREE')
+    expect(free).toContain('00185')            // the rest of the receipt is untouched
+    const charged = renderToken({ ...base, fee: 500, feeState: 'paid' })
+    expect(charged).toContain('tk-fee')
+    expect(charged).toContain('500')
+    const waived = renderToken({ ...base, fee: 0, feeState: 'waived' })
+    expect(waived).toContain('FREE')           // a fee that WAS waived still says so
+  })
+})
