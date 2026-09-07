@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { profile, saveProfile, type Profile } from '../../profile'
+import { profile, saveProfile, type Profile, chargesFee } from '../../profile'
 import { SPECIALTIES, seedDiagnoses } from '../../data/specialty'
 import { paper, setPaper, PAGE_MM, usableHeightMm, type Paper } from '../../paper'
 import { printCalibration, printToken } from '../../print/print'
@@ -193,9 +193,14 @@ export function TokenFields({ v, on }: { v: Paper; on: (p: Partial<Paper>) => vo
           </div>
 
           <button className="btn wide" onClick={async () => {
+            /* The test token is a picture of a real one, so it carries a fee
+               only where real ones do. A clinic that charges nothing was being
+               shown a hard-coded Rs 300 on the one piece of paper it prints to
+               check its printer. */
             const ok = await printToken({
               token: 7, patientName: 'Test slip', patientCode: '00007',
-              fee: profile().fee || 300, feeState: 'paid', at: Date.now(),
+              ...(chargesFee() ? { fee: profile().fee || 300, feeState: 'paid' as const } : {}),
+              at: Date.now(),
             })
             setSaid(ok ? 'Sent. Check the paper that came out.' : 'Turn the receipt printer on above first.')
           }}>

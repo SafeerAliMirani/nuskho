@@ -80,3 +80,29 @@ describe('a clinic that does not charge', () => {
     expect(waived).toContain('FREE')           // a fee that WAS waived still says so
   })
 })
+
+import { daySummary } from './db'
+import type { Visit } from './types'
+
+/**
+ * AN AMENDED SLIP IS A CORRECTION, NOT A SECOND PATIENT. The desk's row used
+ * to say "20 tokens" and then list statuses adding up to 22, in one sentence.
+ */
+describe('the day adds up', () => {
+  const v = (p: Partial<Visit>): Visit => ({
+    id: Math.random().toString(36), patientId: 'p1', token: 1, status: 'done',
+    createdAt: Date.now(), lines: [], tests: [], advice: [], printedAt: Date.now(), ...p,
+  })
+  it('counts a corrected prescription once, in every column of the same row', async () => {
+    const s = await daySummary([
+      v({ id: 'a', fee: { amount: 500, state: 'paid', at: Date.now() } }),
+      v({ id: 'b', status: 'left', printedAt: undefined }),
+      v({ id: 'c', amendsId: 'a' }),          // the correction of a
+    ])
+    expect(s.total).toBe(2)
+    expect(s.printed).toBe(1)
+    expect(s.left).toBe(1)
+    expect(s.total).toBe(s.printed + s.left + s.waiting + s.seen + s.cancelled + s.referred)
+    expect(s.collected).toBe(500)             // not 1000
+  })
+})

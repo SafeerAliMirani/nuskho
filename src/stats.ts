@@ -1,4 +1,3 @@
-import { chargesFee } from './profile'
 import { db } from './db'
 import { FIRST_DOCTOR } from './doctors'
 import type { Visit } from './types'
@@ -136,8 +135,14 @@ export async function computeStats(forDoctor?: string): Promise<Stats> {
 
   const t0 = startOfDay()
   const m0 = startOfMonth()
-  const seen = visits.filter(counted)
-  const monthAll = visits.filter(v => v.createdAt >= m0)
+  /* AN AMENDED SLIP IS A CORRECTION, NOT A SECOND PATIENT.
+     daySummary learned this; this page had not, so the two disagreed about the
+     same evening — and worse, an amendment counted as that patient's SECOND
+     visit, which inflated "people who came back", the one quality figure on
+     this page. A corrected prescription is not a returning patient. */
+  const own = visits.filter(v => !v.amendsId)
+  const seen = own.filter(counted)
+  const monthAll = own.filter(v => v.createdAt >= m0)
   const monthSeen = seen.filter(v => v.createdAt >= m0)
 
   /* --- returning: the best quality signal this data honestly supports.
@@ -178,8 +183,7 @@ export async function computeStats(forDoctor?: string): Promise<Stats> {
   received -= refunded
   // an amendment never carries a fee of its own; see daySummary. And a clinic
   // that does not charge has nothing to record, so nothing is missing.
-  const feeUnrecorded = chargesFee()
-    ? monthAll.filter(v => !v.fee && !v.amendsId && v.status !== 'waiting').length : 0
+  const feeUnrecorded = monthAll.filter(v => !v.fee && !v.noFee && v.status !== 'waiting').length
 
   /* --- the queue. "Left" paired with the hour it happened is a staffing
          decision; on its own it is only a sad number. --- */
@@ -189,7 +193,10 @@ export async function computeStats(forDoctor?: string): Promise<Stats> {
   const seenOnlyN = monthAll.filter(v => v.status === 'seen').length
 
   const from = Date.now() - 28 * DAY
-  const recent = visits.filter(v => v.createdAt >= from)
+  // when patients ARRIVE: an amendment is written at the moment of the
+  // correction, not the moment the patient walked in, so it would put a
+  // phantom arrival in whatever hour the doctor noticed his mistake
+  const recent = own.filter(v => v.createdAt >= from)
   const hours = new Map<number, { arrived: number; left: number }>()
   for (const v of recent) {
     const h = new Date(v.createdAt).getHours()

@@ -662,8 +662,15 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
    * until it is, exactly like every other unreviewed string in this app.
    */
   const alertText = (d.patientAlert ?? '').trim()
-  const care = (alertText || visit.pregnant) ? `<div class="care">
-    ${visit.pregnant ? '<b class="care-pg">PREGNANT</b>' : ''}
+  /* THE FLAG IS ON THE VISIT AND THE SEX IS ON THE PATIENT, SO THEY CAN FALL
+     OUT OF STEP. The chip is not offered for a man, but it IS offered when
+     nobody recorded a sex — which is the common case at a busy door — and the
+     desk may correct that sex afterwards. Nothing then went back and took the
+     flag off, and PREGNANT prints in the heaviest type on the sheet. The sheet
+     decides at the last moment, where both facts are in one place. */
+  const pregnantNow = visit.pregnant === true && d.patientSex !== 'M'
+  const care = (alertText || pregnantNow) ? `<div class="care">
+    ${pregnantNow ? '<b class="care-pg">PREGNANT</b>' : ''}
     ${alertText ? `<span class="care-t">${esc(alertText)}</span>` : ''}
   </div>` : ''
 

@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type { Patient, Visit, Drug, VisitStatus, Fee, RxSet, RxLine } from './types'
-import { profile, chargesFee } from './profile'
+import { profile } from './profile'
 import { FIRST_DOCTOR } from './doctors'
 import { highWater, noteIssued, tokenHighWater, noteToken, CLINIC_DAY_SHIFT } from './safety'
 import { isDemo } from './version'
@@ -288,14 +288,18 @@ export const owedRefund = (v: Visit) => !!v.fee?.refund && !v.fee.refundedAt
 
 /** The day, as the doctor's panel will eventually count it. */
 export async function daySummary(visits: Visit[]) {
-  const by = (s: VisitStatus) => visits.filter(v => v.status === s).length
-  const fees = visits.map(v => v.fee).filter(Boolean) as Fee[]
   /* AN AMENDED SLIP IS THE SAME PATIENT, NOT A SECOND ONE.
      Correcting a prescription makes a new visit row that carries the old
      one's readings so they print again. Counted naively it was a second
      patient, a second slip, a second set of test money owed, and a standing
      "no fee recorded" nobody could clear, every time a slip was corrected. */
   const firsts = visits.filter(v => !v.amendsId)
+  /* AND THE COUNTS BELOW USE THE SAME POPULATION AS THE TOTAL ABOVE IT.
+     `by()` closed over the unfiltered list while `total` and `printed` used
+     `firsts`, so a row that said "20 tokens" could be followed by statuses
+     adding up to 22, in the same sentence, on the desk's own screen. */
+  const by = (s: VisitStatus) => firsts.filter(v => v.status === s).length
+  const fees = firsts.map(v => v.fee).filter(Boolean) as Fee[]
   return {
     total: firsts.length,
     printed: firsts.filter(v => v.printedAt).length,
@@ -313,7 +317,11 @@ export async function daySummary(visits: Visit[]) {
     /* A visit with no fee is "unrecorded" only where a fee was expected. In a
        clinic that does not charge, every visit has no fee and that is the
        correct state, not a hundred pieces of missing paperwork. */
-    unrecorded: chargesFee() ? firsts.filter(v => !v.fee && v.status !== 'waiting').length : 0,
+    /* A visit with no fee is "unrecorded" only where a fee was expected, and
+       that is asked of the TOKEN rather than of today's setting: a clinic that
+       saw people free for a month and later began charging must not have that
+       whole month reappear as missing paperwork. */
+    unrecorded: firsts.filter(v => !v.fee && !v.noFee && v.status !== 'waiting').length,
 
     /* Tests done in the clinic, kept apart from the consultation fee in every
        figure. A clinic that cannot tell the two apart cannot tell whether the

@@ -6,7 +6,8 @@ import {
 } from '../building'
 import { ROLE_NAME, ROLE_SD, ROLE_WHAT, can, type Role } from '../roles'
 import { roleIsOn } from '../staff'
-import { VITALS, INSTANT, filled, vitalText, type VitalDef } from '../data/vitals'
+import { VITALS, INSTANT, filled, vitalText, firstImpossible, impossible, incomplete, type VitalDef } from '../data/vitals'
+import { cleanDecimal } from '../fields'
 import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
 import { readQrPayload } from '../print/qr'
@@ -709,11 +710,17 @@ function VBox({ d, vit, set }: {
   set: (f: (p: Record<string, string>) => Record<string, string>) => void
 }) {
   const parts = (vit[d.key] ?? '').split('/')
+  /* THE SAME STRING THE DESK WOULD HAVE STORED.
+     This wrote a systolic-only reading as "180" with no slash, while the
+     clinic machine writes "180/". The same half-taken blood pressure then
+     printed as a bare unlabelled 180 from one device and not at all from the
+     other, which is worse than either answer on its own. */
   const put = (i: number, x: string) => {
     const a = [parts[0] ?? '', parts[1] ?? '']
     a[i] = x.replace(/[^0-9.]/g, '').slice(0, d.max)
-    set(p => ({ ...p, [d.key]: a[1] || i === 1 ? `${a[0]}/${a[1]}` : a[0] }))
+    set(p => ({ ...p, [d.key]: a[0] || a[1] ? `${a[0]}/${a[1]}` : '' }))
   }
+  const raw = vit[d.key] ?? ''
   return (
     <div className="fld" style={{ minWidth: 118, flex: 1 }}>
       <label>{d.short}{d.unit ? ` ${d.unit}` : ''}</label>
@@ -726,9 +733,16 @@ function VBox({ d, vit, set }: {
                  value={parts[1] ?? ''} onChange={e => put(1, e.target.value)} />
         </div>
       ) : (
-        <input inputMode="decimal" maxLength={d.max} value={vit[d.key] ?? ''}
-               onChange={e => set(p => ({ ...p, [d.key]: e.target.value.slice(0, d.max) }))} />
+        <input inputMode="decimal" maxLength={d.max} value={raw}
+               onChange={e => set(p => ({ ...p, [d.key]: cleanDecimal(e.target.value).slice(0, d.max) }))} />
       )}
+      {impossible(d, raw)
+        ? <span className="unit" style={{ color: 'var(--bad)', fontWeight: 700 }}>
+            not a possible reading — the slip will not print</span>
+        : incomplete(d, raw)
+        ? <span className="unit" style={{ color: 'var(--w-text)', fontWeight: 600 }}>
+            only half typed — it will not print</span>
+        : null}
     </div>
   )
 }
@@ -1304,16 +1318,21 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
           {/* the same two facts, and the same silence about what they mean */}
           <CareLine alert={visit.patient.alert} pregnant={visit.pregnant}
                     sex={visit.patient.sex} disabled={locked || !!busy}
-                    onAlert={a => {
-                      // shown at once, then sent: the record holder is the
-                      // truth, but a toggle that waits for a round trip on a
-                      // phone in a corridor reads as a broken button
-                      setVisit(v => (v ? { ...v, patient: { ...v.patient, alert: a } } : v))
-                      void intent('setCare', { visitId: visit.id, alert: a ?? '' })
+                    /* NOTHING HERE IS BELIEVED UNTIL THE RECORD HOLDER SAYS
+                       SO. These two were sent and forgotten: on a phone in a
+                       corridor with the wifi gone, the chip went on, the text
+                       stayed in the box, and the slip printed without either.
+                       That is the same failure this file's own `ask` was
+                       written about, three hundred lines up. */
+                    onAlert={async a => {
+                      const r = await ask('care', 'The allergy was not saved', 'setCare',
+                                          { visitId: visit.id, alert: a ?? '' })
+                      if (r) setVisit(v => (v ? { ...v, patient: { ...v.patient, alert: a } } : v))
                     }}
-                    onPregnant={b => {
-                      setVisit(v => (v ? { ...v, pregnant: b } : v))
-                      void intent('setCare', { visitId: visit.id, pregnant: b })
+                    onPregnant={async b => {
+                      const r = await ask('care', 'That was not saved', 'setCare',
+                                          { visitId: visit.id, pregnant: b })
+                      if (r) setVisit(v => (v ? { ...v, pregnant: b } : v))
                     }} />
           {visit.prev && (visit.prev.diagnosis || visit.prev.brands.length > 0) && (
             <div className="prev">
@@ -1329,6 +1348,33 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
           ) : (
             <p className="hint">No vitals taken yet.</p>
           )}
+          {/* A READING THAT STOPS THE PRINT, AND A WAY OUT OF IT ON THIS SCREEN.
+              The slip refuses to carry a number no body produces, which is
+              right — and this screen does not enter vitals, which is also
+              right. Between those two a doctor could be refused a print
+              because of somebody else's typo with nothing on his phone able
+              to fix it. He cannot type a reading here; he can take one off. */}
+          {(() => {
+            const bad = firstImpossible(visit.vitals)
+            if (!bad || locked) return null
+            return (
+              <div className="badmsg">
+                {bad.en} reads &ldquo;{(visit.vitals ?? {})[bad.key]}&rdquo;, which is not a possible
+                reading. The slip will not print until it is corrected at the clinic machine,
+                or taken off here.
+                <button className="lnk" disabled={busy === 'clr'} onClick={async () => {
+                  const r = await ask('clr', 'The reading was not cleared', 'clearVital',
+                                      { visitId: visit.id, key: bad.key })
+                  if (r) setVisit(v => {
+                    if (!v) return v
+                    const vs = { ...(v.vitals ?? {}) }
+                    delete vs[bad.key]
+                    return { ...v, vitals: vs }
+                  })
+                }}>take {bad.short} off this visit</button>
+              </div>
+            )
+          })()}
 
           {/* Above the locked note and above the medicines, because it is true
               of the whole panel and a doctor scrolled past a long prescription

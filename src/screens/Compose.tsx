@@ -13,7 +13,7 @@ import { sendOn, unsend, incoming, sendTargets, destinationEn, type Incoming } f
 import { filled } from '../data/vitals'
 import { IcBook, IcPill, IcPrint, IcUser, FormIcon } from '../ui/art'
 import { SlipPreview } from '../ui/SlipPreview'
-import { CareLine } from '../ui/CareLine'
+import { CareLine, flushCare } from '../ui/CareLine'
 import { Note } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Bell from '../ui/Bell'
@@ -322,6 +322,10 @@ export default function Compose({ visitId, onDone, onBack }: {
     if (!pt) return
     await db.patients.update(pt.id, { alert: a })
     setPt({ ...pt, alert: a })
+    // the preview reads the patient, and the preview's effect watches the
+    // visit, so nudge it: what "What will print" shows must be what prints
+    cur.current = { ...cur.current! }
+    setVisit(cur.current)
   }
   async function savePregnant(b: boolean) {
     await db.visits.update(visitId, { pregnant: b || undefined })
@@ -502,6 +506,9 @@ export default function Compose({ visitId, onDone, onBack }: {
     if (busy) return                                   // double-tap on a slow printer
     if (badIdx >= 0) { bump(badIdx); return }
     if (namelessIdx >= 0) { bump(namelessIdx); return }
+    // Anything typed into the care line and not yet written down goes down
+    // now, before a single field is frozen: see flushCare.
+    await flushCare()
     const noDoctor = slipDoctorMissing(cur.current!)
     if (noDoctor) { setErr(noDoctor); return }
     const badVital = vitalsBlocker(cur.current!)
@@ -594,7 +601,7 @@ export default function Compose({ visitId, onDone, onBack }: {
       </div>
 
       {/* Directly under the name, above everything he is about to write. */}
-      <CareLine alert={pt.alert} pregnant={visit.pregnant} sex={pt.sex}
+      <CareLine key={pt.id} alert={pt.alert} pregnant={visit.pregnant} sex={pt.sex}
                 disabled={locked}
                 onAlert={saveAlert} onPregnant={savePregnant} />
 
@@ -672,7 +679,11 @@ export default function Compose({ visitId, onDone, onBack }: {
       {/* The money was already taken at the door. All the doctor does here is
           decide that this one pays less, or nothing, and send him back to the
           counter for it. */}
-      {chargesFee() && <FeeBar visit={visit} onChange={reload} />}
+      {/* A clinic that stops charging still owes back whatever it owes back.
+          The setting hides the fee for tokens that never had one; a token that
+          HAS money on it keeps its line, or a refund granted last week becomes
+          invisible to the only screen that can hand it over. */}
+      {(chargesFee() || !!visit.fee) && <FeeBar visit={visit} onChange={reload} />}
 
       <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0, opacity: locked ? .55 : 1 }}>
         {/* Vitals the compounder already took, and anything the doctor runs on a
@@ -965,7 +976,7 @@ export default function Compose({ visitId, onDone, onBack }: {
 
         {/* The paper itself, while it is being written. Laptop only. */}
         {visit.lines.length > 0 && (
-          <SlipPreview data={slipData} deps={visit} />
+          <SlipPreview data={slipData} />
         )}
 
         </div>

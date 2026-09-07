@@ -149,6 +149,7 @@ export type WireOpenVisit = {
 
 export type IntentKind =
   | 'addPatient' | 'openByCode' | 'closeVisit' | 'setVitals' | 'markRefunded' | 'setCare'
+  | 'clearVital'
   | 'setGiven' | 'giveAll' | 'reopen' | 'reprint' | 'setSitting' | 'openSlip'
   | 'markTestsPaid'
   | 'openVisit' | 'saveRx' | 'printRx' | 'myMeds' | 'takeMed'
@@ -166,6 +167,11 @@ const NEED: Record<IntentKind, Parameters<typeof can>[0]> = {
   // applyIntent: 'prescribe' says he is a doctor, the doctorId on his sitting
   // says which one, and another room's patient answers as if it did not exist.
   openVisit: 'prescribe', saveRx: 'prescribe', printRx: 'prescribe', setCare: 'prescribe',
+  // He may DELETE a reading he can see is impossible, and may not type one:
+  // entering vitals from the room is a deliberate exclusion (decisions.md),
+  // but a doctor refused a print because of somebody else's typo, on a screen
+  // with no way to fix it, is a doctor stranded mid-consultation.
+  clearVital: 'prescribe',
   myMeds: 'prescribe', takeMed: 'medicines',
 }
 
@@ -672,7 +678,8 @@ async function applyIntent(
     const vid = uid()
     await db.visits.add({
       id: vid, patientId, token, status: 'waiting', createdAt: Date.now(),
-      lines: [], tests: [], advice: [], ...(fee ? { fee } : {}),
+      lines: [], tests: [], advice: [],
+      ...(fee ? { fee } : { noFee: true }),
       urgent: p.urgent === true || undefined, doctorId,
     })
     const pt = await db.patients.get(patientId)
@@ -737,15 +744,23 @@ async function applyIntent(
     /* AND A CEILING ON THE HITS, NOT ONLY ON THE MISSES.
        The throttle above stops a walk through the numbering, because a walk is
        mostly misses. It does nothing about a device that already knows the
-       codes. A counter serves the patients who come to it — a few dozen in an
-       evening, each one looked up once or twice — so a device asking for its
-       fortieth DIFFERENT patient within the hour is not dispensing, and waits.
-       Looking the same slip up again, which is what ticking medicines off
-       does, costs nothing. */
+       codes, so there is a second ceiling on how many DIFFERENT patients one
+       device may open in an hour. Looking the same slip up again, which is
+       what ticking medicines off does, costs nothing.
+
+       THE NUMBER IS 250, AND THE FIRST TRY AT IT WAS 40, WHICH WOULD HAVE
+       STOPPED THE PHARMACY AT HALF PAST EIGHT. This app is built for 140
+       patients an evening; a busy hour of that is well over forty, and a
+       counter refused mid-evening with patients queueing holding printed
+       slips is a far worse failure than the one being guarded against. 250 an
+       hour is beyond any real counter and still nowhere near a walk through
+       ten thousand numbers, which the miss throttle above is what actually
+       stops. A limit that fires on honest work is not a security measure, it
+       is an outage. */
     const seenKey = 'slipseen:' + (sit?.fromId ?? '?')
     const seen = distinct.get(seenKey) ?? { ids: new Set<string>(), at: Date.now() }
     if (Date.now() - seen.at > 3600_000) { seen.ids.clear(); seen.at = Date.now() }
-    if (!seen.ids.has(pt.id) && seen.ids.size >= 40) {
+    if (!seen.ids.has(pt.id) && seen.ids.size >= 250) {
       distinct.set(seenKey, seen)
       return { ok: false, why: 'That is a lot of different slips in one hour. Wait a while, or ask the clinic desk.' }
     }
@@ -983,6 +998,19 @@ async function applyIntent(
     return { ok: true }
   }
 
+  /* One reading, removed. Never set, never merged: the only thing this can do
+     is take a number off a visit, which is the one action a stranded doctor
+     needs and the one that cannot invent a measurement. */
+  if (kind === 'clearVital') {
+    if (!v || !mineToo(v)) return { ok: false, why: 'That patient is another room\u2019s.' }
+    if (v.printedAt) return { ok: false, why: 'That slip is printed.' }
+    const key = clip(p.key, 16)
+    const vs = { ...(v.vitals ?? {}) }
+    if (!(key in vs)) return { ok: false, why: 'That box is already empty.' }
+    delete vs[key]
+    await db.visits.update(vid, { vitals: vs })
+    return { ok: true }
+  }
   /* THE CARE LINE: what this patient reacts to, and whether she is pregnant.
      The app attaches no rule to either — see clinical-decisions-needed.md — it
      carries what a person wrote to the people who need to read it. The alert
@@ -1049,6 +1077,8 @@ async function applyIntent(
 const knocks = new Map<string, { n: number; until: number; at: number }>()
 function knock(key: string, limit: number, penaltyMs: number): string | null {
   const now = Date.now()
+  // an entry nobody has touched for an hour is somebody who went home
+  if (knocks.size > 200) for (const [k2, v2] of knocks) if (now - v2.at > 3600_000) knocks.delete(k2)
   const k = knocks.get(key) ?? { n: 0, until: 0, at: now }
   if (now - k.at > 3600_000) { k.n = 0; k.until = 0 }
   k.at = now
@@ -1108,11 +1138,19 @@ function startHost(): void {
         }
         doctorId = want
       }
-      const gate = knock('pin:' + String(m.from ?? '?'), 5, 30_000)
+      /* TWO BRAKES, BECAUSE THE FIRST ONE IS DODGED BY HANGING UP.
+         `m.from` is assigned per connection, so a device that closes its
+         socket between guesses arrives as somebody new every time and never
+         trips a per-device counter. The second brake is the whole door: after
+         a run of wrong PINs from anyone at all, everybody waits a few seconds.
+         A member of staff mistypes twice and never notices; a machine trying
+         ten thousand numbers is slowed to a crawl it cannot reconnect out of. */
+      const gate = knock('pin:' + String(m.from ?? '?'), 5, 30_000) ?? knock('pin:door', 12, 5_000)
       if (gate) { send({ t: 'authno', to: m.from, req: m.req, why: gate }); return }
       const ok = await checkRolePin(role, String(m.pin ?? ''))
       if (!ok) { send({ t: 'authno', to: m.from, req: m.req, why: 'That is not right. Try again.' }); return }
       knockClear('pin:' + String(m.from ?? '?'))
+      knockClear('pin:door')
       const sid2 = newSid()
       sittings.set(sid2, { role, fromId: m.from!, at: Date.now(), doctorId })
       send({ t: 'authok', to: m.from, req: m.req, sid: sid2, role, doctorId })

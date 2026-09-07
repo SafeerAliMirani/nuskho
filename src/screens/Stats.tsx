@@ -89,7 +89,7 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
                  A clinic that does not charge is shown none of it: three empty
                  rupee tiles are not a smaller version of this section, they are
                  a page telling a charity evening it earned nothing. ---- */}
-          {chargesFee() && (<>
+          {(chargesFee() || s.received > 0 || s.dueTotal > 0 || s.refunded > 0 || s.waivedCount > 0) && (<>
           <h2><IcMoney size={17} /> Fees this month</h2>
           <div className="tiles money">
             <Tile big={`Rs ${s.received.toLocaleString('en-GB')}`} lab="received"

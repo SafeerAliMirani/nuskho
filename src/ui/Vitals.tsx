@@ -1,6 +1,6 @@
 import { cleanDecimal } from '../fields'
 import { useRef, useState } from 'react'
-import { VITALS, INSTANT, flag, impossible, isChild, type VitalDef } from '../data/vitals'
+import { VITALS, INSTANT, flag, impossible, incomplete, isChild, type VitalDef } from '../data/vitals'
 import { IcCheck } from './art'
 
 /**
@@ -149,8 +149,9 @@ export default function Vitals({ which, value, onChange, title, startOpen, age }
  * somewhere else (the desk typing while the room has the visit open), it is
  * taken, and `sent` is what tells the two apart.
  */
-function Pair({ def, raw, onSet, flag: f, imp }: {
-  def: VitalDef; raw: string; onSet: (s: string) => void; flag: string | null; imp?: boolean
+function Pair({ def, raw, onSet, flag: f, imp, half }: {
+  def: VitalDef; raw: string; onSet: (s: string) => void
+  flag: string | null; imp?: boolean; half?: boolean
 }) {
   const split = (s: string): [string, string] => {
     const [x = '', y = ''] = s.split('/')
@@ -168,7 +169,7 @@ function Pair({ def, raw, onSet, flag: f, imp }: {
   const clean = (v: string) => v.replace(/\D/g, '')
 
   return (
-    <div className={'vfld pair' + (imp ? ' f-imp' : f ? ' f-' + f : '')}>
+    <div className={'vfld pair' + (imp ? ' f-imp' : half ? ' f-half' : f ? ' f-' + f : '')}>
       <label>{def.en} <i className="sd">{def.sd}</i></label>
       <div className="vpair">
         <input inputMode="numeric" maxLength={def.max} value={a} placeholder="120"
@@ -180,6 +181,8 @@ function Pair({ def, raw, onSet, flag: f, imp }: {
       </div>
       {imp
         ? <span className="vmark">not a possible reading — the slip will not print</span>
+        : half
+        ? <span className="vmark half">only half typed — it will not print</span>
         : f && <span className="vmark">{f === 'high' ? 'higher than usual' : 'lower than usual'}</span>}
     </div>
   )
@@ -193,11 +196,12 @@ function Field({ def, raw, onSet, age }: {
      typo, and the slip refuses to print until it is corrected or cleared, so
      the box has to say so rather than mark it like an abnormal reading. */
   const imp = impossible(def, raw)
+  const half = !imp && incomplete(def, raw)
 
   // A blood pressure is one reading written as two numbers, and it is typed as
   // two numbers. Two boxes with a slash between them beats one box that has to
   // be taught what a slash is.
-  if (def.pair) return <Pair def={def} raw={raw} onSet={onSet} flag={f} imp={imp} />
+  if (def.pair) return <Pair def={def} raw={raw} onSet={onSet} flag={f} imp={imp} half={half} />
 
   const numeric = def.key !== 'urine'
   return (

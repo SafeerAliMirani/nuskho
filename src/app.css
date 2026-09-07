@@ -2209,6 +2209,10 @@ h2 svg{width:26px;height:26px;padding:5px;border-radius:8px;background:var(--g-1
    the slip, so it is the same red the empty-dose line uses. */
 .vfld.f-imp .vone,.vfld.f-imp .vpair{border-color:var(--bad);background:var(--bad-bg)}
 .vfld.f-imp .vmark{color:var(--bad);font-weight:700}
+/* Half a reading: a nudge to finish it, not an accusation. It does not stop
+   the slip; it simply does not go on it. */
+.vfld.f-half .vone,.vfld.f-half .vpair{border-color:var(--w-line)}
+.vfld.f-half .vmark{color:var(--w-text);font-weight:600}
 
 /* the care line: allergies and pregnancy, under the patient's name */
 .careline{display:flex;align-items:center;gap:var(--s2);margin:0 0 var(--s4);

@@ -112,19 +112,50 @@ function allFit(d: SlipData, groups: number[], compact: boolean, total: number):
   return true
 }
 
-/** The fitting pass costs real time on a 12-medicine slip, so its result is
- *  cached and warmed while the doctor is still choosing. The key covers every
- *  field that can change a height. */
-function layoutKey(d: SlipData): string {
+/**
+ * The fitting pass costs real time on a 12-medicine slip, so its result is
+ * cached and warmed while the doctor is still choosing. The key covers every
+ * field that can change a height.
+ *
+ * EVERY FIELD. A KEY THAT FORGETS ONE IS WORSE THAN NO CACHE AT ALL.
+ *
+ * This forgot five, and the way it fails is the reason this module exists. A
+ * nine-medicine slip is planned and cached as one sheet with a millimetre to
+ * spare. The doctor then types "dissolve in half a glass of water" under line
+ * three, or the allergy into the care line. The key is byte-identical, so the
+ * stale plan is returned, the extra lines are laid out on a sheet that was
+ * measured without them, and `.page` is overflow:hidden — so the screen and
+ * the preview both look perfect and the advice box and the handwriting strip
+ * are simply missing from the paper. It fails only on paper, only at the
+ * bottom, and only on a full prescription: exactly the fault the fitter was
+ * written to prevent.
+ *
+ * So the rule is the same one `snapFor` obeys a file away: when a field is
+ * added that the printer draws, it belongs in this list the same day.
+ */
+export function layoutKey(d: SlipData): string {
   return JSON.stringify([
     d.visit.lines.map(l => {
       const g = d.drugs[l.drugId]
       const m = l.snap ?? g
       return [l.drugId, l.dose.m, l.dose.d, l.dose.e ?? 0, l.dose.n, l.meal, l.days,
-              m?.brand, m?.strength, m?.generic, m?.sd, m?.sdReviewed, m?.unitSd, m?.form]
+              m?.brand, m?.strength, m?.generic, m?.sd, m?.sdReviewed, m?.unitSd, m?.form,
+              // the doctor's own line under the medicine: its own row in the name cell
+              l.note,
+              // an SOS line draws a reason and a cap instead of the dose cells
+              l.sos, l.sosReason?.sd, l.sosReason?.en, l.supply, l.sosMax,
+              // "left eye" replaces the meal picture and can wrap differently
+              l.side]
     }),
     d.visit.diagnosis, d.visit.vitals, d.visit.tests, d.visit.advice, d.visit.nextVisit,
+    // the care band under the patient row: present or absent changes every
+    // height below it, and the allergy's own length can wrap it to two lines
+    d.patientAlert, d.visit.pregnant,
     d.patientName, d.patientAge, d.patientSex, d.patientCode,
+    // a referral prints its own box, with the destination AND the reason in it
+    d.visit.sentOn, d.sentTo?.en, d.sentTo?.sd,
+    // whose name heads the sheet, in a building with several rooms
+    d.doctor?.nameEn, d.doctor?.nameSd, d.doctor?.degreesEn, d.doctor?.degreesSd, d.doctor?.reg,
     paper(),   // page size and letterhead bands change every height on the sheet
   ])
 }

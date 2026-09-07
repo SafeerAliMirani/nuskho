@@ -179,15 +179,46 @@ export function impossible(def: VitalDef, raw: string): boolean {
     Number.isFinite(n) && ((lo != null && n < lo) || (hi != null && n > hi))
   if (def.pair) {
     const [a, b] = t.split('/').map(x => parseFloat(x))
-    // a pair needs both halves: "180/" is half a reading, and half a blood
-    // pressure on a slip is worse than none
-    if (t.includes('/') && (!Number.isFinite(a) || !Number.isFinite(b))) return true
+    // HALF A READING IS NOT AN IMPOSSIBLE ONE, IT IS AN UNFINISHED ONE.
+    // This used to call "180/" impossible, and the two boxes compose that
+    // string from the first keystroke — so the field went red and said the
+    // slip would not print in the middle of typing 120 into an empty box.
+    // Unfinished is judged by `incomplete` below, which does not shout at
+    // somebody who is still typing and does not print half a blood pressure
+    // either.
     return out(a, def.pmin, def.pmax) || out(b, def.pmin2, def.pmax2)
   }
   if (!def.pmin && !def.pmax) return false      // a text box, like the urine strip
   const n = parseFloat(t)
   if (!Number.isFinite(n)) return true
   return out(n, def.pmin, def.pmax)
+}
+
+/**
+ * A PAIR WITH ONE HALF MISSING.
+ *
+ * "180/" is what a cuff reading looks like when the compounder was called
+ * away between the two numbers, and it is the shape the old lost-systolic bug
+ * left behind. It is not a typo to be shouted about and it is not a reading to
+ * be printed: "180/ mmHg" on a slip is a number a chemist cannot use.
+ *
+ * So it is quietly left off the paper, and the screen says so once, where the
+ * person who can finish it will see it. Nothing is blocked: an unfinished
+ * blood pressure must never stand between a patient and his medicines.
+ */
+export function incomplete(def: VitalDef, raw: string): boolean {
+  if (!def.pair) return false
+  const t = (raw ?? '').trim()
+  if (!t) return false
+  const [a, b] = t.split('/').map(x => parseFloat(x))
+  return !Number.isFinite(a) || !Number.isFinite(b)
+}
+
+/** The first pair somebody started and did not finish, or null. */
+export function firstIncomplete(v: Record<string, string> | undefined): VitalDef | null {
+  if (!v) return null
+  for (const d of ALL_VITALS) if (incomplete(d, v[d.key] ?? '')) return d
+  return null
 }
 
 /** The first box whose reading cannot be a reading, or null. Both print paths
@@ -235,6 +266,7 @@ export function vitalText(key: string, raw: string): string {
 export function filled(v: Record<string, string> | undefined): [VitalDef, string][] {
   if (!v) return []
   return ALL_VITALS
-    .filter(d => (v[d.key] ?? '').trim())
+    // an unfinished pair is left off the sheet rather than printed as "180/"
+    .filter(d => (v[d.key] ?? '').trim() && !incomplete(d, v[d.key]))
     .map(d => [d, v[d.key].trim()] as [VitalDef, string])
 }

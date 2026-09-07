@@ -248,6 +248,18 @@ export interface Visit {
    * is writing. See clinical-decisions-needed.md.
    */
   pregnant?: boolean
+  /**
+   * This token was issued where nothing is charged.
+   *
+   * A visit with no fee could mean two opposite things — a charity evening, or
+   * a counter that forgot — and the day's figures nag about the second. The
+   * clinic's setting answers it today, but a setting is a fact about NOW and
+   * the figures are about then: a clinic that ran free for a month and later
+   * started charging would have that whole month reappear as missing
+   * paperwork. So the answer is written on the token at the moment it is
+   * issued, where it stays true for ever.
+   */
+  noFee?: boolean
   printedAt?: number     // set on every successful print — this is the audit trail
   /** when the visit stopped being open, whatever the outcome */
   closedAt?: number

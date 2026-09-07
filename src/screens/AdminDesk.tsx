@@ -52,7 +52,7 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
 
       {/* nothing was taken, nothing is owed and nothing is waiting to go back
           in a clinic that does not charge: see profile.noFee */}
-      {chargesFee() && (
+      {(chargesFee() || !!(sum && (sum.collected || sum.toRefund || sum.due))) && (
       <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
         <div className="feebar" style={{ flexDirection: 'column', alignItems: 'flex-start', flex: 1, minWidth: 160 }}>
           <label>Taken at the desk</label>
@@ -102,7 +102,7 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
         </>
       )}
 
-      {chargesFee() && (<>
+      {(chargesFee() || !!(sum && sum.collected)) && (<>
       <h2 style={{ marginTop: 18 }}>Closing the drawer</h2>
       <div className="row">
         <div className="fld" style={{ maxWidth: 220 }}>

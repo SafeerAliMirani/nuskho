@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { impossible, firstImpossible, flag, isChild, vitalDef, VITALS } from './data/vitals'
+import { impossible, incomplete, firstImpossible, firstIncomplete, filled, flag, isChild, vitalDef, VITALS } from './data/vitals'
 import { courseCheck } from './course'
 import { canBecome } from './db'
 import type { RxLine } from './types'
@@ -24,9 +24,21 @@ describe('a reading that is not a reading', () => {
     expect(impossible(pulse, '1210')).toBe(true)
     expect(impossible(temp, '986')).toBe(true)
   })
-  it('treats half a blood pressure as impossible, not as a low one', () => {
-    expect(impossible(bp, '180/')).toBe(true)
-    expect(impossible(bp, '/110')).toBe(true)
+  it('treats half a blood pressure as unfinished, not as impossible and not as a low one', () => {
+    // it is what a cuff reading looks like mid-keystroke, and what the old
+    // lost-systolic bug left behind. Not shouted about, and not printed.
+    expect(impossible(bp, '180/')).toBe(false)
+    expect(incomplete(bp, '180/')).toBe(true)
+    expect(incomplete(bp, '/110')).toBe(true)
+    expect(incomplete(bp, '120/80')).toBe(false)
+    expect(incomplete(bp, '')).toBe(false)
+    expect(flag(bp, '180/')).toBe('high')          // the half that IS there still reads high
+    expect(firstIncomplete({ pulse: '72', bp: '180/' })?.key).toBe('bp')
+  })
+
+  it('leaves an unfinished pair off the paper rather than printing "180/"', () => {
+    expect(filled({ bp: '180/', pulse: '72' }).map(([d]) => d.key)).toEqual(['pulse'])
+    expect(filled({ bp: '120/80' }).map(([d]) => d.key)).toEqual(['bp'])
   })
   it('says nothing about an empty box', () => {
     expect(impossible(bp, '')).toBe(false)

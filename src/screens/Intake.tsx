@@ -124,9 +124,24 @@ export default function Intake({ visits, onOpen, onChange }: {
    * It is the first half of the sentence a person reads, so it is never
    * "an error occurred": it is "the patient was not added".
    */
-  async function guard(where: 'add' | 'code' | 'queue', did: string, fn: () => Promise<void>) {
+  /**
+   * A THROW IS A FAILURE; A RETURNED SENTENCE IS A RULE.
+   *
+   * whyItFailed exists to translate a storage fault into what the person at
+   * the desk should do about it, and its catch-all ends with "use the paper
+   * pad and take a backup before this computer is switched off". That is the
+   * right thing to say about a disk and completely the wrong thing to say
+   * about a rule working as intended. So a job that wants to refuse returns
+   * its own sentence instead of throwing one.
+   */
+  async function guard(
+    where: 'add' | 'code' | 'queue', did: string, fn: () => Promise<void | string>,
+  ): Promise<void> {
     setErr(null)
-    try { await fn() } catch (e) {
+    try {
+      const refused = await fn()
+      if (refused) setErr({ where, text: refused })
+    } catch (e) {
       console.error('[nuskho] ' + did, e)
       setErr({ where, text: whyItFailed(e, did) })
     }
@@ -201,7 +216,9 @@ export default function Intake({ visits, onOpen, onChange }: {
       : undefined
     await db.visits.add({
       id, patientId, token, status: 'waiting', createdAt: Date.now(),
-      lines: [], tests: [], advice: [], ...(fee ? { fee } : {}), urgent: urgent || undefined,
+      lines: [], tests: [], advice: [],
+      ...(fee ? { fee } : { noFee: true }),
+      urgent: urgent || undefined,
       doctorId: sel?.id,
     })
     setAmt(String(rate || ''))
@@ -294,14 +311,19 @@ export default function Intake({ visits, onOpen, onChange }: {
   }
 
   async function close(id: string, s: VisitStatus) {
+    /* A REFUSAL IS NOT A FAILURE, AND MUST NOT BE DRESSED AS ONE.
+       Throwing this into guard() ran it through whyItFailed, which matched no
+       known storage fault and produced the catch-all: press it again, reload,
+       use the paper pad, take a backup before switching off. All of that for a
+       rule working exactly as intended. The rule says its own sentence. */
     await guard('queue', 'The token was not closed', async () => {
-      if (!await closeVisit(id, s, closeNote)) {
-        // canBecome refused it: a printed slip is in somebody's hand
-        throw new Error('That token has already been prescribed for. Its slip is printed, so it cannot be closed as something else.')
+      if (await closeVisit(id, s, closeNote)) {
+        setClosing(null)
+        setCloseNote('')
+        onChange()
+        return ''
       }
-      setClosing(null)
-      setCloseNote('')
-      onChange()
+      return 'That token has already been prescribed for. Its slip is printed, so it cannot be closed as something else.'
     })
   }
 
@@ -576,7 +598,7 @@ export default function Intake({ visits, onOpen, onChange }: {
           {sum.seen > 0 && <span><b>{sum.seen}</b> seen only</span>}
           {sum.left + sum.cancelled > 0 && <span><b>{sum.left + sum.cancelled}</b> left / cancelled</span>}
           {sum.referred > 0 && <span><b>{sum.referred}</b> sent on</span>}
-          {takesFee && <span className="money"><b>Rs {sum.collected}</b> in hand</span>}
+          {(takesFee || sum.collected > 0) && <span className="money"><b>Rs {sum.collected}</b> in hand</span>}
           {sum.toRefund > 0 && <span className="money back"><b>Rs {sum.toRefund}</b> to give back
             <small> ({sum.refundCount})</small></span>}
           {sum.due > 0 && <span className="money due"><b>Rs {sum.due}</b> due</span>}

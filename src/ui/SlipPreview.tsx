@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SlipData } from '../print/renderSlip'
-import { renderFitted } from '../print/paginate'
+import { renderFitted, layoutKey } from '../print/paginate'
 import { ensurePrintStyles } from '../print/styles'
 import { paper, PAGE_MM } from '../paper'
 
@@ -23,11 +23,17 @@ import { paper, PAGE_MM } from '../paper'
  * tapping MORNING, NIGHT, +, + in a second gets one render at the end, not
  * four. Below 1081px the column is not shown and this renders nothing at all.
  */
-export function SlipPreview({ data, deps }: { data: () => SlipData; deps: unknown }) {
+export function SlipPreview({ data }: { data: () => SlipData }) {
   const [html, setHtml] = useState('')
   const [scale, setScale] = useState(0.4)
   const wrap = useRef<HTMLDivElement>(null)
   const pw = PAGE_MM[paper().size].w
+  /* WHAT THE FITTER WATCHES IS WHAT THIS WATCHES. Handing this component a
+     list of dependencies to compare meant keeping a second list in step with
+     the printer's, and it was already out of step: the allergy lives on the
+     patient, not the visit, so typing one changed the paper and not the
+     picture of the paper. It asks the fitter's own key instead. */
+  const key = layoutKey(data())
 
   useEffect(() => {
     if (!matchMedia('(min-width:1081px)').matches) return
@@ -41,7 +47,7 @@ export function SlipPreview({ data, deps }: { data: () => SlipData; deps: unknow
     }, 320)
     return () => { live = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deps])
+  }, [key])
 
   useEffect(() => {
     const el = wrap.current

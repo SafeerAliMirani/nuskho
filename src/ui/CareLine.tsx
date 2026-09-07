@@ -2,6 +2,30 @@ import { useEffect, useRef, useState } from 'react'
 import { IcWarn } from './art'
 
 /**
+ * A TYPED ALLERGY THAT HAS NOT BEEN WRITTEN DOWN YET MUST NOT BE PRINTED
+ * AROUND.
+ *
+ * The box below saves a moment after the typing stops, so a round trip to the
+ * database cannot eat a keystroke. That debounce very nearly cost a patient
+ * his warning: a doctor who typed "PENICILLIN ALLERGY" and reached straight
+ * for PRINT — which is exactly what a doctor in a hurry does, and this whole
+ * app is built so he never has to wait — printed a slip with no band on it,
+ * because the write was still sitting in a timer.
+ *
+ * So the pending write is registered here, and the print path awaits it. One
+ * promise, module level, because there is only ever one care line on screen.
+ */
+let pending: (() => Promise<void>) | null = null
+
+/** Awaited by both print paths before anything is frozen. Resolves at once
+ *  when nothing is waiting, which is the ordinary case. */
+export async function flushCare(): Promise<void> {
+  const p = pending
+  pending = null
+  if (p) await p()
+}
+
+/**
  * WHAT THIS PATIENT REACTS TO, AND WHETHER SHE IS PREGNANT.
  *
  * Two facts the app had nowhere to put, sitting where the doctor cannot miss
@@ -20,16 +44,12 @@ import { IcWarn } from './art'
  * The allergy belongs to the PATIENT and survives the token; the pregnancy
  * belongs to THIS visit and does not, because a flag that is never taken off
  * is a flag nobody believes.
- *
- * The box types like every other one on this screen: local while the finger is
- * on it, saved a moment after it stops, so a round trip to the database can
- * never eat a keystroke.
  */
 export function CareLine({ alert, pregnant, sex, onAlert, onPregnant, disabled }: {
   alert?: string
   pregnant?: boolean
   sex?: 'M' | 'F'
-  onAlert: (s: string | undefined) => void
+  onAlert: (s: string | undefined) => void | Promise<void>
   onPregnant: (b: boolean) => void
   disabled?: boolean
 }) {
@@ -41,12 +61,29 @@ export function CareLine({ alert, pregnant, sex, onAlert, onPregnant, disabled }
     saved.current = alert ?? ''
     if (draft !== (alert ?? '')) setDraft(alert ?? '')
   }
+
+  /* THE WRITE, IN ONE PLACE, CALLED BY THREE THINGS: the debounce, the blur,
+     and the print path through flushCare. Whichever gets there first, the
+     other two find nothing left to do. */
+  const write = useRef<() => Promise<void>>(async () => {})
+  write.current = async () => {
+    if (draft === saved.current) return
+    saved.current = draft
+    await onAlert(draft.trim() || undefined)
+  }
+
   useEffect(() => {
-    if (draft === (alert ?? '')) return
-    const t = setTimeout(() => { saved.current = draft; onAlert(draft.trim() || undefined) }, 700)
+    if (draft === saved.current) { if (pending) pending = null; return }
+    pending = () => write.current()
+    const t = setTimeout(() => { pending = null; void write.current() }, 500)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft])
+
+  /* AND ON THE WAY OUT. A doctor who types the allergy and taps back to the
+     queue inside half a second used to lose it silently: the timer was
+     cleared by the unmount and nothing had been written. */
+  useEffect(() => () => { void flushCare() }, [])
 
   // A man is not offered it. A patient whose sex nobody recorded is, because
   // the commonest reason the field is empty is that the counter was busy.
@@ -57,12 +94,13 @@ export function CareLine({ alert, pregnant, sex, onAlert, onPregnant, disabled }
       <span className="cl-i"><IcWarn size={16} /></span>
       <input className="cl-in" value={draft} maxLength={120} disabled={disabled}
              placeholder="allergies or conditions, in your own words (prints)"
-             onChange={e => { typed.current = Date.now(); setDraft(e.target.value) }} />
+             onChange={e => { typed.current = Date.now(); setDraft(e.target.value) }}
+             onBlur={() => { pending = null; void write.current() }} />
       {mayBePregnant && (
         <button type="button" className={'chip cl-pg' + (pregnant ? ' on' : '')} disabled={disabled}
                 aria-pressed={!!pregnant}
                 onClick={() => onPregnant(!pregnant)}>
-          {pregnant ? '✓ ' : ''}Pregnant
+          {pregnant ? '\u2713 ' : ''}Pregnant
         </button>
       )}
     </div>
