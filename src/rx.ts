@@ -21,7 +21,7 @@
  * Nothing in this file touches the database. Everything is handed in, so it
  * can serve the solo screen, the wire path, and a unit test identically.
  */
-import type { Visit, Patient, Drug, RxLine, RxSnap } from './types'
+import type { Visit, Patient, Drug, RxLine, RxSnap, WhoSnap } from './types'
 import type { SlipData } from './print/renderSlip'
 import type { DictEntry } from './data/dictionary'
 import { doseSdFor, defaultRoute } from './data/forms'
@@ -150,8 +150,14 @@ export function slipDoctorMissing(v: Visit): string | null {
  * ended in a prescription, not in a cancellation, and the day's figures must
  * not carry both.
  */
-export const printedStamp = (lines?: RxLine[]) => ({
+export const printedStamp = (lines?: RxLine[], who?: WhoSnap) => ({
   ...(lines ? { lines } : {}),
+  // WHO IT WAS PRINTED FOR, frozen in the same write as the medicines.
+  // Identity became correctable (patient.ts), and the moment it did, a slip
+  // that reads its name from the live record stopped being a record of what
+  // was printed. It is written here and only here, for the same reason the
+  // snapshots are: printing is the act that makes a thing permanent.
+  ...(who ? { who } : {}),
   printedAt: Date.now(), status: 'done' as const,
   closedAt: undefined, closeNote: undefined,
 })
@@ -166,10 +172,20 @@ export const printedStamp = (lines?: RxLine[]) => ({
  */
 export function slipDataFor(v: Visit, pt: Patient, drugs: Record<string, Drug>): SlipData {
   const room = doctorById(v.doctorId)
+  /* WHAT THE PAPER SAYS, WHICH AFTER PRINTING IS NOT THE LIVE RECORD.
+     A visit that has been printed carries its own copy of the patient, so a
+     spelling corrected in October cannot change what this app says it printed
+     in March, and a reprint still matches the slip in the patient's hand.
+     Absent on every unprinted visit and on everything printed before the
+     freeze existed, and both fall back to the record, exactly as before. */
+  const w = v.who
   return {
-    visit: v, patientName: pt.name, patientAge: pt.age, patientSex: pt.sex,
-    patientAlert: pt.alert,
-    patientCode: patientCode(pt.num), drugs, rxId: v.id.slice(-6),
+    visit: v,
+    patientName: w?.name ?? pt.name,
+    patientAge: w ? w.age : pt.age,
+    patientSex: w ? w.sex : pt.sex,
+    patientAlert: w ? w.alert : pt.alert,
+    patientCode: patientCode(w?.num ?? pt.num), drugs, rxId: v.id.slice(-6),
     doctor: room ? {
       nameEn: room.nameEn, nameSd: room.nameSd,
       degreesEn: room.degreesEn, degreesSd: room.degreesSd, reg: room.reg,

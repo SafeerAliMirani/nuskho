@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { db } from '../db'
+import { db, livingPatients } from '../db'
 import { profile, APP } from '../profile'
 import { paper } from '../paper'
 import { role, ROLE_NAME } from '../roles'
@@ -54,7 +54,8 @@ export default function About({ onBack }: { onBack: () => void }) {
     (async () => {
       const drugs = await db.drugs.toArray()
       setCounts({
-        patients: await db.patients.count(),
+        // a record folded into another is a signpost, not a patient
+        patients: (await livingPatients()).length,
         visits: await db.visits.count(),
         drugs: drugs.filter(d => !d.archived).length,
         unchecked: drugs.filter(d => !d.archived && d.sdReviewed !== true).length,
@@ -139,6 +140,17 @@ export default function About({ onBack }: { onBack: () => void }) {
         Nuskho is made in Larkana. It is not a hospital system, an insurance product or a
         data business: it prints one piece of paper as clearly as it can, and everything it
         knows stays on the machine it is installed on.
+      </p>
+      {/* THE SINDHI ON THE SLIP IS SOMEBODY ELSE'S WORK AND IT IS SAID SO.
+          Noto Naskh Arabic is what draws every Sindhi letter this app prints,
+          including the hays and the retroflexes a generic font drops, and it
+          is embedded in the app rather than fetched, so it is there with the
+          router unplugged. All three faces are SIL Open Font Licensed; the
+          licence travels with the source, in src/ui/fonts/OFL.txt. */}
+      <p className="hint">
+        The Sindhi is set in <b>Noto Naskh Arabic</b>, the English in <b>Inter</b> and
+        <b> Plus Jakarta Sans</b>. All three are free and open typefaces, used under the
+        SIL Open Font Licence and built into the app so they work with no internet.
       </p>
 
       {store && !store.persisted && (

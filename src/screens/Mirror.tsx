@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   mirrorSubscribe, mirrorAuth, mirrorSignOut, intent, hostUp, setHostHere, hubIsLocal,
   MIRROR_ROLES, buildingRoles, buildingDocs, type WireState, type WireRx, type WireSlip,
-  type WireVisit, type WireDoctor, type WireMed, type WireOpenVisit, type IntentKind,
+  type WireVisit, type WireDoctor, type WireMed, type WireOpenVisit, type IntentKind, type WirePerson,
 } from '../building'
 import { ROLE_NAME, ROLE_SD, ROLE_WHAT, can, type Role } from '../roles'
 import { roleIsOn } from '../staff'
@@ -15,6 +15,11 @@ import { printToken, printSlip } from '../print/print'
 import { paper } from '../paper'
 import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn, FormIcon } from '../ui/art'
 import { CareLine } from '../ui/CareLine'
+import { FixPatient } from '../ui/FixPatient'
+import { parseCode } from '../code'
+import { phoneKey } from '../household'
+import type { Patient } from '../types'
+import type { PatientPatch } from '../patient'
 import { courseCheck } from '../course'
 import { isChild } from '../data/vitals'
 import { APP } from '../profile'
@@ -447,6 +452,12 @@ function MDesk({ s }: { s: WireState }) {
   const [age, setAge] = useState('')
   const [sex, setSex] = useState<'' | 'M' | 'F'>('')
   const [city, setCity] = useState('')
+  /* THE PHONE, AND THE FAMILY UNDER IT. The desk collected a phone from the
+     first day; this screen never asked, so every patient taken in on a phone
+     had none, and the household list could not exist for them. Now it asks,
+     and asks the record holder who is already on the books under it. */
+  const [phone, setPhone] = useState('')
+  const [fam, setFam] = useState<WirePerson[]>([])
   const [urgent, setUrgent] = useState(false)
   const [selDoc, setSelDoc] = useState('')
   const sitting = s.doctors.filter(d => d.sitting)
@@ -461,18 +472,35 @@ function MDesk({ s }: { s: WireState }) {
   const rate = sel ? sel.fee : (s.doctors[0]?.fee ?? 0)
   useEffect(() => { setAmt(String(rate || '')) }, [sel?.id])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function fire(kind: 'addPatient' | 'openByCode') {
+  // the household, asked for as the number is typed: seven digits, then a
+  // pause. The record holder answers a short list or nothing.
+  useEffect(() => {
+    if (!phoneKey(phone)) { setFam([]); return }
+    let live = true
+    const t = setTimeout(async () => {
+      try {
+        const r = await intent('household', { phone })
+        if (live && r.ok !== false) setFam((r.people as WirePerson[]) ?? [])
+      } catch { if (live) setFam([]) }
+    }, 350)
+    return () => { live = false; clearTimeout(t) }
+  }, [phone])
+
+  /** `useCode` is a family member tapped from the household list: his number
+   *  goes in place of whatever is in the slip box, and the token lands on his
+   *  old record. Everything else about the token is as the desk set it. */
+  async function fire(kind: 'addPatient' | 'openByCode', useCode?: string) {
     if (busy) return
     setBusy(true); setMsg('')
     const r = await intent(kind, {
-      code, name, age, sex: sex || undefined, city, urgent,
+      code: useCode ?? code, name, phone, age, sex: sex || undefined, city, urgent,
       amount: +amt || 0, feeState: fstate, doctorId: sel?.id,
       wantHostPrint: !paper().token,
     })
     setBusy(false)
     if (r.ok === false) { setMsg(String(r.why)); return }
     setMsg(`Token ${r.token} issued${sel ? ` for Room ${sel.room}` : ''}.`)
-    setName(''); setAge(''); setSex(''); setCode(''); setUrgent(false)
+    setName(''); setAge(''); setSex(''); setCode(''); setPhone(''); setFam([]); setUrgent(false)
     setAmt(String(rate || '')); setFstate('paid')
     if (r.slip && paper().token) printToken(r.slip as TokenSlip)
   }
@@ -496,6 +524,24 @@ function MDesk({ s }: { s: WireState }) {
       <h2 style={{ marginTop: 16 }}><IcUser size={17} /> New patient</h2>
       <div className="fld"><label>Name — نالو</label>
         <input value={name} onChange={e => setName(e.target.value)} /></div>
+      <div className="fld"><label>Phone — optional</label>
+        <input value={phone} inputMode="numeric"
+               onChange={e => setPhone(e.target.value.replace(/[^0-9+ ]/g, '').slice(0, 15))} /></div>
+      {fam.length > 0 && (
+        <div className="famlist">
+          <b>This phone is already here — {fam.length === 1 ? 'is it the same person?' : 'which one is it?'}</b>
+          <div className="chips">
+            {fam.map(p => (
+              <button key={p.code} className="chip fam" disabled={busy} onClick={() => fire('openByCode', p.code)}>
+                <IcUser size={13} /> {[p.name, p.code, p.age, p.sex === 'M' ? 'man' : p.sex === 'F' ? 'woman' : ''].filter(Boolean).join(' · ')}
+                {p.city ? <small> · {p.city}</small> : null}
+              </button>
+            ))}
+          </div>
+          <span className="unit">Tap the person for a token on their old number. Somebody new in the
+            family: fill the name and add as new.</span>
+        </div>
+      )}
       <div className="row">
         <div className="fld"><label>Age — optional</label>
           <input value={age} inputMode="numeric" maxLength={3}
@@ -1024,6 +1070,22 @@ function MedLine({ l, i, medsMap, twin, onChange, onRemove }: {
   )
 }
 
+/**
+ * The three fields the wire sends, shaped as the correction box expects.
+ *
+ * Not a Patient and never stored as one: a mirror holds no records. The id is
+ * empty because nothing on this screen may address a record by id — the intent
+ * carries a TOKEN and the record holder does the looking up — and the number
+ * is read back out of the printed code so the box can say whose record this is
+ * before anybody types.
+ */
+function asPatient(p: WireOpenVisit['patient']): Patient {
+  return {
+    id: '', num: parseCode(p.code) ?? 0, name: p.name,
+    age: p.age, sex: p.sex, alert: p.alert, createdAt: 0,
+  }
+}
+
 function MDr({ s, docId }: { s: WireState; docId: string | null }) {
   const me = s.doctors.find(d => d.id === docId)
 
@@ -1031,6 +1093,7 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
   const medsMap = useMemo(() => Object.fromEntries(meds.map(m => [m.id, m])), [meds])
 
   const [openId, setOpenId] = useState<string | null>(null)
+  const [fixing, setFixing] = useState(false)
   const [visit, setVisit] = useState<WireOpenVisit | null>(null)
   const [lines, setLines] = useState<RxLine[]>([])
   const [diagnosis, setDiagnosis] = useState('')
@@ -1072,6 +1135,7 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
   }, [])
 
   function applyVisit(v: WireOpenVisit) {
+    setFixing(false)
     setVisit(v)
     setLines(v.lines)
     setDiagnosis(v.diagnosis ?? '')
@@ -1314,6 +1378,37 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
             </span>
             <IcUser size={22} className="pt-ic" />
           </div>
+
+          {/* THE AGE IS WRONG AND HE IS THE ONE WHO CAN SEE IT.
+              The desk types the age; the doctor is the person who notices it
+              says 4 for the man in front of him, and until now his screen
+              could show him the mistake and do nothing about it — including
+              when the app was about to judge that man's pulse by a child's
+              range. The record holder applies it, the same rules as the desk,
+              and this phone stores nothing. Name, age and sex only: see the
+              `slim` note in FixPatient. */}
+          {fixing ? (
+            <FixPatient slim pt={asPatient(visit.patient)} printed={visit.printedForPatient ?? 0}
+                        /* the record holder stamps the real role from the
+                           sitting; this is only the sentence under the button,
+                           and this screen is the doctor's by construction */
+                        by={ROLE_NAME.doctor}
+                        onClose={() => setFixing(false)}
+                        onSave={async (patch: PatientPatch) => {
+                          const r = await ask('fix', 'The details were not corrected', 'fixPatient',
+                                              { visitId: visit.id, ...patch })
+                          if (!r) return err || 'The details were not corrected.'
+                          setVisit(v => (v ? { ...v, patient: {
+                            ...v.patient,
+                            name: patch.name ?? v.patient.name,
+                            age: patch.age || undefined,
+                            sex: patch.sex || undefined,
+                          } } : v))
+                          return null
+                        }} />
+          ) : (
+            <button className="lnk" onClick={() => setFixing(true)}>correct these details</button>
+          )}
 
           {/* the same two facts, and the same silence about what they mean */}
           <CareLine alert={visit.patient.alert} pregnant={visit.pregnant}

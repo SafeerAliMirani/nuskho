@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { db, uid, nextToken, doctorDrugs, usageCounts, lastVisit, patientCode, similarDrugs, grantDiscount, listSets, saveSet, deleteSet } from '../db'
+import { db, uid, nextToken, doctorDrugs, usageCounts, lastVisit, patientCode, similarDrugs, grantDiscount, listSets, saveSet, deleteSet, correctPatient } from '../db'
 import { formulary, labTests, adviceList } from '../data/formulary'
 import { sosReasons } from '../data/sos'
 import { seedDiagnoses } from '../data/specialty'
@@ -19,7 +19,9 @@ import { signal } from '../ui/bus'
 import Bell from '../ui/Bell'
 import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
-import { role } from '../roles'
+import { whoFor, printedCount } from '../patient'
+import { FixPatient } from '../ui/FixPatient'
+import { role, can, ROLE_NAME } from '../roles'
 import { warmPlan } from '../print/paginate'
 import { notePrinted, printerLikelyCold } from '../safety'
 import { whyItFailed } from '../fail'
@@ -98,6 +100,8 @@ export default function Compose({ visitId, onDone, onBack }: {
    * every step ringing something in front of him.
    */
   const [tour, setTour] = useState(false)
+  const [fixOpen, setFixOpen] = useState(false)
+  const [fixPrinted, setFixPrinted] = useState(0)
 
   // The single source of truth between renders. Two quick taps used to read the
   // same stale copy and the second overwrote the first — which is what put the
@@ -460,8 +464,13 @@ export default function Compose({ visitId, onDone, onBack }: {
 
   /** Build exactly what printSlip will be given, so the warm-up and the real
    *  print agree on the layout key. */
-  function slipData() {
-    return slipDataFor(cur.current!, pt!, drugs)
+  /**
+   * `at` is the patient AS THE DATABASE HAS HIM, which after a flush is not
+   * the same thing as `pt`. See print(): this parameter exists because the
+   * care line writes to storage and this component's copy cannot see it.
+   */
+  function slipData(at?: Patient) {
+    return slipDataFor(cur.current!, at ?? pt!, drugs)
   }
 
   /**
@@ -509,6 +518,17 @@ export default function Compose({ visitId, onDone, onBack }: {
     // Anything typed into the care line and not yet written down goes down
     // now, before a single field is frozen: see flushCare.
     await flushCare()
+    /* AND THEN READ THE PATIENT BACK, because flushCare wrote to the database
+       and not to this function.
+       `pt` was captured when this handler was created, and no await makes a
+       closure see a setState that happened inside it. So the flush above put
+       the allergy safely on the disk and the slip was still assembled from the
+       copy that predates it: the band the flush exists to save was written
+       down and left off the paper anyway, which is the identical outcome to
+       having no flush at all. It also decides what is FROZEN onto the visit
+       below, so a stale read here would be permanent. */
+    const now = (await db.patients.get(cur.current!.patientId)) ?? pt
+    if (now && now !== pt) setPt(now)
     const noDoctor = slipDoctorMissing(cur.current!)
     if (noDoctor) { setErr(noDoctor); return }
     const badVital = vitalsBlocker(cur.current!)
@@ -519,11 +539,13 @@ export default function Compose({ visitId, onDone, onBack }: {
       // refused, the patient would walk out holding a prescription this clinic
       // has no record of, and apply() has already put the reason on the screen.
       if (!(await freeze())) return
-      await printSlip(slipData())
+      await printSlip(slipData(now ?? undefined))
       // status and printedAt are written HERE and only here, as their own
       // targeted patch: they are not in MINE, so no other tap on this screen
       // can drag a stale copy of them over what the desk did meanwhile
-      const stamp = printedStamp()
+      // and WHO it was printed for, frozen in the same breath as the medicines:
+      // the desk may correct a spelling tomorrow, and this paper may not change
+      const stamp = printedStamp(undefined, now ? whoFor(now) : undefined)
       await db.visits.update(visitId, stamp)
       cur.current = { ...cur.current!, ...stamp }
       setVisit(cur.current)
@@ -599,6 +621,35 @@ export default function Compose({ visitId, onDone, onBack }: {
         </span>
         <IcUser size={22} className="pt-ic" />
       </div>
+
+      {/* THE SAME CORRECTION THE DESK HAS, because the doctor is frequently
+          the desk: plenty of evenings there is nobody else at the door, and
+          the age is the field he is most likely to catch. Correcting after a
+          print is allowed and safe — the printed slip carries its own copy of
+          the name (WhoSnap) and cannot be altered by anything typed here. */}
+      {can('money') && (
+        fixOpen ? (
+          <FixPatient pt={pt} printed={fixPrinted} by={ROLE_NAME[role()]}
+                      onClose={() => setFixOpen(false)}
+                      onSave={async patch => {
+                        const why = await correctPatient(pt.id, patch, ROLE_NAME[role()])
+                        if (why) return why
+                        const fresh = await db.patients.get(pt.id)
+                        if (fresh) setPt(fresh)
+                        // the preview reads the patient and its effect watches
+                        // the visit, so nudge it, exactly as saveAlert does
+                        cur.current = { ...cur.current! }
+                        setVisit(cur.current)
+                        return null
+                      }} />
+        ) : (
+          <button className="lnk" onClick={async () => {
+            const his = await db.visits.where('patientId').equals(pt.id).toArray()
+            setFixPrinted(printedCount(his))
+            setFixOpen(true)
+          }}>correct these details</button>
+        )
+      )}
 
       {/* Directly under the name, above everything he is about to write. */}
       <CareLine key={pt.id} alert={pt.alert} pregnant={visit.pregnant} sex={pt.sex}

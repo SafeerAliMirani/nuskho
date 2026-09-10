@@ -6,6 +6,9 @@ import { highWater, noteIssued, tokenHighWater, noteToken, CLINIC_DAY_SHIFT } fr
 import { isDemo } from './version'
 import { chargesFor, chargeTotal } from './testfees'
 import { INSTANT } from './data/vitals'
+import { correct, refusal, type PatientPatch } from './patient'
+import { household, phoneKey } from './household'
+import { mergeRefusal, planMerge } from './merge'
 
 // Everything is written the moment it changes. Load-shedding is normal here:
 // power will cut mid-session and reopening Chrome must lose nothing.
@@ -122,10 +125,59 @@ export async function nextPatientNum(): Promise<number> {
   return n
 }
 
-export const findByCode = (code: string) => {
+/**
+ * The number on a slip, followed to the person it now means.
+ *
+ * A record folded into another (merge.ts) keeps its number as a signpost, so
+ * a slip printed before the merge still opens the right history. The chain is
+ * followed at most a few steps and never loops: mergeRefusal forbids merging
+ * into a signpost, so every chain ends at a living record.
+ */
+export async function findByCode(code: string): Promise<Patient | undefined> {
   const n = parseCode(code)
-  return n === null ? Promise.resolve(undefined) : db.patients.where('num').equals(n).first()
+  if (n === null) return undefined
+  let p = await db.patients.where('num').equals(n).first()
+  for (let hop = 0; p?.mergedInto && hop < 8; hop++) p = await db.patients.get(p.mergedInto)
+  return p
 }
+
+/**
+ * Everyone under this phone. Scans the table rather than hitting the index,
+ * because the index holds the number as typed and one household has typed it
+ * four ways; see household.ts. A few thousand rows, once per intake, at the
+ * moment the desk pauses to type a phone: not worth a schema migration the
+ * week before real patients go in.
+ */
+export async function findByPhone(phone: string): Promise<Patient[]> {
+  if (!phoneKey(phone)) return []
+  return household(phone, await db.patients.toArray())
+}
+
+/**
+ * The merge, written. One transaction over both tables, re-read live, so a
+ * visit taken at the desk while the admin was reading the two records still
+ * lands on the survivor. Answers a sentence when it refused, null when done.
+ */
+export async function mergePatients(keepId: string, goneId: string, by: string): Promise<string | null> {
+  let said: string | null = null
+  await db.transaction('rw', db.patients, db.visits, async () => {
+    const keep = await db.patients.get(keepId)
+    const gone = await db.patients.get(goneId)
+    if (!keep || !gone) { said = 'One of those records is no longer there.'; return }
+    const no = mergeRefusal(keep, gone)
+    if (no) { said = no; return }
+    const plan = planMerge(keep, gone, by)
+    if (!plan) { said = 'Those two cannot be merged.'; return }
+    await db.visits.where('patientId').equals(gone.id).modify({ patientId: keep.id })
+    await db.patients.put(plan.keep)
+    await db.patients.put(plan.gone)
+  })
+  return said
+}
+
+/** Living records only: a signpost is not a patient. */
+export const livingPatients = async (): Promise<Patient[]> =>
+  (await db.patients.toArray()).filter(p => !p.mergedInto)
 
 /** Same medicine, however it was spelled when it was entered. */
 const drugKey = (d: Drug) =>
@@ -342,6 +394,35 @@ export async function markTestsPaid(visitId: string): Promise<void> {
 
 
 /* ------------------------------------------------------------------- sets */
+
+/**
+ * A PATIENT'S DETAILS, CORRECTED. The only write in the app that changes
+ * identity after the fact, so it is the one that is transactional, re-reads
+ * the live row, and refuses rather than guesses.
+ *
+ * It re-reads inside the transaction because the desk's copy of the patient
+ * can be a minute old — the room may have written an allergy onto the same
+ * record while the correction box was open — and a whole-record put would
+ * throw that away. The rules module decides WHAT changes; this decides only
+ * that it is written safely, once, against the row as it stands.
+ *
+ * Answers a sentence when it refuses, and null when it worked, matching the
+ * `guard` contract the desk already uses.
+ */
+export async function correctPatient(id: string, patch: PatientPatch, by: string): Promise<string | null> {
+  let said: string | null = null
+  await db.transaction('rw', db.patients, async () => {
+    const live = await db.patients.get(id)
+    if (!live) { said = 'That patient is no longer in the records.'; return }
+    const no = refusal(live, patch)
+    if (no) { said = no; return }
+    const r = correct(live, patch, by)
+    if (!r) { said = 'Nothing was changed.'; return }
+    const { name, age, sex, phone, city, corrections } = r.next
+    await db.patients.update(id, { name, age, sex, phone, city, corrections })
+  })
+  return said
+}
 
 export const listSets = () => db.sets.orderBy('name').toArray()
 

@@ -1,13 +1,14 @@
 import { chargesFee } from './profile'
 import { cleanName, cleanPhone, cleanAge, cleanCity, cleanSex } from './fields'
 import {
-  db, uid, nextToken, nextPatientNum, findByCode, patientCode, closeVisit, markRefunded, owedRefund,
+  db, uid, nextToken, nextPatientNum, findByCode, findByPhone, patientCode, closeVisit, markRefunded, owedRefund,
   daySummary, todaysVisits, markTestsPaid, doctorDrugs, lastVisit,
 } from './db'
 import { formulary } from './data/formulary'
 import { dictionary } from './data/dictionary'
 import { linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp, vitalsBlocker } from './rx'
-import { checkRolePin, can, type Role } from './roles'
+import { whoFor, correct, refusal, cleanPatch, printedCount, type PatientPatch } from './patient'
+import { checkRolePin, can, ROLE_NAME, type Role } from './roles'
 import { activeDoctors, isSitting, setSitting, multiRoom, doctorById, visitDoctorId } from './doctors'
 import { course } from './course'
 import { printToken } from './print/print'
@@ -93,6 +94,13 @@ export type WireVisit = {
   testsPaid?: boolean
 }
 
+/** One member of a household, as the desk phone lists them. Name and number
+ *  the queue already shows this role; age, sex and village to tell a
+ *  grandmother from a grandchild with the same name. */
+export type WirePerson = {
+  code: string; name: string; age?: string; sex?: 'M' | 'F'; city?: string
+}
+
 export type WireDoctor = {
   id: string; nameEn: string; nameSd: string; room: string; fee: number; sitting: boolean
 }
@@ -137,6 +145,16 @@ export type WireOpenVisit = {
   id: string; token: number; status: VisitStatus; urgent?: boolean
   printedAt?: number
   patient: { name: string; age?: string; sex?: 'M' | 'F'; code: string; alert?: string }
+  /**
+   * How many prescriptions this patient already has on paper, ANYWHERE in the
+   * clinic. One integer, and the correction box on the phone needs it to be
+   * true: it tells the doctor that slips already printed keep the details they
+   * were printed with, and a sentence that says "one" when there are six is a
+   * sentence that gets ignored the next time it matters. It is a count and
+   * never a list — no dates, no rooms, no medicines — so it says nothing about
+   * anyone else's consultations.
+   */
+  printedForPatient: number
   diagnosis?: string
   pregnant?: boolean
   vitals?: Record<string, string>
@@ -153,6 +171,7 @@ export type IntentKind =
   | 'setGiven' | 'giveAll' | 'reopen' | 'reprint' | 'setSitting' | 'openSlip'
   | 'markTestsPaid'
   | 'openVisit' | 'saveRx' | 'printRx' | 'myMeds' | 'takeMed'
+  | 'fixPatient' | 'household'
 
 /** Which permission each intent needs, checked by the record holder against
  *  the ROLE the mirror signed in as. One list, same as roles.ts: nothing
@@ -173,6 +192,17 @@ const NEED: Record<IntentKind, Parameters<typeof can>[0]> = {
   // with no way to fix it, is a doctor stranded mid-consultation.
   clearVital: 'prescribe',
   myMeds: 'prescribe', takeMed: 'medicines',
+  /* CORRECTING A NAME IS A DOOR JOB, so it needs what the door needs.
+     'money' is held by the counter, the compounder and the doctor — the three
+     people who ever see the patient and the slip together — and not by the
+     pharmacy, which reads printed slips and has no business rewriting who a
+     patient is. Same permission as taking him in, because it is the same act
+     done thirty seconds late. */
+  fixPatient: 'money',
+  /* The family under a phone, for the desk at the door. The same permission
+     as taking a patient in, because it IS taking a patient in: the list
+     carries the same name-and-number the queue already shows this role. */
+  household: 'money',
 }
 
 /** The roles a device on the wire may hold. The Nuskho role changes identity
@@ -817,6 +847,46 @@ async function applyIntent(
     await db.visits.update(vid, { vitals: merged })
     return { ok: true }
   }
+  /* CORRECTING A PATIENT FROM A PHONE AT THE DOOR.
+     The phone sends a token, never a patient id: a mirror is not allowed to
+     name a record it was never given, and the queue is the only set of
+     patients it has been shown. The record holder turns that token into the
+     patient itself, re-reads him, applies the same rules the desk applies, and
+     writes once. The phone learns nothing it did not already have on screen. */
+  /* WHO IS ALREADY HERE UNDER THIS PHONE. A short list of name, number and
+     age, capped at eight — the size of a family, not of a search. The phone
+     then opens the one it picks with openByCode, the intent it already has,
+     so no new way of opening a record was added to the wire. Nothing is
+     returned that the queue does not already show this role. */
+  if (kind === 'household') {
+    const ps = await findByPhone(clip(p.phone, 20))
+    return {
+      ok: true,
+      people: ps.slice(0, 8).map(x => ({
+        code: patientCode(x.num), name: x.name, age: x.age, sex: x.sex, city: x.city,
+      })),
+    }
+  }
+  if (kind === 'fixPatient') {
+    if (!v) return { ok: false, why: 'That token is gone.' }
+    const live = await db.patients.get(v.patientId)
+    if (!live) return { ok: false, why: 'That patient is no longer in the records.' }
+    // clipped before the rules see them, like every other wire value
+    const patch: PatientPatch = cleanPatch({
+      name: p.name === undefined ? undefined : String(p.name),
+      age: p.age === undefined ? undefined : String(p.age),
+      sex: p.sex === undefined ? undefined : (String(p.sex) as 'M' | 'F' | ''),
+      phone: p.phone === undefined ? undefined : String(p.phone),
+      city: p.city === undefined ? undefined : String(p.city),
+    })
+    const no = refusal(live, patch)
+    if (no) return { ok: false, why: no }
+    const r = correct(live, patch, ROLE_NAME[sit?.role ?? 'counter'] ?? 'a phone')
+    if (!r) return { ok: false, why: 'Nothing was changed.' }
+    const { name, age, sex, phone, city, corrections } = r.next
+    await db.patients.update(live.id, { name, age, sex, phone, city, corrections })
+    return { ok: true }
+  }
   if (kind === 'markTestsPaid') {
     if (!v) return { ok: false, why: 'That token is gone.' }
     const owed = chargeTotal(chargesFor(v.vitals, INSTANT))
@@ -929,9 +999,11 @@ async function applyIntent(
     const pt = await db.patients.get(v.patientId)
     if (!pt) return { ok: false, why: 'That token is gone.' }
     const prev = await lastVisit(pt.id, v.id)
+    const his = await db.visits.where('patientId').equals(pt.id).toArray()
     const o: WireOpenVisit = {
       id: v.id, token: v.token, status: v.status, urgent: v.urgent, printedAt: v.printedAt,
       patient: { name: pt.name, age: pt.age, sex: pt.sex, code: patientCode(pt.num), alert: pt.alert },
+      printedForPatient: printedCount(his),
       diagnosis: v.diagnosis, pregnant: v.pregnant, vitals: v.vitals,
       lines: v.lines, tests: v.tests, advice: v.advice, nextVisit: v.nextVisit,
       prev: prev ? {
@@ -1048,7 +1120,9 @@ async function applyIntent(
     // freeze and stamp in one write, so no reload can ever see a printed
     // visit whose lines are not frozen
     const lines = freezeLines(v.lines, dmap)
-    const stamp = printedStamp(lines)
+    // the patient is frozen with them: the desk may correct a spelling
+    // tomorrow, and the paper this phone is about to print may not change
+    const stamp = printedStamp(lines, whoFor(pt))
     await db.visits.update(vid, stamp)
     signal({ kind: 'printed', token: v.token })
     return { ok: true, slip: slipDataFor({ ...v, ...stamp }, pt, dmap) }

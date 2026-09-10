@@ -6,6 +6,7 @@ import Compose from './screens/Compose'
 import Setup from './screens/Setup'
 import StatsScreen from './screens/Stats'
 import About from './screens/About'
+import Merge from './screens/Merge'
 import Welcome, { needsWelcome } from './screens/Welcome'
 import Lock from './screens/Lock'
 import { profile, adminIsSet, lockAdmin } from './profile'
@@ -42,6 +43,7 @@ function Clinic() {
   const [stats, setStats] = useState(false)
   const [pharm, setPharm] = useState(false)
   const [about, setAbout] = useState(false)
+  const [merge, setMerge] = useState(false)
   const [tour, setTour] = useState(false)
   // read once, at mount. See the block above the early return.
   const [dead] = useState(() => licenceRanOut())
@@ -68,7 +70,7 @@ function Clinic() {
   // forty-row queue used to keep the queue's scroll position, so Compose
   // opened on the middle of the medicine grid with the patient's name out of
   // sight — which looks broken and invites the wrong-patient mistake.
-  useEffect(() => { window.scrollTo(0, 0) }, [visitId, setup, stats, pharm, about])
+  useEffect(() => { window.scrollTo(0, 0) }, [visitId, setup, stats, pharm, about, merge])
 
   // Keep the practice copy alive while somebody is actually using it, so a
   // demonstration survives reloads and a walk to another room, and still
@@ -200,9 +202,12 @@ function Clinic() {
    * no door.
    */
   const maySetup = can('paper') || can('identity') || can('staff')
+  // the merge tool: the owner (backup, because he can already move every
+  // record) and the clinic admin (ops). Never the door, never the pharmacy.
+  const mayMerge = can('backup') || can('ops')
 
   const showing: 'queue' | 'compose' =
-    !about && !(ops && can('ops')) && !(stats && can('figures'))
+    !about && !(merge && mayMerge) && !(ops && can('ops')) && !(stats && can('figures'))
     && !(setup && maySetup) && !(pharm && can('dispense'))
     && !!visitId && can('prescribe') && roomOk(visitId)
       ? 'compose' : 'queue'
@@ -270,7 +275,7 @@ function Clinic() {
                 <div className="scrim" onClick={() => setMenu(false)} />
                 <div className="menu">
                   {can('figures') && (
-                    <button onClick={() => { setMenu(false); setSetup(false); setVisitId(null); setStats(true) }}>
+                    <button onClick={() => { setMenu(false); setMerge(false); setSetup(false); setVisitId(null); setStats(true) }}>
                       <IcChart size={16} /> My figures <small>patients, fees, month card</small>
                     </button>
                   )}
@@ -279,22 +284,30 @@ function Clinic() {
                       true for him only when he is the owner (roles.ts), so this
                       never appears for an employed doctor. */}
                   {can('ops') && can('queue') && (
-                    <button onClick={() => { setMenu(false); setSetup(false); setStats(false); setVisitId(null); setOps(true) }}>
+                    <button onClick={() => { setMenu(false); setMerge(false); setSetup(false); setStats(false); setVisitId(null); setOps(true) }}>
                       <IcChart size={16} /> The building <small>money by room, the day, the machines</small>
                     </button>
                   )}
                   {can('dispense') && can('queue') && (
-                    <button onClick={() => { setMenu(false); setSetup(false); setStats(false); setVisitId(null); setPharm(true) }}>
+                    <button onClick={() => { setMenu(false); setMerge(false); setSetup(false); setStats(false); setVisitId(null); setPharm(true) }}>
                       <IcQueue size={16} /> Pharmacy desk <small>printed slips, mark medicines given</small>
                     </button>
                   )}
+                  {/* Folding two records into one. The owner and the clinic
+                      admin: the people who close the day and read the
+                      register, and nobody at the door in a hurry. */}
+                  {mayMerge && (
+                    <button onClick={() => { setMenu(false); setSetup(false); setStats(false); setVisitId(null); setMerge(true) }}>
+                      <IcUser size={16} /> Same person twice <small>fold a duplicate record into the first</small>
+                    </button>
+                  )}
                   {maySetup &&
-                  <button onClick={() => { setMenu(false); setStats(false); setSetup(true) }}>
+                  <button onClick={() => { setMenu(false); setMerge(false); setStats(false); setSetup(true) }}>
                     <IcCog size={16} /> Setup <small>paper, medicines, PINs</small>
                   </button>}
                   {role() === 'admin' && (
                     <button onClick={() => {
-                      setMenu(false); setSetup(false); setStats(false); setVisitId(null); setWelcome(true)
+                      setMenu(false); setMerge(false); setSetup(false); setStats(false); setVisitId(null); setWelcome(true)
                     }}><IcCog size={16} /> Run setup again <small>the whole first-run sequence</small></button>
                   )}
                   {role() === 'admin' && adminIsSet() ? (
@@ -357,6 +370,8 @@ function Clinic() {
           cannot read a prescription. */}
       {about
         ? <About onBack={() => setAbout(false)} />
+        : merge && mayMerge
+        ? <Merge onBack={() => { setMerge(false); void refresh() }} />
         : ops && can('ops')
         ? <><button className="btn ghost" style={{ margin: 'var(--s5) 0 0 var(--s5)' }}
                    onClick={() => setOps(false)}>&larr; Queue</button>

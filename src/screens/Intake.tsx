@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react'
 import { readQrPayload } from '../print/qr'
 import { ArtWaiting, IcScan, IcUser, IcMoney, IcQueue } from '../ui/art'
 import { cleanName, cleanPhone, cleanAge, cleanCity } from '../fields'
+import { NEAR } from '../data/places'
+import { printedCount, type PatientPatch } from '../patient'
+import { phoneKey, tell } from '../household'
+import { FixPatient } from '../ui/FixPatient'
 import { Note, Tip } from '../ui/Note'
 import { signal } from '../ui/bus'
 import Vitals from '../ui/Vitals'
 import { IcWarn } from '../ui/art'
 import { printToken } from '../print/print'
 import { paper } from '../paper'
-import { can, role, currentDoctorId } from '../roles'
+import { can, role, currentDoctorId, ROLE_NAME } from '../roles'
 import {
 /**
  * THE SINDHI ON THIS SCREEN WAS CHECKED ON 8 AUG 2026.
@@ -39,12 +43,13 @@ import {
 import {
   db, uid, nextToken, nextPatientNum, findByCode, patientCode, parseCode, closeVisit,
   daySummary, markRefunded, owedRefund, setFee, markTestsPaid,
+  correctPatient, findByPhone,
 } from '../db'
 import { chargesFor, chargeTotal } from '../testfees'
 import { whyItFailed } from '../fail'
 import { cameFrom } from '../refer'
 import { INSTANT } from '../data/vitals'
-import type { Visit, VisitStatus, FeeState } from '../types'
+import type { Visit, VisitStatus, FeeState, Patient } from '../types'
 import { isDemo } from '../version'
 import { daysSinceExport } from '../safety'
 import { profile, chargesFee } from '../profile'
@@ -58,7 +63,6 @@ import { profile, chargesFee } from '../profile'
 // at the door are not.
 
 /** Common places patients come in from. Tapped, not typed; anything else is typed once. */
-const NEAR = ['Larkana', 'Naudero', 'Ratodero', 'Dokri', 'Bakrani', 'Warah']
 
 /** Every way a visit can end other than a prescription. */
 const OUTCOMES: { s: VisitStatus; label: string; sd: string }[] = [
@@ -93,6 +97,10 @@ export default function Intake({ visits, onOpen, onChange }: {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  /* THE HOUSEHOLD under the phone just typed, or nobody. Looked up as the
+     number is typed, debounced, so the list is on the screen by the time the
+     desk looks up from the keyboard. Cleared with the form. */
+  const [fam, setFam] = useState<Patient[]>([])
   const [age, setAge] = useState('')
   const [sex, setSex] = useState<'' | 'M' | 'F'>('')
   const [city, setCity] = useState(NEAR[0])
@@ -182,11 +190,28 @@ export default function Intake({ visits, onOpen, onChange }: {
   const [urgent, setUrgent] = useState(false)
   // a second tap while the first is still writing gives two patients one token
   const [adding, setAdding] = useState(false)
+  /* Which row has its correction box open, and the record it is correcting.
+     Held as the PATIENT and not just an id, because the box shows the number,
+     the old name and the corrections already made, and a box that has to fetch
+     all that after it opens flickers through a wrong state first. */
+  const [fixing, setFixing] = useState<{ visitId: string; pt: Patient; printed: number } | null>(null)
   const [sum, setSum] = useState<Awaited<ReturnType<typeof daySummary>> | null>(null)
 
   // The evening as it will be counted later. Shown now, because a figure nobody
   // sees until the end of the month is a figure nobody corrects.
   useEffect(() => { daySummary(visits).then(setSum) }, [visits])
+
+  /* ONE PHONE, ONE HOUSEHOLD. The number is a household key, never a person:
+     see household.ts. Seven digits before anything is looked up, so a desk
+     that typed "03" and moved on is not shown the whole clinic. */
+  useEffect(() => {
+    if (!phoneKey(phone)) { setFam([]); return }
+    let live = true
+    const t = setTimeout(() => {
+      findByPhone(phone).then(ps => { if (live) setFam(ps) }).catch(() => { if (live) setFam([]) })
+    }, 350)
+    return () => { live = false; clearTimeout(t) }
+  }, [phone])
 
   if (visits.length && Object.keys(names).length !== visits.length) {
     db.patients.bulkGet(visits.map(v => v.patientId)).then(ps => {
@@ -295,6 +320,27 @@ export default function Intake({ visits, onOpen, onChange }: {
    *  database that refuses is reported rather than swallowed. */
   const openOld = () => guard('code', 'The patient was not opened', lookup)
 
+  /**
+   * A RETURNING PATIENT, FOUND THROUGH THE FAMILY'S PHONE.
+   *
+   * The desk typed a phone, the list showed the household, the desk tapped
+   * the person. That is the moment a duplicate used to be born, and this is
+   * the path that does not make one: his existing record, a token on it, no
+   * new number. Everything else about the token is as the desk set it — the
+   * fee, the room, cannot-wait — and the form clears exactly as after addNew.
+   * The name box may still hold what was typed; it is not used.
+   */
+  async function openMember(p: Patient) {
+    if (adding) return
+    setAdding(true)
+    try {
+      await guard('add', 'The patient was not opened', async () => {
+        onOpen(await openVisitFor(p.id))
+        setName(''); setPhone(''); setAge(''); setSex(''); setFam([]); setNames({}); setMsg('')
+      })
+    } finally { setAdding(false) }
+  }
+
   async function addNew() {
     if (!name.trim()) return
     const pid = uid()
@@ -305,9 +351,39 @@ export default function Intake({ visits, onOpen, onChange }: {
       city: cleanCity(city) || undefined, createdAt: Date.now(),
     })
     await openVisitFor(pid)
-    setName(''); setPhone(''); setAge(''); setSex(''); setNames({}); setMsg('')
+    setName(''); setPhone(''); setAge(''); setSex(''); setFam([]); setNames({}); setMsg('')
     // city is NOT cleared: most of the queue comes from the same place, and
     // retyping it 60 times is exactly the kind of thing that kills adoption
+  }
+
+  /**
+   * OPEN THE CORRECTION BOX FOR THIS ROW.
+   *
+   * It counts that patient's printed slips first, because what the box has to
+   * say about paper already in somebody's hand is the part a desk does not
+   * expect and must not read after saving.
+   */
+  async function openFix(v: Visit) {
+    const p = await db.patients.get(v.patientId)
+    if (!p) { setMsg('That patient is no longer in the records.'); return }
+    const his = await db.visits.where('patientId').equals(p.id).toArray()
+    setFixing({ visitId: v.id, pt: p, printed: printedCount(his) })
+  }
+
+  async function saveFix(patch: PatientPatch): Promise<string | null> {
+    if (!fixing) return 'Nothing to correct.'
+    try {
+      const why = await correctPatient(fixing.pt.id, patch, ROLE_NAME[role()])
+      if (why) return why
+      // the row's label is built from a map this screen caches, so it has to be
+      // dropped or the queue keeps showing the name that was just corrected
+      setNames({})
+      onChange()
+      return null
+    } catch (e) {
+      console.error('[nuskho] the correction was not saved', e)
+      return whyItFailed(e, 'The correction was not saved')
+    }
   }
 
   async function close(id: string, s: VisitStatus) {
@@ -475,6 +551,25 @@ export default function Intake({ visits, onOpen, onChange }: {
           </div>
         </div>
       </div>
+      {/* THIS NUMBER HAS BEEN HERE BEFORE. The list, never a decision: one
+          phone serves a household, so the desk is shown the family and picks.
+          Tapping a person opens his existing record with a token on it and
+          issues no new number. Adding as new stays one button away, because
+          the child with the elder's phone is a new patient. */}
+      {fam.length > 0 && (
+        <div className="famlist">
+          <b>This phone is already here — {fam.length === 1 ? 'is it the same person?' : 'which one is it?'}</b>
+          <div className="chips">
+            {fam.slice(0, 8).map(p => (
+              <button key={p.id} className="chip fam" disabled={adding} onClick={() => openMember(p)}>
+                <IcUser size={13} /> {tell(p)}{p.city ? <small> · {p.city}</small> : null}
+              </button>
+            ))}
+          </div>
+          <span className="unit">Tap the person to give them a token on their old number. Somebody new in
+            the family: fill the name and add as new, same phone.</span>
+        </div>
+      )}
       <div className="fld"><label>City or village — شهر</label>
         <div className="chips">
           {NEAR.map(c => (
@@ -671,6 +766,23 @@ export default function Intake({ visits, onOpen, onChange }: {
               <Vitals which="vital" value={v.vitals ?? {}}
                       age={ages[v.id]}
                       onChange={nv => saveVitals(v, nv)} />
+            )}
+
+            {/* THE NAME TYPED WRONG THIRTY SECONDS AGO.
+                On the row rather than in a patients screen, because this is
+                where the mistake is noticed: the desk reads the queue back,
+                sees "Wazeer", and the patient is still standing there. A
+                correction that costs a walk to another screen is a correction
+                that becomes a duplicate record instead.
+                Behind `money`, which the counter, the compounder and the
+                doctor hold and the pharmacy does not. */}
+            {can('money') && (
+              fixing?.visitId === v.id ? (
+                <FixPatient pt={fixing.pt} printed={fixing.printed} by={ROLE_NAME[role()]}
+                            onSave={saveFix} onClose={() => setFixing(null)} />
+              ) : (
+                <button className="lnk qclose" onClick={() => openFix(v)}>correct these details</button>
+              )
             )}
 
             {/* Reprint. Thermal rolls jam, run out, and get torn across the

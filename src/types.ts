@@ -176,6 +176,54 @@ export interface Patient {
    */
   alert?: string
   createdAt: number
+  /**
+   * EVERY CORRECTION EVER MADE TO THIS RECORD, AND WHO MADE IT.
+   *
+   * A name typed wrong at the door is the commonest fault in the building and
+   * until now it could not be fixed at all: the record was sealed the moment
+   * the token printed. But letting a desk overwrite identity silently is the
+   * more dangerous of the two mistakes, because the way it goes wrong is not a
+   * typo. It is the desk correcting the RIGHT record with the WRONG person's
+   * details — a returning patient found by the wrong number — and that quietly
+   * rewrites somebody else's whole history under his own number, with nothing
+   * anywhere to say it happened.
+   *
+   * So a correction is never destructive. The new details go on the record and
+   * the old ones stay here, dated and attributed, for as long as the patient
+   * does. It is bounded (see MAX_CORRECTIONS) so a hundred idle edits cannot
+   * grow a record without limit, and it is never printed.
+   */
+  corrections?: Correction[]
+  /**
+   * THIS RECORD WAS FOLDED INTO ANOTHER, and this is the one it went into.
+   *
+   * Nothing in this app deletes a patient, and a merge is no exception: the
+   * number was printed on a slip that is still in a drawer somewhere, and
+   * five years from now that slip will be handed over at the desk. So the
+   * merged-away record stays, with its number, as a signpost: findByCode
+   * follows this to the record that lives on. It is not a patient any more.
+   * It is left out of every list, every count and every household.
+   */
+  mergedInto?: string
+}
+
+/** One correction: when, by which role, and the fields AS THEY WERE. Only the
+ *  fields that actually changed are kept, so an untouched field is absent
+ *  rather than repeated. */
+export interface Correction {
+  at: number
+  /** the role that made it, not a person: this app has no user accounts */
+  by: string
+  /** set when this entry records another record being folded into this one:
+   *  the number that record carried, so the trail can be followed both ways */
+  merged?: number
+  was: {
+    name?: string
+    age?: string
+    sex?: 'M' | 'F'
+    phone?: string
+    city?: string
+  }
 }
 
 /**
@@ -216,6 +264,21 @@ export interface Fee {
   refundNote?: string
   /** when the counter handed the money back */
   refundedAt?: number
+}
+
+/**
+ * The patient as he was named on a printed slip. Not a copy of the Patient:
+ * only the five things the paper actually carries.
+ */
+export interface WhoSnap {
+  name: string
+  /** the number printed large on the slip. Frozen with the rest, because the
+   *  slip IS the patient's card and the card must keep saying what it says. */
+  num: number
+  age?: string
+  sex?: 'M' | 'F'
+  /** the allergy band, exactly as it read when the chemist's copy was printed */
+  alert?: string
 }
 
 export interface Visit {
@@ -260,6 +323,21 @@ export interface Visit {
    * issued, where it stays true for ever.
    */
   noFee?: boolean
+  /**
+   * WHO THIS SLIP WAS PRINTED FOR, copied onto the visit at the moment of
+   * printing — the same act, and for the same reason, as the RxSnap on a line.
+   *
+   * The patient record can now be corrected (see Correction). Without this,
+   * fixing a spelling in October would silently change what the app says it
+   * printed in March, and a reprint of that March prescription would no longer
+   * match the paper the patient is holding. The medicine list learned this
+   * lesson first; identity is the same fact.
+   *
+   * Absent on every visit printed before this existed, and on every visit not
+   * yet printed. Both fall back to the live patient record, which is what the
+   * app has always done.
+   */
+  who?: WhoSnap
   printedAt?: number     // set on every successful print — this is the audit trail
   /** when the visit stopped being open, whatever the outcome */
   closedAt?: number
