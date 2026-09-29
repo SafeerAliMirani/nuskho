@@ -27,6 +27,32 @@
   "kv_namespaces": [
     { "binding": "NKHB", "id": "67dfa2ff479840a6813694b48a08eb3f" }
   ],
+  /* THE ADDRESS A DOCTOR IS ACTUALLY SENT.
+     Until now the only address was nuskho.safeer-ali-mirani.workers.dev,
+     which carries a personal name and reads as somebody's test deployment —
+     not the thing to put in front of a clinic. larkode.com is already on
+     Cloudflare, so this needs no purchase and no DNS wait: wrangler creates
+     the record and the certificate on deploy.
+
+     The workers.dev address is deliberately NOT switched off. Every link
+     already sent, and the QR square on anything printed from the site, still
+     points at it, and a standalone nuskho domain is coming later (Safeer, 29
+     Sep 2026) — at which point this becomes the redirect and that becomes the
+     address. Nothing clinical rides on either: a clinic opens the app from
+     its own folder at localhost:8123, so no record anywhere depends on what
+     this worker is called. */
+  "routes": [
+    { "pattern": "nuskho.larkode.com", "custom_domain": true }
+  ],
+  /* AND THIS LINE IS WHY THE OLD ADDRESS STILL ANSWERS.
+     Wrangler treats a missing `workers_dev` as "off" the moment any route
+     exists, and says so only in a warning at the end of a deploy that has
+     already happened. The first deploy of the route above took the
+     workers.dev address down with it, so every link ever sent 404'd until
+     this was added. It is not a default worth trusting to memory: leave it
+     written down, true, for as long as that address is one somebody might
+     still click. */
+  "workers_dev": true,
   // The WhatsApp number the extension button opens. The same number the
   // website already publishes, so nothing new is disclosed by it.
   "vars": { "WA": "923333368189" },
