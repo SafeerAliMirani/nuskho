@@ -1,5 +1,6 @@
 import { db } from './db'
 import { FIRST_DOCTOR } from './doctors'
+import { dxList } from './dx'
 import type { Visit } from './types'
 
 /**
@@ -235,11 +236,17 @@ export async function computeStats(forDoctor?: string): Promise<Stats> {
   const busiestDay = busiest && seen.length >= MIN_TREND ? DAYS[busiest[0]] : undefined
 
   /* --- diagnosis: whole clinic only. Never crossed with a place or a person. --- */
+  /* A visit with three diagnoses is ONE visit that recorded something, and
+     THREE counts in the bars. Those two are different questions — "how often
+     is anything written down" and "what is this clinic seeing" — and folding
+     them together would make the percentage above 100 the first time a
+     doctor picked two. */
   const dx = new Map<string, number>()
   let dxRecorded = 0
   for (const v of monthSeen) {
-    const d = (v.diagnosis ?? '').trim()
-    if (d) { dxRecorded++; dx.set(d, (dx.get(d) ?? 0) + 1) }
+    const ds = dxList(v)
+    if (ds.length) dxRecorded++
+    for (const d of ds) dx.set(d, (dx.get(d) ?? 0) + 1)
   }
   const diagnoses = bars(dx, monthSeen.length, 'Other diagnoses')
   if (monthSeen.length - dxRecorded > 0) {

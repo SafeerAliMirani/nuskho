@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { db, patientCode } from '../db'
 import { readQrPayload } from '../print/qr'
-import { IcPill, IcScan } from '../ui/art'
+import { IcPill, IcScan, ArtSlip, ArtPrinter } from '../ui/art'
 import { course } from '../course'
 import { storeSeesTheDay } from '../store'
 import { whyItFailed } from '../fail'
@@ -155,14 +155,29 @@ export default function Pharmacy({ visits, onChange }: {
 
       <h2 style={{ marginTop: 18 }}><IcPill size={17} />{' '}
         {wholeDay ? 'Printed today' : 'The slip in front of you'}</h2>
+      {/* AN EMPTY COUNTER IS THE NORMAL STATE HERE, NOT A FAULT.
+          This desk spends most of the evening with nothing on it: a slip
+          arrives, is handed over, and the screen is bare again until the next
+          one. It used to say so in one grey sentence on a blank white page,
+          which reads as a screen that has failed to load rather than one
+          waiting. It gets the same picture-and-sentence treatment the queue's
+          empty state has, and it says which of the three silences this is. */}
       {shown.length === 0 && (
-        <p className="hint">
-          {!wholeDay && !needle
-            ? 'Type the patient number from the paper, or point the scanner at the square on it. This counter opens one slip at a time and is not shown the day\u2019s patients.'
-            : printed.length === 0
-            ? 'Nothing printed yet. Slips appear here the moment the room prints them.'
-            : 'No printed slip matches that number.'}
-        </p>
+        <div className="blank">
+          {printed.length === 0 && !needle ? <ArtPrinter /> : <ArtSlip />}
+          <b>
+            {!wholeDay && !needle ? 'Waiting for a slip'
+              : printed.length === 0 ? 'Nothing printed yet'
+              : 'No slip with that number'}
+          </b>
+          <p>
+            {!wholeDay && !needle
+              ? 'Type the patient number from the paper, or point the scanner at the square on it. This counter opens one slip at a time and is not shown the day\u2019s patients.'
+              : printed.length === 0
+              ? 'Slips appear here the moment the room prints them.'
+              : 'Check the number against the paper. It is the big one under the patient\u2019s name, not the token.'}
+          </p>
+        </div>
       )}
 
       {shown.map(v => {

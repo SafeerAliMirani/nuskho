@@ -287,7 +287,27 @@ export interface Visit {
   token: number          // display label only
   status: VisitStatus
   createdAt: number
+  /**
+   * ONE diagnosis, and only on visits written before several were possible.
+   * Never written again: `dxPatch` clears it whenever a set is stored. Read
+   * it through `dxList` in dx.ts and nowhere else, so no screen can print a
+   * stale copy of a fact that now lives next door.
+   */
   diagnosis?: string
+  /**
+   * WHAT THE DOCTOR FOUND, in the order he found it worth saying.
+   *
+   * Several, because a consultation here ends with several: anaemia and a
+   * urinary infection, or the diabetes that explains why this chest
+   * infection is being treated the way it is. One field forced him to drop
+   * whichever he minded less, and the slip then said one thing where he had
+   * found two. Capped at MAX_DX, which is a limit about paper and about
+   * saying what matters, not about storage.
+   *
+   * Absent on every visit written before this existed; `dxList` falls back
+   * to `diagnosis` for those, exactly as `dose.e` and `RxSnap` do.
+   */
+  diagnoses?: string[]
   vitals?: Record<string, string>
   lines: RxLine[]
   tests: string[]

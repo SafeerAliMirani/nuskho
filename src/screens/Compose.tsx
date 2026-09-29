@@ -20,6 +20,7 @@ import Bell from '../ui/Bell'
 import Tour from '../ui/Tour'
 import { tourFor, tourSeen } from '../tour'
 import { whoFor, printedCount } from '../patient'
+import { dxList, dxPatch, toggleDx, hasDx, dxText, dxSd } from '../dx'
 import { FixPatient } from '../ui/FixPatient'
 import { role, can, ROLE_NAME } from '../roles'
 import { warmPlan } from '../print/paginate'
@@ -101,6 +102,8 @@ export default function Compose({ visitId, onDone, onBack }: {
    */
   const [tour, setTour] = useState(false)
   const [fixOpen, setFixOpen] = useState(false)
+  const [dxTyped, setDxTyped] = useState('')
+  const [dxFull, setDxFull] = useState('')
   const [fixPrinted, setFixPrinted] = useState(0)
 
   // The single source of truth between renders. Two quick taps used to read the
@@ -242,7 +245,7 @@ export default function Compose({ visitId, onDone, onBack }: {
    * back to life. Vitals now merge against the LIVE row (see saveVitals), and
    * status changes only in the explicit print path.
    */
-  const MINE = ['lines', 'diagnosis', 'tests', 'advice', 'nextVisit'] as const
+  const MINE = ['lines', 'diagnosis', 'diagnoses', 'tests', 'advice', 'nextVisit'] as const
 
   /**
    * AND WHEN THE WRITE REFUSES, THE SCREEN MUST STOP LOOKING RIGHT.
@@ -334,6 +337,28 @@ export default function Compose({ visitId, onDone, onBack }: {
   async function savePregnant(b: boolean) {
     await db.visits.update(visitId, { pregnant: b || undefined })
     if (cur.current) { cur.current = { ...cur.current, pregnant: b || undefined }; setVisit(cur.current) }
+  }
+
+  /* THE DIAGNOSES. `toggleDx` answers null when the cap is reached, which is
+     the one case that must not be silent: a doctor whose fifth tap did
+     nothing at all concludes the chip is broken, not that he has four. */
+  const picked = dxList(visit)
+
+  function pickDx(d: string) {
+    const next = toggleDx(cur.current!, d)
+    if (!next) { setDxFull(`Four is the most a slip carries. Take one off first.`); return }
+    setDxFull('')
+    void apply(v => ({ ...v, ...dxPatch(next) }))
+  }
+
+  function addTypedDx() {
+    const d = dxTyped.trim()
+    if (!d) return
+    const next = toggleDx(cur.current!, d)
+    if (!next) { setDxFull('Four is the most a slip carries. Take one off first.'); return }
+    if (hasDx(cur.current!, d)) { setDxTyped(''); return }   // already there, nothing to say
+    setDxFull(''); setDxTyped('')
+    void apply(v => ({ ...v, ...dxPatch(next) }))
   }
 
   const setLine = (i: number, patch: Partial<RxLine>) =>
@@ -678,7 +703,7 @@ export default function Compose({ visitId, onDone, onBack }: {
           </div>
           <p className="fd-why">{inc.note}</p>
           <div className="fd-body">
-            {inc.from.diagnosis && <div><b>He found</b> {inc.from.diagnosis}</div>}
+            {dxText(inc.from) && <div><b>He found</b> {dxText(inc.from)}</div>}
             {filled(inc.from.vitals).length > 0 && (
               <div><b>He recorded</b> {filled(inc.from.vitals)
                 .map(([d, val]) => `${d.short} ${val}${d.unit ? ' ' + d.unit : ''}`).join(' · ')}</div>
@@ -708,7 +733,7 @@ export default function Compose({ visitId, onDone, onBack }: {
           {multiRoom() && doctorById(visitDoctorId(prev.doctorId))?.id !== visitDoctorId(visit.doctorId)
             ? `${doctorById(visitDoctorId(prev.doctorId))?.nameEn ?? 'Another room'}, ` : ''}
           Last visit {Math.round((Date.now() - prev.createdAt) / 86400000)} days ago
-          {prev.diagnosis ? `, ${prev.diagnosis}` : ''}. {prev.lines.map(l => (l.snap?.brand ?? drugs[l.drugId]?.brand ?? '?')).join(', ')}
+          {dxText(prev) ? `, ${dxText(prev)}` : ''}. {prev.lines.map(l => (l.snap?.brand ?? drugs[l.drugId]?.brand ?? '?')).join(', ')}
           {!locked && prev.lines.length > 0 && (
             <button className="lnk" onClick={repeatLast}>bring it back to edit</button>
           )}
@@ -751,13 +776,59 @@ export default function Compose({ visitId, onDone, onBack }: {
             the two stack and the flow is what it always was. */}
         <div className="composegrid">
         <div className="cg-left">
-        <h2><IcBook size={17} /> Diagnosis</h2>
+        {/* SEVERAL, because a consultation here ends with several. The chips
+            are a multi-select now; the box under them takes one he did not
+            put on his list in Setup, because a doctor who has just found
+            "threatened miscarriage" should not have to leave the room to be
+            able to write it down. Capped at MAX_DX, and the cap says so
+            rather than swallowing the fifth tap. */}
+        <h2><IcBook size={17} /> {picked.length > 1 ? 'Diagnoses' : 'Diagnosis'}
+          {picked.length > 0 && <span className="hcount">{picked.length}</span>}</h2>
         <div className="chips">
           {myDx.map(d => (
-            <button key={d} className={`chip ${visit.diagnosis === d ? 'on' : ''}`}
-                    onClick={() => apply(v => ({ ...v, diagnosis: v.diagnosis === d ? undefined : d }))}>{d}</button>
+            <button key={d} className={`chip ${hasDx(visit, d) ? 'on' : ''}`}
+                    onClick={() => pickDx(d)}>{d}
+              {/* THE CHIP SHOWS WHAT THE SLIP WILL SHOW, and only once it is
+                  picked. A reviewed diagnosis carries its Sindhi here exactly
+                  as it will carry it on paper; an unreviewed one carries
+                  none, here and there. Unpicked chips stay bare, because
+                  twenty chips each wearing a second script is a wall. */}
+              {hasDx(visit, d) && dxSd(d) && <i className="sd">{dxSd(d)}</i>}
+            </button>
           ))}
         </div>
+        {/* One he typed that is not on his list. It shows as a chip like any
+            other so it can be taken off the same way. */}
+        {picked.filter(d => !myDx.includes(d)).length > 0 && (
+          <div className="chips" style={{ marginTop: 6 }}>
+            {picked.filter(d => !myDx.includes(d)).map(d => (
+              <button key={d} className="chip on" onClick={() => pickDx(d)}>{d}
+                {dxSd(d) && <i className="sd">{dxSd(d)}</i>}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="saveset dxadd">
+          <input value={dxTyped} maxLength={60} placeholder="something else he found"
+                 onChange={e => { setDxTyped(e.target.value); setDxFull('') }}
+                 onKeyDown={e => { if (e.key === 'Enter') addTypedDx() }} />
+          <button className="btn ghost" disabled={!dxTyped.trim()} onClick={addTypedDx}>Add</button>
+        </div>
+        {dxFull && <p className="hint" style={{ color: 'var(--warn)' }}>{dxFull}</p>}
+        {/* SAID, RATHER THAN LEFT TO BE DISCOVERED AT THE PRINTER.
+            Most diagnoses have no reviewed Sindhi yet, and the family reading
+            the slip is exactly who the Sindhi is for. This is not a warning —
+            English on the slip is correct and always has been — it is the
+            same honesty the medicine list gives about an unticked name, so
+            the doctor knows what the paper will look like before it exists. */}
+        {picked.some(d => !dxSd(d)) && (
+          <p className="hint">
+            {picked.filter(d => !dxSd(d)).join(', ')}{' '}
+            {picked.filter(d => !dxSd(d)).length === 1 ? 'prints' : 'print'} in English only.
+            The Sindhi for {picked.filter(d => !dxSd(d)).length === 1 ? 'it' : 'those'} has
+            not been reviewed yet.
+          </p>
+        )}
 
         <h2><IcPill size={17} /> Medicines, printed in this order</h2>
         {/* A REMINDER, AND DELIBERATELY NOT A RULE. Nothing in this app knows a
@@ -1094,7 +1165,7 @@ export default function Compose({ visitId, onDone, onBack }: {
               who was not presses PRINT again and gets two slips. */}
           {/* A slip with no diagnosis is legal and sometimes right; it must
               not be an accident. Said once, above the button, not blocking. */}
-          {!visit.diagnosis && visit.lines.length > 0 && !busy && (
+          {picked.length === 0 && visit.lines.length > 0 && !busy && (
             <p className="hint" style={{ marginTop: 0 }}>
               No diagnosis picked. The slip prints without one.
             </p>

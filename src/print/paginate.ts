@@ -147,7 +147,12 @@ export function layoutKey(d: SlipData): string {
               // "left eye" replaces the meal picture and can wrap differently
               l.side]
     }),
-    d.visit.diagnosis, d.visit.vitals, d.visit.tests, d.visit.advice, d.visit.nextVisit,
+    // BOTH diagnosis fields. The new one decides the height of the box (one
+    // line per diagnosis); the old one still prints on every visit written
+    // before dx.ts existed. The rule from batch 26 stands: a printed field
+    // goes in this key the same day it starts printing.
+    d.visit.diagnoses, d.visit.diagnosis,
+    d.visit.vitals, d.visit.tests, d.visit.advice, d.visit.nextVisit,
     // the care band under the patient row: present or absent changes every
     // height below it, and the allergy's own length can wrap it to two lines
     d.patientAlert, d.visit.pregnant,

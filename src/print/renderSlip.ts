@@ -16,6 +16,7 @@ import { SUNRISE, SUN, SUNSET, MOON, TAB, HALF, CAP, SPOON, PLATE, CAL, DROP,
   INHALER, SUPP, PATCH,
          EYE, EAR, NOSE, TUBE, SACHET, adviceIcon } from './icons'
 import { qrSvgSafe } from './qr'
+import { dxList, dxSd } from '../dx'
 import { course, courseUnitSd } from '../course'
 import { SOS_PREFIX, sosMaxLine } from '../data/sos'
 import { formSdFor, formEnFor, doseSdFor, doseEnFor1, routeSdFor, routeEnFor, countable,
@@ -688,9 +689,30 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
     .map(([d, val]) => `<div class="v-${esc(d.key)}"><b>${esc(d.short)} <span class="sd">${esc(d.sd)}</span></b>`
       + `<div class="v">${esc(val)}${d.unit ? `<span class="vu"> ${esc(d.unit)}</span>` : ''}</div></div>`)
     .join('')
-  const vt = (visit.diagnosis || vitalCells)
+  /**
+   * THE DIAGNOSES, EACH ONE ON ITS OWN LINE, AND THE SINDHI GATE.
+   *
+   * Several now (dx.ts), in the doctor's own order: the first is what he is
+   * treating today and the rest is what he wants the chemist and the next
+   * doctor to know while reading it.
+   *
+   * The Sindhi is printed ONLY for a diagnosis a person has reviewed. The
+   * app carries a Sindhi word for every diagnosis it seeds and not one of
+   * them may print on that basis: a machine's Sindhi on a prescription is
+   * exactly the thing this whole app refuses, and a diagnosis is worse than
+   * a medicine, because nobody at a counter can check it against a box. An
+   * unreviewed one prints its English alone, which is what a slip has said
+   * since the first sheet.
+   */
+  const dxAll = dxList(visit)
+  const dxCells = dxAll.map(d => {
+    const sd = dxSd(d)
+    return `<div class="dxr"><span class="e">${esc(d)}</span>`
+      + (sd ? `<span class="sd s">${esc(sd)}</span>` : '') + '</div>'
+  }).join('')
+  const vt = (dxAll.length || vitalCells)
     ? `<div class="vt">
-  ${visit.diagnosis ? `<div class="dx"><b>Diagnosis <span class="sd">تشخيص</span></b><div class="v">${esc(visit.diagnosis)}</div></div>` : ''}
+  ${dxAll.length ? `<div class="dx"><b>${dxAll.length > 1 ? 'Diagnoses' : 'Diagnosis'} <span class="sd">تشخيص</span></b><div class="v">${dxCells}</div></div>` : ''}
   ${vitalCells}
 </div>` : ''
 

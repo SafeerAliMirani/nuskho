@@ -8,6 +8,7 @@ import { formulary } from './data/formulary'
 import { dictionary } from './data/dictionary'
 import { linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp, vitalsBlocker } from './rx'
 import { whoFor, correct, refusal, cleanPatch, printedCount, type PatientPatch } from './patient'
+import { dxList, dxText, dxPatch } from './dx'
 import { checkRolePin, can, ROLE_NAME, type Role } from './roles'
 import { activeDoctors, isSitting, setSitting, multiRoom, doctorById, visitDoctorId } from './doctors'
 import { course } from './course'
@@ -155,7 +156,8 @@ export type WireOpenVisit = {
    * anyone else's consultations.
    */
   printedForPatient: number
-  diagnosis?: string
+  /** every diagnosis on this visit, already resolved from both fields */
+  diagnoses: string[]
   pregnant?: boolean
   vitals?: Record<string, string>
   lines: RxLine[]
@@ -1004,10 +1006,10 @@ async function applyIntent(
       id: v.id, token: v.token, status: v.status, urgent: v.urgent, printedAt: v.printedAt,
       patient: { name: pt.name, age: pt.age, sex: pt.sex, code: patientCode(pt.num), alert: pt.alert },
       printedForPatient: printedCount(his),
-      diagnosis: v.diagnosis, pregnant: v.pregnant, vitals: v.vitals,
+      diagnoses: dxList(v), pregnant: v.pregnant, vitals: v.vitals,
       lines: v.lines, tests: v.tests, advice: v.advice, nextVisit: v.nextVisit,
       prev: prev ? {
-        at: prev.createdAt, diagnosis: prev.diagnosis,
+        at: prev.createdAt, diagnosis: dxText(prev) || undefined,
         brands: prev.lines.map(l => l.snap?.brand ?? '').filter(Boolean),
       } : null,
     }
@@ -1062,7 +1064,11 @@ async function applyIntent(
       Array.isArray(x) ? x.slice(0, n).map(t => clip(t, len)).filter(Boolean) : []
     await db.visits.update(vid, {
       lines,
-      diagnosis: clip(p.diagnosis, 240) || undefined,
+      /* The phone sends a list; cleanDx trims it, de-duplicates it and caps
+         it at MAX_DX, and dxPatch clears the old single field in the same
+         write so the two can never disagree. A wire value is a wire value,
+         so it goes through the same cleaner the room uses. */
+      ...dxPatch(list(p.diagnoses, 8, 60)),
       tests: list(p.tests, 12, 60),
       advice: list(p.advice, 8, 120),
       nextVisit: clip(p.nextVisit, 60) || undefined,

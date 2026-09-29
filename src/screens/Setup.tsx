@@ -13,6 +13,7 @@ import DrugsStep from './setup/DrugsStep'
 import ReviewQueue from './setup/ReviewQueue'
 import MarketPaste from './setup/MarketPaste'
 import { Note } from '../ui/Note'
+import { IcMoney, IcPrint, IcPill, IcBook, IcUser, IcLock, IcScan, IcSave, IcStore, IcCheck, IcCog } from '../ui/art'
 import { soundOn, setSound, play } from '../ui/sound'
 import { SPECIALTIES, seedDiagnoses, diagnosisSd } from '../data/specialty'
 import { heartbeatOn, setHeartbeatOn } from '../heartbeat'
@@ -63,6 +64,36 @@ const NEEDS: Record<Tab, Parameters<typeof can>[0]> = {
  */
 const CLINIC: Tab[] = ['Fee', 'Paper', 'Medicines', 'Diagnoses', 'Staff', 'Lock', 'Wifi', 'Backup']
 const ADMIN: Tab[] = ['You', 'Doctors', 'Heading', 'Market', 'Review', 'Service']
+
+/**
+ * WHAT EACH TAB IS, SAID ONCE AT THE TOP OF IT.
+ *
+ * Setup was the last screen with no headings at all. Every other screen in
+ * the app opens a section with an icon tile and a sentence; here a tab was
+ * tapped and a bare form appeared — an uppercase field label was the largest
+ * thing on the page, so there was nothing to tell you which of eight rooms
+ * you had walked into, and nothing to say what the room was for. A doctor
+ * looking for the PIN doors read the Fee tab for a while first.
+ *
+ * The line under each heading is the one a person would ask: not what the
+ * fields are called, but what deciding this changes.
+ */
+const TAB_HEAD: Record<string, { icon: (p: { size?: number }) => JSX.Element; says: string }> = {
+  Fee:       { icon: IcMoney, says: 'What the counter charges by default, and the prices of the tests done in the room.' },
+  Paper:     { icon: IcPrint, says: 'The sheet the prescription is printed on, and whether a token receipt is printed at the door.' },
+  Medicines: { icon: IcPill,  says: 'The list the doctor picks from. Nothing prints its Sindhi name until a person has read it.' },
+  Diagnoses: { icon: IcBook,  says: 'The diagnoses offered in the room, in your own words.' },
+  Staff:     { icon: IcUser,  says: 'Which roles this clinic uses. A role nobody holds should not have a door.' },
+  Lock:      { icon: IcLock,  says: 'A PIN for each role. Until one is set, every role opens on a single tap.' },
+  Wifi:      { icon: IcScan,  says: 'The address and the square the clinic\u2019s phones use. Nothing here touches the internet.' },
+  Backup:    { icon: IcSave,  says: 'A copy of every patient and every prescription, saved to a drive you hold. Nothing else survives the machine.' },
+  You:       { icon: IcUser,  says: 'The name, degrees and registration number printed at the head of every slip.' },
+  Doctors:   { icon: IcUser,  says: 'The rooms in this building, and who sits in them.' },
+  Heading:   { icon: IcPrint, says: 'The letterhead: the logo, the address and the timings under it.' },
+  Market:    { icon: IcStore, says: 'Paste a market list to add many medicines at once.' },
+  Review:    { icon: IcCheck, says: 'Sindhi medicine names waiting for a person to read them before they can print.' },
+  Service:   { icon: IcCog,   says: 'The licence, the heartbeat and the machine itself.' },
+}
 
 /**
  * THE PASSPHRASE ALONE USED TO OPEN THESE, AND THAT WAS THE HOLE.
@@ -172,6 +203,15 @@ export default function Setup({ onBack }: { onBack: () => void }) {
         ? <AdminGate onOpen={() => redraw(n => n + 1)}
                      roleBlocked={open && !can(ADMIN_NEEDS[tab])} />
         : <>
+            {TAB_HEAD[tab] && (() => {
+              const H = TAB_HEAD[tab]
+              return (
+                <div className="tabhead">
+                  <h2><H.icon size={17} /> {tab}</h2>
+                  <p className="hint">{H.says}</p>
+                </div>
+              )
+            })()}
             {tab === 'Fee' && <FeeFields v={dr.v} on={on(dr.on)} />}
             {tab === 'Paper' && <><PaperFields v={pp.v} on={on(pp.on)} /><TokenFields v={pp.v} on={on(pp.on)} /></>}
             {tab === 'Medicines' && <DrugsStep />}

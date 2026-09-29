@@ -759,6 +759,16 @@ export default function Intake({ visits, onOpen, onChange }: {
                 : <span className={`st s-${v.status}`}>{LABEL[v.status]}</span>}
             </button>
 
+            {/* EVERYTHING A ROW CAN DO, IN ONE FOOTER ATTACHED TO IT.
+                These were loose children of the wrapper: the cuff button, two
+                or three links, and sometimes a money panel, each its own block,
+                stacked down the page under a card that had already visually
+                ended. On the two-column desktop queue they read as debris
+                between the rows rather than as parts of one, and it was not
+                obvious which row "close without a prescription" belonged to.
+                One footer, hairline above it, links along it; the panels that
+                need the full width take it (see .qfoot in app.css). */}
+            <div className="qfoot">
             {/* The cuff goes on after the token, at the door or just inside it.
                 It is the compounder's job and his screen, so it lives here and
                 not in the room. Only what he fills is printed. */}
@@ -868,6 +878,7 @@ export default function Intake({ visits, onOpen, onChange }: {
                 </button>
               )
             )}
+            </div>
           </div>
         )
       })}

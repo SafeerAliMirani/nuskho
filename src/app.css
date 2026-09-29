@@ -335,24 +335,38 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 
 /* --------------------------------------------------------- 2. the queue */
 
-.qrow{
-  display:flex;align-items:center;gap:var(--s3);width:100%;text-align:left;
-  background:var(--card);border:1.5px solid var(--line);border-radius:var(--r3);
-  padding:var(--s3) var(--s4);margin-bottom:var(--s2);font-size:16px;
-  box-shadow:var(--sh-1);
+/* A ROW IS ONE OBJECT, AND SO IS EVERYTHING IT CAN DO.
+   The card used to be the .qrow button, and the cuff, the links and the money
+   panels were loose siblings under it: each its own block, stacked down the
+   page below a card that had visually ended. On the two-column desktop queue
+   they read as debris BETWEEN rows, and "close without a prescription" did not
+   obviously belong to anything. So the wrapper is now the card, the row is its
+   head, and the rest is an attached footer. */
+.qwrap{
+  margin-bottom:var(--s3);background:var(--card);
+  border:1.5px solid var(--line);border-radius:var(--r3);
+  box-shadow:var(--sh-1);overflow:hidden;
   transition:border-color var(--fast) var(--ease),box-shadow var(--fast) var(--ease),
              transform var(--fast) var(--ease);
   animation:nk-rise var(--mid) var(--ease) backwards;
 }
-.qrow:hover{border-color:var(--line-3);box-shadow:var(--sh-2);transform:translateY(-1px)}
-.qrow:active{transform:translateY(0) scale(.995)}
+.qwrap:hover{border-color:var(--line-3);box-shadow:var(--sh-2);transform:translateY(-1px)}
+.qwrap:has(.qrow:active){transform:translateY(0) scale(.995)}
+
+.qrow{
+  display:flex;align-items:center;gap:var(--s3);width:100%;text-align:left;
+  background:transparent;border:0;border-radius:0;
+  padding:var(--s3) var(--s4);margin:0;font-size:16px;
+  transition:background var(--fast) var(--ease);
+}
+.qrow:hover:not(.flat){background:var(--g-50)}
 /* the list arrives in order rather than all at once. 30ms apart is felt, not seen */
-.qwrap:nth-child(1) .qrow{animation-delay:0ms}
-.qwrap:nth-child(2) .qrow{animation-delay:30ms}
-.qwrap:nth-child(3) .qrow{animation-delay:60ms}
-.qwrap:nth-child(4) .qrow{animation-delay:90ms}
-.qwrap:nth-child(5) .qrow{animation-delay:120ms}
-.qwrap:nth-child(n+6) .qrow{animation-delay:150ms}
+.qwrap:nth-child(1){animation-delay:0ms}
+.qwrap:nth-child(2){animation-delay:30ms}
+.qwrap:nth-child(3){animation-delay:60ms}
+.qwrap:nth-child(4){animation-delay:90ms}
+.qwrap:nth-child(5){animation-delay:120ms}
+.qwrap:nth-child(n+6){animation-delay:150ms}
 
 .qrow .tk{width:46px;height:46px;flex:none;border-radius:var(--r2);
   background:var(--g-100);color:var(--g);display:flex;align-items:center;justify-content:center;
@@ -366,13 +380,50 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .st.s-referred{color:var(--warn)}
 .st.s-seen{color:var(--g)}
 
-.qwrap{margin-bottom:var(--s2)}
 .qwrap.shut .qrow{opacity:.62}
-.qclose{display:block;margin:var(--s1) 0 0 var(--s2);font-size:var(--t-sm)}
-.closebox{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center;margin:var(--s2) 0 0 var(--s2);
+
+/* THE FOOTER. A hairline, a quieter ground, and the links laid along it
+   instead of down the page. Anything that is really a panel rather than a
+   link — the closing box, the test money, a refund — claims the whole width
+   and keeps its own look. */
+.qfoot{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2) var(--s4);
+  padding:var(--s2) var(--s4) var(--s3);border-top:1px solid var(--line-2);
+  background:var(--wash,var(--g-50))}
+.qfoot:empty{display:none}
+.qfoot > .closebox,.qfoot > .collect,.qfoot > .refund,.qfoot > .fixpt{flex:1 0 100%;margin:var(--s1) 0 0}
+/* the cuff is an action of substance, not a link: its own line, with the
+   links gathered underneath it rather than wrapping around it */
+.qfoot > .vopen{flex:1 0 100%}
+.qclose{font-size:var(--t-sm);margin:0}
+.qbody{padding:var(--s3) var(--s4);border-top:1px solid var(--line-2)}
+.closebox{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center;
   padding:var(--s3);border:1.5px solid var(--line);border-radius:var(--r2);background:var(--g-50);
   animation:nk-slide var(--mid) var(--ease)}
 .closebox .chip .sd{font-family:'NK',serif;font-size:14px;margin-left:5px;opacity:.75}
+
+/* The Sindhi a picked diagnosis will print, shown on the chip itself. Only
+   on a lit chip: what you see here is what the slip says, and a chip with
+   nothing after its English is a chip that will print English alone. */
+.chip .sd{font-family:'NK',serif;font-style:normal;font-size:14px;
+  margin-left:7px;opacity:.85;direction:rtl;unicode-bidi:isolate}
+.chip.on .sd{opacity:1}
+
+/* The count beside "Diagnoses", so he can see he has three without counting
+   the lit chips. Quiet: it is a fact, not a warning. */
+.hcount{display:inline-flex;align-items:center;justify-content:center;
+  min-width:20px;height:20px;padding:0 6px;margin-left:8px;border-radius:var(--rp);
+  background:var(--g-100);color:var(--g);font-size:var(--t-xs);font-weight:700;
+  vertical-align:middle}
+/* The box for a diagnosis not on his list. Same shape as "save as a set",
+   which is the other place in the app where a thing is named and added. */
+.dxadd{margin-top:var(--s2)}
+
+/* Setup's per-tab heading. The h2 keeps the app's standard icon tile and
+   rule; the line under it sits tight to the heading rather than floating as
+   another loose paragraph, because it belongs to it. */
+.tabhead{margin-bottom:var(--s4);animation:nk-fade var(--mid) var(--ease)}
+.tabhead h2{margin-bottom:var(--s1)}
+.tabhead .hint{margin-top:0;max-width:62ch}
 
 /* THE HOUSEHOLD UNDER A PHONE. Appears between the phone box and the city
    chips the moment a known number is typed. A list, never a decision, so it
@@ -415,7 +466,7 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
    record, and a desk should recognise the second from having used the first.
    Gold rather than green on the edge, because this is the one thing on the
    queue that rewrites who somebody is, and it should not look like a chip. */
-.fixpt{margin:var(--s2) 0 0 var(--s2);padding:var(--s3);border:1.5px solid var(--gold);
+.fixpt{padding:var(--s3);border:1.5px solid var(--gold);
   border-radius:var(--r2);background:var(--g-50);animation:nk-slide var(--mid) var(--ease)}
 .fixpt h3{margin:0 0 2px;font-size:var(--t-md);font-weight:700;color:var(--ink);
   display:flex;align-items:center;gap:6px}
@@ -574,7 +625,7 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .daybar .money b{color:var(--g)}
 .daybar .due b,.daybar .back b{color:var(--bad)}
 .daybar .soft{color:var(--faint)}
-.refund{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;margin:var(--s2) 0 0 var(--s2);
+.refund{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;
   padding:var(--s3) var(--s4);border:2px solid var(--bad);border-radius:var(--r2);
   background:var(--bad-bg);animation:nk-pop var(--mid) var(--spring)}
 .refund>b{font-size:16px;color:var(--bad)}
@@ -815,6 +866,13 @@ h2::after{content:'';flex:1;height:1px;background:var(--line)}
 .stats h3 small{font-weight:400;color:var(--faint);margin-left:var(--s2)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--s3)}
 .tiles.money .tile b{color:var(--g)}
+/* A tile that is money the clinic still owes somebody, or has not been given
+   yet. Colour only when the number is not zero: a red nought reads as an
+   alarm about nothing, and this desk is looked at every single evening. */
+.tiles.money .tile.bad b{color:var(--bad)}
+.tiles.money .tile.warn b{color:var(--warn)}
+.tile.bad{border-color:var(--bad-line)}
+.tile.warn{border-color:var(--warn-line)}
 .tile{padding:var(--s4) var(--s5);border:1.5px solid var(--line);border-radius:var(--r3);
   background:var(--card);box-shadow:var(--sh-1);
   transition:transform var(--mid) var(--ease),box-shadow var(--mid) var(--ease);
@@ -1771,7 +1829,7 @@ h2 svg{color:var(--g);flex:none;opacity:.85}
 
 /* the compounder's pad inside a queue row is narrower and quieter */
 .qwrap .vitals{margin:var(--s2) 0 0 var(--s2);background:var(--g-50)}
-.qwrap .vopen{margin:var(--s2) 0 0 var(--s2);width:auto;padding:9px var(--s3);font-size:var(--t-sm)}
+.qwrap .vopen{margin:0;width:auto;padding:8px var(--s3);font-size:var(--t-sm)}
 
 /* =============================================================================
    THE DOCTOR'S OWN DIAGNOSES

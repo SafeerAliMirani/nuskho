@@ -4,7 +4,7 @@ import { chargesFee } from '../profile'
 import { daysSinceExport, storageReport, snapshotTrouble } from '../safety'
 import { activeDoctors, multiRoom, visitDoctorId, type Doctor } from '../doctors'
 import { stamp } from '../version'
-import { IcChart, IcShield, IcClock } from '../ui/art'
+import { IcChart, IcShield, IcClock, IcQueue, IcMoney } from '../ui/art'
 import type { Visit } from '../types'
 
 /**
@@ -52,20 +52,27 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
 
       {/* nothing was taken, nothing is owed and nothing is waiting to go back
           in a clinic that does not charge: see profile.noFee */}
+      {/* THE SAME TILES THE FIGURES PAGE USES, instead of three fee bars
+          wearing inline styles. A fee bar is a control — it is the strip in
+          the room with "charge him less" on it — and borrowing it for a
+          read-only number gave this desk three boxes that looked like
+          something to press and read like nothing in particular.
+          `.tiles.money` is the pattern that already exists for exactly this:
+          a big tabular number, a label under it, one hue. One idiom, both
+          screens. */}
       {(chargesFee() || !!(sum && (sum.collected || sum.toRefund || sum.due))) && (
-      <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-        <div className="feebar" style={{ flexDirection: 'column', alignItems: 'flex-start', flex: 1, minWidth: 160 }}>
-          <label>Taken at the desk</label>
-          <b style={{ fontSize: 24 }}>Rs {sum?.collected ?? 0}</b>
+      <div className="tiles money">
+        <div className="tile">
+          <b>Rs {sum?.collected ?? 0}</b>
+          <span>Taken at the desk</span>
         </div>
-        <div className="feebar" style={{ flexDirection: 'column', alignItems: 'flex-start', flex: 1, minWidth: 160 }}>
-          <label>Waiting to be given back</label>
-          <b style={{ fontSize: 24, color: sum && sum.toRefund > 0 ? 'var(--bad)' : undefined }}>
-            Rs {sum?.toRefund ?? 0}</b>
+        <div className={'tile' + (sum && sum.toRefund > 0 ? ' bad' : '')}>
+          <b>Rs {sum?.toRefund ?? 0}</b>
+          <span>Waiting to be given back</span>
         </div>
-        <div className="feebar" style={{ flexDirection: 'column', alignItems: 'flex-start', flex: 1, minWidth: 160 }}>
-          <label>Still due, to collect kindly</label>
-          <b style={{ fontSize: 24 }}>Rs {sum?.due ?? 0}</b>
+        <div className={'tile' + (sum && sum.due > 0 ? ' warn' : '')}>
+          <b>Rs {sum?.due ?? 0}</b>
+          <span>Still due, to collect kindly</span>
         </div>
       </div>
       )}
@@ -77,7 +84,7 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
 
       {byRoom && byRoom.length > 1 && (
         <>
-          <h2 style={{ marginTop: 18 }}>By room, tonight</h2>
+          <h2 style={{ marginTop: 18 }}><IcQueue size={17} /> By room, tonight</h2>
           {byRoom.map(({ d, s }) => (
             <div className="line" key={d.id}>
               <div className="hd"><div>
@@ -103,7 +110,7 @@ export default function AdminDesk({ visits }: { visits: Visit[] }) {
       )}
 
       {(chargesFee() || !!(sum && sum.collected)) && (<>
-      <h2 style={{ marginTop: 18 }}>Closing the drawer</h2>
+      <h2 style={{ marginTop: 18 }}><IcMoney size={17} /> Closing the drawer</h2>
       <div className="row">
         <div className="fld" style={{ maxWidth: 220 }}>
           <label>Cash counted in the drawer</label>

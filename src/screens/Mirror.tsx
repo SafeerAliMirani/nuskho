@@ -13,13 +13,14 @@ import { tourFor, tourSeen } from '../tour'
 import { readQrPayload } from '../print/qr'
 import { printToken, printSlip } from '../print/print'
 import { paper } from '../paper'
-import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn, FormIcon } from '../ui/art'
+import { Mark, IcMoney, IcQueue, IcPill, IcChart, IcScan, IcUser, IcWarn, IcBook, FormIcon } from '../ui/art'
 import { CareLine } from '../ui/CareLine'
 import { FixPatient } from '../ui/FixPatient'
 import { parseCode } from '../code'
 import { phoneKey } from '../household'
 import type { Patient } from '../types'
 import type { PatientPatch } from '../patient'
+import { toggleDx } from '../dx'
 import { courseCheck } from '../course'
 import { isChild } from '../data/vitals'
 import { APP } from '../profile'
@@ -601,8 +602,12 @@ function MDesk({ s }: { s: WireState }) {
             </span>
             <span className={`st s-${v.status}`}>{LABEL[v.status]}</span>
           </div>
-          <Reprint v={v} />
-          <Refund v={v} onDone={() => undefined} />
+          {/* the same attached footer the desk's queue has, so a row is one
+              object on a phone too */}
+          <div className="qfoot">
+            <Reprint v={v} />
+            <Refund v={v} onDone={() => undefined} />
+          </div>
         </div>
       ))}
     </div>
@@ -863,7 +868,7 @@ function MQueue({ s, role }: { s: WireState; role: Role }) {
           </button>
 
           {open === v.id && v.status === 'waiting' && (
-            <div style={{ padding: '8px 2px' }}>
+            <div className="qbody">
               <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
                 {VITALS.map(d => <VBox key={d.key} d={d} vit={vit} set={setVit} />)}
               </div>
@@ -1096,7 +1101,9 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
   const [fixing, setFixing] = useState(false)
   const [visit, setVisit] = useState<WireOpenVisit | null>(null)
   const [lines, setLines] = useState<RxLine[]>([])
-  const [diagnosis, setDiagnosis] = useState('')
+  const [dxs, setDxs] = useState<string[]>([])
+  const [dxTyped, setDxTyped] = useState('')
+  const [dxFull, setDxFull] = useState('')
   const [tests, setTests] = useState<string[]>([])
   const [advice, setAdvice] = useState<string[]>([])
   const [nextVisit, setNextVisit] = useState('')
@@ -1138,7 +1145,8 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
     setFixing(false)
     setVisit(v)
     setLines(v.lines)
-    setDiagnosis(v.diagnosis ?? '')
+    setDxs(v.diagnoses ?? [])
+    setDxTyped(''); setDxFull('')
     setTests(v.tests)
     setAdvice(v.advice)
     setNextVisit(v.nextVisit ?? '')
@@ -1149,8 +1157,8 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
    * CLOSURE. Every render refreshes this; `flush` below reads it rather than
    * whatever `lines` happened to be when the timer was scheduled.
    */
-  const formRef = useRef({ lines, diagnosis, tests, advice, nextVisit })
-  formRef.current = { lines, diagnosis, tests, advice, nextVisit }
+  const formRef = useRef({ lines, dxs, tests, advice, nextVisit })
+  formRef.current = { lines, dxs, tests, advice, nextVisit }
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** stops two saves overlapping; deliberately not the `busy` state above, so
    *  a background save never disables a button the doctor is looking at */
@@ -1173,7 +1181,7 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
     try {
       const r = await intent('saveRx', {
         visitId: openId, lines: f.lines,
-        diagnosis: f.diagnosis || undefined,
+        diagnoses: f.dxs,
         tests: f.tests, advice: f.advice,
         nextVisit: f.nextVisit || undefined,
       })
@@ -1231,7 +1239,16 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
     setLines(ls => ls.filter((_, k) => k !== i))
     touch()
   }
-  function setDiag(v: string) { setDiagnosis(v); touch() }
+  function setDiag(v: string[]) { setDxs(v); touch() }
+  /* The cap is announced rather than swallowed: a doctor whose fifth tap did
+     nothing concludes the button is broken, not that he has four. */
+  function addDx() {
+    const d = dxTyped.trim()
+    if (!d) return
+    const next = toggleDx({ diagnoses: dxs }, d)
+    if (!next) { setDxFull('Four is the most a slip carries. Take one off first.'); return }
+    setDxFull(''); setDxTyped(''); setDiag(next)
+  }
   function toggleTest(key: string) {
     setTests(ts => (ts.includes(key) ? ts.filter(x => x !== key) : [...ts, key]))
     touch()
@@ -1492,11 +1509,26 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
           )}
 
           <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0, opacity: locked ? .55 : 1 }}>
-            <h2>Diagnosis</h2>
-            <div className="fld">
-              <input value={diagnosis} maxLength={240} placeholder="what he found"
-                     onChange={e => setDiag(e.target.value)} />
+            {/* SEVERAL, the same as at the clinic machine. A phone has no
+                room for his whole chip list, so here it is what he types,
+                and each one becomes a chip he can take off again. */}
+            <h2><IcBook size={17} /> {dxs.length > 1 ? 'Diagnoses' : 'Diagnosis'}</h2>
+            {dxs.length > 0 && (
+              <div className="chips" style={{ marginBottom: 8 }}>
+                {dxs.map(d => (
+                  <button key={d} className="chip on" onClick={() => { setDxFull(''); setDiag(dxs.filter(x => x !== d)) }}>
+                    {d} ×
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="saveset dxadd">
+              <input value={dxTyped} maxLength={60} placeholder="what he found"
+                     onChange={e => { setDxTyped(e.target.value); setDxFull('') }}
+                     onKeyDown={e => { if (e.key === 'Enter') addDx() }} />
+              <button className="btn ghost" disabled={!dxTyped.trim()} onClick={addDx}>Add</button>
             </div>
+            {dxFull && <p className="hint" style={{ color: 'var(--warn)' }}>{dxFull}</p>}
 
             <h2><IcPill size={17} /> Medicines</h2>
             {isChild(visit.patient.age) && (

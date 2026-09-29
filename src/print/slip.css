@@ -109,6 +109,20 @@
 .vt>div.v-bp{flex:1.3 1 0;}
 .vt>div.dx{flex:2.2 1 0;white-space:normal;}
 .vt>div.dx .v{font-size:8.6pt;line-height:1.1;}
+/* SEVERAL DIAGNOSES, one per line. Stacked rather than run together with
+   commas: a chemist reading fast needs the second one to be a separate thing
+   on the page, and "Anaemia, Urinary tract infection" scans as one long
+   phrase. The Sindhi sits after the English on the same line when it has
+   been reviewed, and simply is not there when it has not. */
+.dxr{display:block;line-height:1.15;}
+.dxr + .dxr{margin-top:.5mm;}
+.dxr .e{font-weight:700;}
+/* margin-LEFT, not right. The span follows the English in an LTR line, and
+   its own direction:rtl governs the text inside the isolate and nothing
+   about which side of it the gap falls on. margin-right put the space on the
+   far side and printed "Feverتپ (بخار)" with the two words touching. */
+.dxr .s{font-family:'NK',serif;direction:rtl;unicode-bidi:isolate;
+  font-weight:700;margin-left:2mm;}
 /* THE BOX THE DOCTOR ASKED ABOUT FIRST.
    The narrow reading cells need their Sindhi on a line of its own or "BP" and
    "بلڊ پريشر" do not both fit across 19mm. The diagnosis cell is 2.2 shares of
