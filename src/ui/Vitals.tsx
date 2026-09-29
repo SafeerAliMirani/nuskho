@@ -180,7 +180,7 @@ function Pair({ def, raw, onSet, flag: f, imp, half }: {
         <em>{def.unit}</em>
       </div>
       {imp
-        ? <span className="vmark">not a possible reading — the slip will not print</span>
+        ? <span className="vmark">not a possible reading — the slip will not print · هي انگ ممڪن ناهي، پرچي نه ڇپبي</span>
         : half
         ? <span className="vmark half">only half typed — it will not print</span>
         : f && <span className="vmark">{f === 'high' ? 'higher than usual' : 'lower than usual'}</span>}
@@ -213,7 +213,7 @@ function Field({ def, raw, onSet, age }: {
         {def.unit && <em>{def.unit}</em>}
       </div>
       {imp
-        ? <span className="vmark">not a possible reading — the slip will not print</span>
+        ? <span className="vmark">not a possible reading — the slip will not print · هي انگ ممڪن ناهي، پرچي نه ڇپبي</span>
         : f && <span className="vmark">{f === 'high' ? 'higher than usual' : 'lower than usual'}</span>}
     </div>
   )

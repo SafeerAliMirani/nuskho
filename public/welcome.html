@@ -91,6 +91,13 @@ body{font-family:var(--text);color:var(--ink);background:var(--bg);line-height:1
 img,svg{display:block}
 a{color:inherit}
 .sd{font-family:var(--sd)}
+.sdline{font-family:var(--sd);display:block;direction:rtl;text-align:right;width:fit-content;max-width:100%;margin:.3em auto 0 0;font-weight:500;line-height:1.95;color:var(--mut)}
+h1>.sdline,h2>.sdline{font-size:.6em;font-weight:600;color:inherit;opacity:.7;margin:.15em auto 0 0}
+.eyebrow+.sdline{margin:.35em auto 0 0;font-size:15px;letter-spacing:0;text-transform:none}
+.princ .sdline,footer .sdline{color:#b9cfc6}
+footer .sdline{margin-left:auto;margin-right:0}
+.princ-item .sdline{margin:.15em auto .15em 0}
+.btn .sdline{display:inline;margin:0 0 0 .5em;color:inherit;opacity:.9;font-size:.95em}
 .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
 section{scroll-margin-top:84px}
 
@@ -486,7 +493,7 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
     </nav>
     <span class="nav-cta">
       <a class="btn btn-ghost btn-sm" href="#demo">Request a demo</a>
-      <a class="btn btn-solid btn-sm" style="white-space:nowrap" href="login.html">Sign in</a>
+      <a class="btn btn-solid btn-sm" style="white-space:nowrap" href="login.html">Sign in<span class="sdline" dir="rtl" lang="sd">سائن ان</span></a>
     </span>
   </div>
 </header>
@@ -497,16 +504,17 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
 <section class="hero" id="top">
   <div class="wrap">
     <div>
-      <span class="eyebrow">The first Sindhi clinic &amp; hospital system <span class="sd" dir="rtl" lang="sd">· نسخو</span></span>
-      <h1>One system for the <em>whole building</em>.</h1>
+      <span class="eyebrow">The first Sindhi clinic &amp; hospital system <span class="sd" dir="rtl" lang="sd" style="white-space:nowrap">· نسخو</span></span><span class="sdline" dir="rtl" lang="sd">پهريون سنڌي ڪلينڪ ۽ اسپتال سسٽم</span>
+      <h1>One system for the <em>whole building</em>.<span class="sdline" dir="rtl" lang="sd">هڪ سسٽم، پوري عمارت لاءِ</span></h1>
       <p class="lede">Nuskho prints the prescription, and it is going into its first clinic now.
         <b>English for the chemist, Sindhi for the family, pictures for everyone who reads
         neither.</b> It keeps printing when the internet goes. And step by step it grows into
         the whole building: token counter at the gate, pharmacy at the exit, rooms upstairs.</p>
+      <span class="sdline" dir="rtl" lang="sd">نسخو پرچي ڇاپي ٿو، ۽ هاڻي پنهنجي پهرين ڪلينڪ ۾ شروع ٿي رهيو آهي.</span><span class="sdline" dir="rtl" lang="sd">دوا واري لاءِ انگريزي، گهر وارن لاءِ سنڌي، ۽ جيڪي ٻئي نه پڙهي سگهن، تن لاءِ تصويرون.</span><span class="sdline" dir="rtl" lang="sd">انٽرنيٽ بند ٿي وڃي ته به ڇپيندو رهي ٿو.</span>
       <div class="hero-cta">
         <a class="btn btn-solid" href="https://wa.me/923333368189?text=Salam%21%20I%20would%20like%20a%20Nuskho%20demo%20for%20my%20clinic.">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2a9.9 9.9 0 0 0-8.6 14.9L2 22l5.3-1.4A10 10 0 1 0 12 2Zm0 2a8 8 0 1 1-4.2 14.8l-.5-.3-3 .8.8-2.9-.3-.5A8 8 0 0 1 12 4Zm-3.1 4.2c-.2 0-.5 0-.7.3-.2.3-.9.9-.9 2.1s.9 2.4 1 2.6c.2.2 1.8 2.9 4.5 3.9 2.2.9 2.7.7 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2l-.9-.5c-.1-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1s-1.1-.4-2-1.3c-.8-.7-1.3-1.5-1.4-1.8-.1-.2 0-.4.1-.5l.4-.5c.1-.2.2-.3.3-.5v-.5C10.7 10 10.2 8.7 10 8.4c-.2-.4-.4-.4-.6-.4h-.5Z"/></svg>
-          Request a demo
+          Request a demo<span class="sdline" dir="rtl" lang="sd">ڊيمو گهرايو</span>
         </a>
         <a class="btn btn-ghost" href="#watch">Watch it work</a>
       </div>
@@ -648,7 +656,7 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
 <section class="sect" id="system">
   <div class="wrap">
     <div class="sect-head">
-      <span class="eyebrow">Every shape of practice</span>
+      <span class="eyebrow">Every shape of practice</span><span class="sdline" dir="rtl" lang="sd">هر قسم جي پريڪٽس</span>
       <h2>Solo room or full hospital. Same system, different switches.</h2>
       <p>Nuskho is not an edition ladder. A clinic turns on exactly the roles the building
         needs, and nothing it didn't ask for ever appears on screen.</p>
@@ -712,7 +720,7 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
 <section class="sect" id="roles">
   <div class="wrap">
     <div class="sect-head">
-      <span class="eyebrow">One screen each</span>
+      <span class="eyebrow">One screen each</span><span class="sdline" dir="rtl" lang="sd">هر ڪنهن لاءِ پنهنجي اسڪرين</span>
       <h2>Five roles. Each one sees the job, and only the job.</h2>
       <p>The counter never reads a diagnosis. The pharmacy never sees a fee. An
         administrator can never reach further than the doctors allow. Nuskho is built
@@ -775,7 +783,7 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
   <div class="wrap">
     <div class="sect-head">
       <span class="eyebrow">A complete package</span>
-      <h2>Finished first. Growing next.</h2>
+      <h2>Finished first. Growing next.<span class="sdline" dir="rtl" lang="sd">پهرين مڪمل. پوءِ وڌيڪ.</span></h2>
       <p>A building turns modules on as it grows. It never changes systems.</p>
     </div>
 
@@ -829,28 +837,28 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
 <!-- ======================= PRINCIPLES ======================= -->
 <section class="princ" id="principles">
   <div class="wrap">
-    <span class="eyebrow">Why doctors trust it</span>
+    <span class="eyebrow">Why doctors trust it</span><span class="sdline" dir="rtl" lang="sd">ڊاڪٽر ان تي ڀروسو ڇو ٿا ڪن</span>
     <h2>Four promises, kept by design.</h2>
     <div class="princ-grid">
       <div class="princ-item"><span class="num">01</span>
-        <div><b>It prints with the internet down.</b>
+        <div><b>It prints with the internet down.</b><span class="sdline" dir="rtl" lang="sd">انٽرنيٽ بند هجي ته به ڇپي ٿو.</span>
         <p>Nothing stands between the doctor tapping print and paper appearing. No
           network call, no sync, no server anywhere. An offline evening is a normal
           evening, and so is an offline month.</p></div>
       </div>
       <div class="princ-item"><span class="num">02</span>
-        <div><b>Records stay in the building.</b>
+        <div><b>Records stay in the building.</b><span class="sdline" dir="rtl" lang="sd">رڪارڊ عمارت ۾ ئي رهن ٿا.</span>
         <p>Patient records live on the clinic's own machines and nowhere else. The public
           copy even instructs the browser itself to refuse to send data to any server, so
           the promise is enforced, not just made.</p></div>
       </div>
       <div class="princ-item"><span class="num">03</span>
-        <div><b>Nuskho cannot read a prescription.</b>
+        <div><b>Nuskho cannot read a prescription.</b><span class="sdline" dir="rtl" lang="sd">نسخو ڪنهن جي پرچي پڙهي نٿو سگهي.</span>
         <p>Not "does not". Cannot. The company holds no key to any clinic's clinical
           records, and prescribing data is never gathered up or sold. To anyone.</p></div>
       </div>
       <div class="princ-item"><span class="num">04</span>
-        <div><b>Licensed software. Unlicensed records.</b>
+        <div><b>Licensed software. Unlicensed records.</b><span class="sdline" dir="rtl" lang="sd">سافٽ ويئر اسان جو، پر رڪارڊ مڪمل اوهان جو.</span>
         <p>Nuskho is paid for, like any tool, and a licence that lapses is warned about
           for weeks and then stops the app until a code is read down the phone. It never
           asks a server for permission, and it never holds a clinic's patients: even
@@ -866,13 +874,13 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
     <div class="cta-card">
       <div class="cta-l">
         <span class="eyebrow">New customer?</span>
-        <h2>See a full evening<br>in twenty minutes.</h2>
+        <h2>See a full evening<br>in twenty minutes.<span class="sdline" dir="rtl" lang="sd">ويهن منٽن ۾ پوري شام ڏسو.</span></h2>
         <p>We bring Nuskho to your clinic and print on your own printer, on your own
           paper, token to slip to pharmacy. Message us and we will arrange it.</p>
         <div class="cta-btns">
           <a class="btn btn-gold" href="https://wa.me/923333368189?text=Salam%21%20I%20would%20like%20a%20Nuskho%20demo%20for%20my%20clinic.">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2a9.9 9.9 0 0 0-8.6 14.9L2 22l5.3-1.4A10 10 0 1 0 12 2Zm0 2a8 8 0 1 1-4.2 14.8l-.5-.3-3 .8.8-2.9-.3-.5A8 8 0 0 1 12 4Zm-3.1 4.2c-.2 0-.5 0-.7.3-.2.3-.9.9-.9 2.1s.9 2.4 1 2.6c.2.2 1.8 2.9 4.5 3.9 2.2.9 2.7.7 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2l-.9-.5c-.1-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1s-1.1-.4-2-1.3c-.8-.7-1.3-1.5-1.4-1.8-.1-.2 0-.4.1-.5l.4-.5c.1-.2.2-.3.3-.5v-.5C10.7 10 10.2 8.7 10 8.4c-.2-.4-.4-.4-.6-.4h-.5Z"/></svg>
-            WhatsApp us for a demo
+            WhatsApp us for a demo<span class="sdline" dir="rtl" lang="sd">ڊيمو گهرايو</span>
           </a>
         </div>
         <p class="cta-sub">Want to try it yourself first? Ask on WhatsApp and we send you the
@@ -929,7 +937,7 @@ footer{background:#0b1a16;color:#8fa39c;padding:56px 0 40px;font-size:14px}
            screen, and nowhere on the printed slip. The prescription is the
            doctor's document. -->
       <span>A product of <a href="https://larkode.com" style="color:#8fa39c">Larkode</a></span>
-      <span>Records belong to the clinic. Always.</span>
+      <span>Records belong to the clinic. Always.<span class="sdline" dir="rtl" lang="sd">رڪارڊ ڪلينڪ جو آهي. هميشه.</span></span>
     </div>
   </div>
 </footer>

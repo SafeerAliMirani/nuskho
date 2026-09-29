@@ -2,7 +2,7 @@ import { describe as group, it, expect } from 'vitest'
 import type { Patient, Visit } from './types'
 import {
   cleanPatch, changedFields, refusal, correct, describe, describeOld,
-  printedNote, printedCount, whoFor, MAX_CORRECTIONS,
+  printedNote, printedCount, whoFor, describeSd, MAX_CORRECTIONS,
 } from './patient'
 import { slipDataFor } from './rx'
 import { printedStamp } from './rx'
@@ -21,7 +21,7 @@ group('what counts as a change', () => {
   it('pressing save without touching anything changes nothing', () => {
     const p = pt({ age: '34' })
     expect(changedFields(p, { name: 'Wazeer Ali', age: '34' })).toEqual({})
-    expect(refusal(p, { name: 'Wazeer Ali', age: '34' })).toBe('Nothing was changed.')
+    expect(refusal(p, { name: 'Wazeer Ali', age: '34' })).toMatch(/^Nothing was changed\./)
   })
 
   it('an empty box and an absent field are the same absence', () => {
@@ -116,6 +116,15 @@ group('the paper already in somebody hand', () => {
     expect(printedNote(1)).toMatch(/^One prescription/)
     expect(printedNote(2)).toMatch(/^2 prescriptions/)
   })
+
+  // The desk reads this one in Sindhi more often than in English, and it is the
+  // sentence that stops somebody carrying a corrected record to the printer
+  // expecting a corrected slip. Both numbers say it, or neither should.
+  it('says it in Sindhi too, and counts in Sindhi as well', () => {
+    expect(printedNote(1)).toContain('هڪ پرچي اڳ ئي ڇپجي چڪي آهي')
+    expect(printedNote(2)).toContain('2 پرچيون اڳ ئي ڇپجي چڪيون آهن')
+    expect(printedNote(9)).toContain('9 پرچيون')
+  })
 })
 
 group('a printed slip still never changes', () => {
@@ -184,5 +193,39 @@ group('the same rules over the wire', () => {
 
   it('a name of nothing but spaces is refused, whoever sends it', () => {
     expect(refusal(pt(), { name: '  \t ' })).toMatch(/needs a name/)
+  })
+})
+
+group('the Sindhi read-back is a noun phrase, not a translated verb phrase', () => {
+  /* Gemini's shape (29 Sep 2026): one "تبديلي:" then "field X مان Y" clauses.
+     What it has to survive is the range — one clause and five — because the
+     English verb phrase does not, which is the whole reason it is shaped
+     differently rather than translated. */
+  it('one change reads as one clause', () => {
+    expect(describeSd(pt(), { name: 'Wazir Ali' })).toBe('تبديلي: نالو Wazeer Ali مان Wazir Ali.')
+  })
+
+  it('five changes stay one sentence, comma-joined in Sindhi', () => {
+    const p = pt({ age: '34', sex: 'M', phone: '03001234567', city: 'Dokri' })
+    const out = describeSd(p, { name: 'Wazir Ali', age: '35', sex: 'F', phone: '03007654321', city: 'Larkana' })
+    expect(out.startsWith('تبديلي: ')).toBe(true)
+    expect(out.endsWith('.')).toBe(true)
+    expect(out.split('، ').length).toBe(5)       // the Sindhi comma, not the Latin one
+    expect(out).not.toContain(', ')
+  })
+
+  it('an absent value is a word, never an empty gap', () => {
+    expect(describeSd(pt(), { age: '34' })).toContain('عمر ڪجهه نه مان 34')
+    expect(describeSd(pt({ age: '34' }), { age: '' })).toContain('عمر 34 مان ڪجهه نه')
+  })
+
+  it('man and woman are words in Sindhi too, not M and F', () => {
+    const out = describeSd(pt(), { sex: 'F' })
+    expect(out).toContain('عورت')
+    expect(out).not.toContain('F')
+  })
+
+  it('nothing changed is an empty string, so no bare "تبديلي:" is ever shown', () => {
+    expect(describeSd(pt({ age: '34' }), { age: '34' })).toBe('')
   })
 })

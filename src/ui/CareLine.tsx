@@ -93,14 +93,14 @@ export function CareLine({ alert, pregnant, sex, onAlert, onPregnant, disabled }
     <div className={'careline' + (alert || pregnant ? ' on' : '')}>
       <span className="cl-i"><IcWarn size={16} /></span>
       <input className="cl-in" value={draft} maxLength={120} disabled={disabled}
-             placeholder="allergies or conditions, in your own words (prints)"
+             placeholder="allergies or conditions, in your own words (prints) — الرجي يا ٻي بيماري، پنهنجن لفظن ۾ (پرچي تي ڇپبي)"
              onChange={e => { typed.current = Date.now(); setDraft(e.target.value) }}
              onBlur={() => { pending = null; void write.current() }} />
       {mayBePregnant && (
         <button type="button" className={'chip cl-pg' + (pregnant ? ' on' : '')} disabled={disabled}
                 aria-pressed={!!pregnant}
                 onClick={() => onPregnant(!pregnant)}>
-          {pregnant ? '\u2713 ' : ''}Pregnant
+          {pregnant ? '\u2713 ' : ''}Pregnant <i className="sd">حمل</i>
         </button>
       )}
     </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Patient } from '../types'
 import { NEAR } from '../data/places'
-import { describe, describeOld, refusal, printedNote, type PatientPatch } from '../patient'
+import { describe, describeSd, describeOld, refusal, printedNote, type PatientPatch } from '../patient'
 import { patientCode } from '../code'
 import { Note } from './Note'
 import { IcUser } from './art'
@@ -63,6 +63,7 @@ export function FixPatient({ pt, printed, by, slim, onSave, onClose }: {
 
   const patch: PatientPatch = slim ? { name, age, sex } : { name, age, sex, phone, city }
   const said = describe(pt, patch)
+  const saidSd = describeSd(pt, patch)
   const no = refusal(pt, patch)
   const note = printedNote(printed)
 
@@ -78,7 +79,7 @@ export function FixPatient({ pt, printed, by, slim, onSave, onClose }: {
 
   return (
     <div className="fixpt">
-      <h3><IcUser size={15} /> Correct the details</h3>
+      <h3><IcUser size={15} /> Correct the details <i className="sd">تفصيل درست ڪريو</i></h3>
       {/* WHOSE RECORD, on its own line and above every box.
           The number first because that is what the desk is holding — it read
           it off the slip thirty seconds ago — and the name after it, in its
@@ -92,6 +93,9 @@ export function FixPatient({ pt, printed, by, slim, onSave, onClose }: {
       <p className="hint">
         The patient number never changes. If this is not the right person, close this
         and open the right number instead.
+        {/* Gemini, 29 Sep: a polite warning is read as advice at a busy counter,
+            so the Sindhi opens with ياد رکو and states the rule flat. */}
+        <i className="sd cl-block">ياد رکو: مريض جو نمبر ڪڏهن به نٿو بدلجي. جيڪڏهن هي صحيح مريض ناهي، ته هي بند ڪري صحيح نمبر کوليو.</i>
       </p>
 
       <div className="fld"><label>Name — نالو</label>
@@ -130,21 +134,26 @@ export function FixPatient({ pt, printed, by, slim, onSave, onClose }: {
       )}
 
       {/* What is about to happen, in words, before it happens. */}
-      {said && <p className="fixsay">Changing <b>{said}</b>.</p>}
+      {said && (
+        <p className="fixsay">
+          Changing <b>{said}</b>.
+          {saidSd && <i className="sd cl-block">{saidSd}</i>}
+        </p>
+      )}
       {note && <Note tone="info" title="The slips already printed do not change">{note}</Note>}
       {err && <div className="saidno"><Note tone="stop" title="Not corrected">{err}</Note></div>}
 
       <div className="row">
         <button className="btn" disabled={!!no || busy} onClick={save}>
-          {busy ? 'Saving…' : 'Save the correction'}
+          {busy ? 'Saving…' : <>Save the correction <i className="sd">درستي محفوظ ڪريو</i></>}
         </button>
-        <button className="btn ghost" onClick={onClose}>Leave it as it is</button>
+        <button className="btn ghost" onClick={onClose}>Leave it as it is <i className="sd">ائين ئي رهڻ ڏيو</i></button>
       </div>
       <p className="hint">Saved as a correction by the <b>{by}</b>, with the old details kept.</p>
 
       {!!pt.corrections?.length && (
         <div className="fixlog">
-          <b>Corrected before</b>
+          <b>Corrected before <i className="sd">اڳ ڪيل درستيون</i></b>
           {[...pt.corrections].reverse().map((c, i: number) => (
             <span key={i}>{when(c.at)} · {c.by} · {describeOld(c)}</span>
           ))}

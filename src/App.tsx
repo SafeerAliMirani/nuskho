@@ -299,6 +299,7 @@ function Clinic() {
                   {mayMerge && (
                     <button onClick={() => { setMenu(false); setSetup(false); setStats(false); setVisitId(null); setMerge(true) }}>
                       <IcUser size={16} /> Same person twice <small>fold a duplicate record into the first</small>
+                      <small className="sd">هڪ ئي مريض ٻه ڀيرا · نقل رڪارڊ پهرئين ۾ ملايو</small>
                     </button>
                   )}
                   {maySetup &&

@@ -346,7 +346,7 @@ export default function Compose({ visitId, onDone, onBack }: {
 
   function pickDx(d: string) {
     const next = toggleDx(cur.current!, d)
-    if (!next) { setDxFull(`Four is the most a slip carries. Take one off first.`); return }
+    if (!next) { setDxFull('Four is the most a slip carries. Take one off first. \u2014 پرچي تي وڌ ۾ وڌ 4 تشخيصون اچي سگهن ٿيون. پهرين هڪ هٽايو.'); return }
     setDxFull('')
     void apply(v => ({ ...v, ...dxPatch(next) }))
   }
@@ -355,7 +355,7 @@ export default function Compose({ visitId, onDone, onBack }: {
     const d = dxTyped.trim()
     if (!d) return
     const next = toggleDx(cur.current!, d)
-    if (!next) { setDxFull('Four is the most a slip carries. Take one off first.'); return }
+    if (!next) { setDxFull('Four is the most a slip carries. Take one off first. \u2014 پرچي تي وڌ ۾ وڌ 4 تشخيصون اچي سگهن ٿيون. پهرين هڪ هٽايو.'); return }
     if (hasDx(cur.current!, d)) { setDxTyped(''); return }   // already there, nothing to say
     setDxFull(''); setDxTyped('')
     void apply(v => ({ ...v, ...dxPatch(next) }))
@@ -672,7 +672,7 @@ export default function Compose({ visitId, onDone, onBack }: {
             const his = await db.visits.where('patientId').equals(pt.id).toArray()
             setFixPrinted(printedCount(his))
             setFixOpen(true)
-          }}>correct these details</button>
+          }}>correct these details · تفصيل درست ڪريو</button>
         )
       )}
 
@@ -783,6 +783,7 @@ export default function Compose({ visitId, onDone, onBack }: {
             able to write it down. Capped at MAX_DX, and the cap says so
             rather than swallowing the fifth tap. */}
         <h2><IcBook size={17} /> {picked.length > 1 ? 'Diagnoses' : 'Diagnosis'}
+          <i className="sd">{picked.length > 1 ? 'تشخيصون' : 'تشخيص'}</i>
           {picked.length > 0 && <span className="hcount">{picked.length}</span>}</h2>
         <div className="chips">
           {myDx.map(d => (
@@ -809,7 +810,7 @@ export default function Compose({ visitId, onDone, onBack }: {
           </div>
         )}
         <div className="saveset dxadd">
-          <input value={dxTyped} maxLength={60} placeholder="something else he found"
+          <input value={dxTyped} maxLength={60} placeholder="something else he found — ڪا ٻي تشخيص"
                  onChange={e => { setDxTyped(e.target.value); setDxFull('') }}
                  onKeyDown={e => { if (e.key === 'Enter') addTypedDx() }} />
           <button className="btn ghost" disabled={!dxTyped.trim()} onClick={addTypedDx}>Add</button>
@@ -827,6 +828,7 @@ export default function Compose({ visitId, onDone, onBack }: {
             {picked.filter(d => !dxSd(d)).length === 1 ? 'prints' : 'print'} in English only.
             The Sindhi for {picked.filter(d => !dxSd(d)).length === 1 ? 'it' : 'those'} has
             not been reviewed yet.
+            <i className="sd"> صرف انگريزيءَ ۾ ڇپبي. ان جي سنڌي اڃا چڪاسيل ناهي.</i>
           </p>
         )}
 

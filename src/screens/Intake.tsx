@@ -558,7 +558,8 @@ export default function Intake({ visits, onOpen, onChange }: {
           the child with the elder's phone is a new patient. */}
       {fam.length > 0 && (
         <div className="famlist">
-          <b>This phone is already here — {fam.length === 1 ? 'is it the same person?' : 'which one is it?'}</b>
+          <b>This phone is already here — {fam.length === 1 ? 'is it the same person?' : 'which one is it?'}
+            <i className="sd cl-block">هي فون نمبر اڳ ئي موجود آهي — {fam.length === 1 ? 'ڇا هي اهو ساڳيو مريض آهي؟' : 'هي انهن مان ڪهڙو مريض آهي؟'}</i></b>
           <div className="chips">
             {fam.slice(0, 8).map(p => (
               <button key={p.id} className="chip fam" disabled={adding} onClick={() => openMember(p)}>
@@ -567,7 +568,9 @@ export default function Intake({ visits, onOpen, onChange }: {
             ))}
           </div>
           <span className="unit">Tap the person to give them a token on their old number. Somebody new in
-            the family: fill the name and add as new, same phone.</span>
+            the family: fill the name and add as new, same phone.
+            <i className="sd cl-block">پراڻي نمبر تي ٽوڪن ڏيڻ لاءِ مريض تي ڪلڪ ڪريو. گهر جو نئون ڀاتي هجي ته:
+              نالو لکي نئين مريض طور شامل ڪريو، فون ساڳيو رهندو.</i></span>
         </div>
       )}
       <div className="fld"><label>City or village — شهر</label>
@@ -791,7 +794,7 @@ export default function Intake({ visits, onOpen, onChange }: {
                 <FixPatient pt={fixing.pt} printed={fixing.printed} by={ROLE_NAME[role()]}
                             onSave={saveFix} onClose={() => setFixing(null)} />
               ) : (
-                <button className="lnk qclose" onClick={() => openFix(v)}>correct these details</button>
+                <button className="lnk qclose" onClick={() => openFix(v)}>correct these details · تفصيل درست ڪريو</button>
               )
             )}
 

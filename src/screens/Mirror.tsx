@@ -530,7 +530,8 @@ function MDesk({ s }: { s: WireState }) {
                onChange={e => setPhone(e.target.value.replace(/[^0-9+ ]/g, '').slice(0, 15))} /></div>
       {fam.length > 0 && (
         <div className="famlist">
-          <b>This phone is already here — {fam.length === 1 ? 'is it the same person?' : 'which one is it?'}</b>
+          <b>This phone is already here — {fam.length === 1 ? 'is it the same person?' : 'which one is it?'}
+            <i className="sd cl-block">هي فون نمبر اڳ ئي موجود آهي — {fam.length === 1 ? 'ڇا هي اهو ساڳيو مريض آهي؟' : 'هي انهن مان ڪهڙو مريض آهي؟'}</i></b>
           <div className="chips">
             {fam.map(p => (
               <button key={p.code} className="chip fam" disabled={busy} onClick={() => fire('openByCode', p.code)}>
@@ -1246,7 +1247,7 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
     const d = dxTyped.trim()
     if (!d) return
     const next = toggleDx({ diagnoses: dxs }, d)
-    if (!next) { setDxFull('Four is the most a slip carries. Take one off first.'); return }
+    if (!next) { setDxFull('Four is the most a slip carries. Take one off first. \u2014 پرچي تي وڌ ۾ وڌ 4 تشخيصون اچي سگهن ٿيون. پهرين هڪ هٽايو.'); return }
     setDxFull(''); setDxTyped(''); setDiag(next)
   }
   function toggleTest(key: string) {
@@ -1512,7 +1513,7 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
             {/* SEVERAL, the same as at the clinic machine. A phone has no
                 room for his whole chip list, so here it is what he types,
                 and each one becomes a chip he can take off again. */}
-            <h2><IcBook size={17} /> {dxs.length > 1 ? 'Diagnoses' : 'Diagnosis'}</h2>
+            <h2><IcBook size={17} /> {dxs.length > 1 ? 'Diagnoses' : 'Diagnosis'} <i className="sd">{dxs.length > 1 ? 'تشخيصون' : 'تشخيص'}</i></h2>
             {dxs.length > 0 && (
               <div className="chips" style={{ marginBottom: 8 }}>
                 {dxs.map(d => (
@@ -1523,7 +1524,7 @@ function MDr({ s, docId }: { s: WireState; docId: string | null }) {
               </div>
             )}
             <div className="saveset dxadd">
-              <input value={dxTyped} maxLength={60} placeholder="what he found"
+              <input value={dxTyped} maxLength={60} placeholder="what he found — ڪا ٻي تشخيص"
                      onChange={e => { setDxTyped(e.target.value); setDxFull('') }}
                      onKeyDown={e => { if (e.key === 'Enter') addDx() }} />
               <button className="btn ghost" disabled={!dxTyped.trim()} onClick={addDx}>Add</button>

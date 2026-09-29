@@ -162,7 +162,9 @@ export default function Merge({ onBack }: { onBack: () => void }) {
           </p>
 
           <button className="btn warn wide" disabled={busy} onClick={fold}>
-            {busy ? 'Merging…' : `Fold ${patientCode(gone.p.num)} into ${patientCode(keep.p.num)}`}
+            {busy ? 'Merging… · ملائجي رهيو آهي…'
+              : `Fold ${patientCode(gone.p.num)} into ${patientCode(keep.p.num)}`}
+            {!busy && <i className="sd cl-block">{patientCode(gone.p.num)} کي {patientCode(keep.p.num)} ۾ ملايو</i>}
           </button>
         </>
       )}

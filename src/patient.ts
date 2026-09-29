@@ -105,9 +105,10 @@ export function refusal(pt: Patient, raw: PatientPatch): string | null {
   const p = cleanPatch(raw)
   if (p.name !== undefined && !p.name) {
     return 'A patient needs a name. Type it back in, or press cancel to leave the record as it is.'
+      + ' \u2014 مريض جو نالو لکڻ لازمي آهي. نالو لکو، يا رڪارڊ ائين ئي رکڻ لاءِ منسوخ ڪريو.'
   }
   if (!Object.keys(changedFields(pt, raw)).length) {
-    return 'Nothing was changed.'
+    return 'Nothing was changed. \u2014 ڪابه تبديلي نه ڪئي وئي.'
   }
   return null
 }
@@ -164,6 +165,33 @@ export function describe(pt: Patient, raw: PatientPatch): string {
     .join(', ')
 }
 
+const LABEL_SD: Record<keyof PatientPatch, string> = {
+  name: 'نالو', age: 'عمر', sex: 'مرد يا عورت', phone: 'فون', city: 'شهر',
+}
+
+const shownSd = (k: keyof PatientPatch, v: string | undefined): string =>
+  !v ? 'ڪجهه نه' : k === 'sex' ? (v === 'M' ? 'مرد' : 'عورت') : v
+
+/**
+ * THE SAME READ-BACK IN SINDHI, AND IT IS A DIFFERENT SENTENCE SHAPE.
+ *
+ * The English reads as a verb phrase — "changing name X to Y" — and the direct
+ * Sindhi of that does not survive being repeated five times in one line.
+ * Gemini's shape (29 Sep 2026) is a noun phrase instead: a single "تبديلي:"
+ * followed by "field X مان Y" clauses, which reads correctly with one clause
+ * and with five, and needs no verb agreement as the list grows. The English
+ * keeps its own shape; these are two sentences saying one thing, not a
+ * translation of each other.
+ *
+ * Empty: the caller shows nothing rather than a bare "تبديلي:".
+ */
+export function describeSd(pt: Patient, raw: PatientPatch): string {
+  const ch = changedFields(pt, raw)
+  const parts = (Object.keys(ch) as (keyof PatientPatch)[])
+    .map(k => `${LABEL_SD[k]} ${shownSd(k, (pt[k] as string) ?? '')} مان ${shownSd(k, ch[k])}`)
+  return parts.length ? `تبديلي: ${parts.join('، ')}.` : ''
+}
+
 /** The same sentence for a correction already in the log, read the other way
  *  round: what it was, and therefore what somebody changed. */
 export function describeOld(c: Correction): string {
@@ -187,13 +215,18 @@ export function describeOld(c: Correction): string {
  */
 export function printedNote(n: number): string | null {
   if (!n) return null
-  return n === 1
+  const sd = n === 1
+    ? ' \u2014 هن مريض لاءِ هڪ پرچي اڳ ئي ڇپجي چڪي آهي. اها پرچي پراڻن تفصيلن سان ئي رهندي، '
+      + '۽ وري ڇاپڻ سان به اهي تبديل نه ٿيندا. صرف هي رڪارڊ ۽ ايندڙ پرچيون درست ٿينديون.'
+    : ` \u2014 هن مريض لاءِ ${n} پرچيون اڳ ئي ڇپجي چڪيون آهن. اهي پرچيون پراڻن تفصيلن سان ئي رهنديون، `
+      + '۽ وري ڇاپڻ سان به اهي تبديل نه ٿينديون. صرف هي رڪارڊ ۽ ايندڙ پرچيون درست ٿينديون.'
+  return (n === 1
     ? 'One prescription has already been printed for this patient. That slip keeps the '
       + 'details it was printed with, and printing it again will not change them. Only '
       + 'this record and future slips are corrected.'
     : `${n} prescriptions have already been printed for this patient. Those slips keep the `
       + 'details they were printed with, and printing them again will not change them. Only '
-      + 'this record and future slips are corrected.'
+      + 'this record and future slips are corrected.') + sd
 }
 
 /** How many of these visits have been printed. The caller counts, so this
