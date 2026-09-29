@@ -130,16 +130,26 @@ export default function About({ onBack }: { onBack: () => void }) {
         </div>
       </div>
 
+      {/* WHO MADE IT, ON THIS SCREEN AND NOWHERE ELSE.
+          The heading has said "Made by" since the first build and then never
+          named anybody, which is an odd thing for a screen whose whole job is
+          to answer that question. Larkode is named here, and deliberately not
+          on the slip: the prescription is the DOCTOR'S document, the only
+          mark on it is the small نسخو Nuskho at the foot, and that one can
+          already be switched off in Setup. A vendor's name on a paper a
+          patient carries out of a clinic is a different thing from branding a
+          product, and it is not a thing this app does. (Safeer, 29 Sep 2026.) */}
       <h2><IcInfo size={17} /> Made by</h2>
       <div className="sumbox">
+        <div><span>Made by</span><b>Larkode, in Larkana</b></div>
         <div><span>Built for</span><b>{dev.doctorEn || 'this clinic'}</b></div>
         <div><span>Installed on</span><b>{pretty(BUILT)}</b></div>
         <div><span>Runs</span><b>on this computer only, with or without internet</b></div>
       </div>
       <p className="hint">
-        Nuskho is made in Larkana. It is not a hospital system, an insurance product or a
-        data business: it prints one piece of paper as clearly as it can, and everything it
-        knows stays on the machine it is installed on.
+        Nuskho is made in Larkana by <b>Larkode</b>. It is not a hospital system, an
+        insurance product or a data business: it prints one piece of paper as clearly as
+        it can, and everything it knows stays on the machine it is installed on.
       </p>
       {/* THE SINDHI ON THE SLIP IS SOMEBODY ELSE'S WORK AND IT IS SAID SO.
           Noto Naskh Arabic is what draws every Sindhi letter this app prints,
