@@ -82,9 +82,40 @@ export const REVIEWED: Record<string, string> = {
   'Hypothyroidism': 'ٿائرائڊ جي گهٽتائي (هائپوٿائرائڊزم)',
 }
 
+/**
+ * THE SAME CONDITION UNDER THE CHIP'S OWN NAME.
+ *
+ * Two chips in the seeded lists say what a reviewed entry says, in different
+ * words: the chip is "Urine infection" where the review reads "Urinary tract
+ * infection", and "Worms" against "Worm infestation". Tapping those printed
+ * English while the approved Sindhi for exactly that condition sat unused,
+ * and nothing on the screen could tell you until the paper came out.
+ *
+ * This was NOT done when the gap was found. Deciding that a reviewed Sindhi
+ * belongs under a label the reviewer did not write is the reviewer's call,
+ * not the app's, so it was put to Safeer as two questions and left alone.
+ * He confirmed both on 29 Sep 2026: same condition, use the Sindhi.
+ *
+ * That is the whole licence for this map, and it is the licence any future
+ * entry needs too. An alias is a REVIEWED decision about two names for one
+ * thing, never a guess that two words look close enough.
+ */
+const ALIAS: Record<string, string> = {
+  'Urine infection': 'Urinary tract infection',   // Safeer, 29 Sep 2026
+  'Worms': 'Worm infestation',                    // Safeer, 29 Sep 2026
+}
+
 /** The reviewed Sindhi for a diagnosis, or '' — which means print English.
- *  Never falls back to the unreviewed word in specialty.ts. */
-export const dxSd = (en: string): string => REVIEWED[en.trim()] ?? ''
+ *  Follows an alias the reviewer confirmed, and never falls back to the
+ *  unreviewed word in specialty.ts. */
+export const dxSd = (en: string): string => {
+  const k = en.trim()
+  return REVIEWED[k] ?? REVIEWED[ALIAS[k] ?? ''] ?? ''
+}
+
+/** The reviewed entry an alias points at, for the tests and for anyone
+ *  auditing which labels lean on somebody else's review. */
+export const aliasOf = (en: string): string | undefined => ALIAS[en.trim()]
 
 /** Every diagnosis on this visit, new field first, old field as one item. */
 export function dxList(v: Pick<Visit, 'diagnoses' | 'diagnosis'>): string[] {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Visit } from './types'
-import { dxList, dxText, cleanDx, dxPatch, toggleDx, hasDx, dxSd, REVIEWED, MAX_DX } from './dx'
+import { dxList, dxText, cleanDx, dxPatch, toggleDx, hasDx, dxSd, aliasOf, REVIEWED, MAX_DX } from './dx'
 import { diagnosisSd, SPECIALTIES } from './data/specialty'
 import { renderSlip } from './print/renderSlip'
 import { layoutKey } from './print/paginate'
@@ -84,9 +84,31 @@ describe('THE SINDHI GATE: only what a person has read reaches paper', () => {
   it('never falls back to the unreviewed word, and never guesses', () => {
     const seeded = new Set<string>()
     for (const sp of SPECIALTIES) for (const [en] of sp.dx) seeded.add(en)
-    const unreviewed = [...seeded].filter(en => !(en in REVIEWED))
+    // an alias is a reviewed decision about two names for one condition, so
+    // it is allowed to print; everything else the file seeds must stay silent
+    const unreviewed = [...seeded].filter(en => !(en in REVIEWED) && !aliasOf(en))
     expect(unreviewed.length).toBeGreaterThan(50)        // most of them
     for (const en of unreviewed) expect(dxSd(en)).toBe('')
+  })
+
+  it('a confirmed alias prints the reviewed words, not the file\u2019s own', () => {
+    // Safeer confirmed on 29 Sep 2026 that these are the same conditions.
+    expect(dxSd('Urine infection')).toBe(REVIEWED['Urinary tract infection'])
+    expect(dxSd('Worms')).toBe(REVIEWED['Worm infestation'])
+    // and NOT the unreviewed word specialty.ts carries for them
+    expect(dxSd('Urine infection')).not.toBe(diagnosisSd('Urine infection'))
+    expect(dxSd('Worms')).not.toBe(diagnosisSd('Worms'))
+  })
+
+  it('every alias points at something actually reviewed', () => {
+    // an alias to a key nobody reviewed would print nothing while looking
+    // like it had been settled
+    const seeded = new Set<string>()
+    for (const sp of SPECIALTIES) for (const [en] of sp.dx) seeded.add(en)
+    for (const en of seeded) {
+      const to = aliasOf(en)
+      if (to) expect(REVIEWED[to], `alias ${en} -> ${to}`).toBeTruthy()
+    }
   })
 
   it('a diagnosis the doctor typed himself prints English alone', () => {
@@ -118,6 +140,12 @@ describe('what actually lands on the sheet', () => {
     const un = slip({ diagnoses: ['Scabies'] })
     expect(un).toContain('Scabies')
     expect(un).not.toContain(diagnosisSd('Scabies'))
+  })
+
+  it('an aliased chip prints its reviewed Sindhi on the paper', () => {
+    const html = slip({ diagnoses: ['Urine infection'] })
+    expect(html).toContain('Urine infection')                      // his own label
+    expect(html).toContain(REVIEWED['Urinary tract infection'])     // his reviewed words
   })
 
   it('a visit from before this existed still prints its diagnosis', () => {
