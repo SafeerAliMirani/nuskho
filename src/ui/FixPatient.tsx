@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Patient } from '../types'
 import { NEAR } from '../data/places'
 import { describe, describeSd, describeOld, refusal, printedNote, type PatientPatch } from '../patient'
@@ -61,7 +61,26 @@ export function FixPatient({ pt, printed, by, slim, onSave, onClose }: {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const patch: PatientPatch = slim ? { name, age, sex } : { name, age, sex, phone, city }
+  /**
+   * ONLY WHAT WAS ACTUALLY TYPED IN IS SENT.
+   *
+   * The boxes are filled from the record as it stood when this box opened, and
+   * every one of them used to be sent on Save. `correctPatient` re-reads the
+   * live row before it writes, so a field somebody else corrected in the
+   * meantime came back as a change this desk appeared to have made, and was
+   * written over with the value from a minute ago. The desk is told nothing,
+   * because from here it looks like a correction to the name alone.
+   *
+   * A field nobody touched is absent from the patch, and absent means "leave
+   * it alone" all the way down — see PatientPatch in patient.ts.
+   */
+  const touched = useRef<Set<keyof PatientPatch>>(new Set())
+  const mark = (k: keyof PatientPatch) => { touched.current.add(k) }
+
+  const typedIn: PatientPatch = slim ? { name, age, sex } : { name, age, sex, phone, city }
+  const patch: PatientPatch = {}
+  for (const k of Object.keys(typedIn) as (keyof PatientPatch)[])
+    if (touched.current.has(k)) (patch as Record<string, unknown>)[k] = typedIn[k]
   const said = describe(pt, patch)
   const saidSd = describeSd(pt, patch)
   const no = refusal(pt, patch)
@@ -99,24 +118,24 @@ export function FixPatient({ pt, printed, by, slim, onSave, onClose }: {
       </p>
 
       <div className="fld"><label>Name — نالو</label>
-        <input value={name} autoFocus onChange={e => { setName(e.target.value); setErr('') }} /></div>
+        <input value={name} autoFocus onChange={e => { mark('name'); setName(e.target.value); setErr('') }} /></div>
       <div className="row">
         {!slim && (
         <div className="fld"><label>Phone — optional</label>
           <input value={phone} inputMode="numeric"
-                 onChange={e => setPhone(e.target.value.replace(/[^0-9+ ]/g, '').slice(0, 15))} /></div>
+                 onChange={e => { mark('phone'); setPhone(e.target.value.replace(/[^0-9+ ]/g, '').slice(0, 15)) }} /></div>
         )}
         <div className="fld"><label>Age — optional</label>
           <input value={age} inputMode="numeric" maxLength={3}
                  onChange={e => {
                    const v = e.target.value.replace(/\D/g, '').slice(0, 3)
-                   if (v === '' || +v <= 120) setAge(v)
+                   if (v === '' || +v <= 120) { mark('age'); setAge(v) }
                  }} /></div>
         <div className="fld"><label>Man or woman</label>
           <div className="chips">
             {([['M', 'Man'], ['F', 'Woman']] as const).map(([k, l]) => (
               <button key={k} className={'chip' + (sex === k ? ' have' : '')}
-                      onClick={() => setSex(sex === k ? '' : k)}>{l}</button>
+                      onClick={() => { mark('sex'); setSex(sex === k ? '' : k) }}>{l}</button>
             ))}
           </div>
         </div>
@@ -126,10 +145,10 @@ export function FixPatient({ pt, printed, by, slim, onSave, onClose }: {
         <div className="chips">
           {NEAR.map(c => (
             <button key={c} className={'chip' + (city === c ? ' have' : '')}
-                    onClick={() => setCity(c)}>{c}</button>
+                    onClick={() => { mark('city'); setCity(c) }}>{c}</button>
           ))}
         </div>
-        <input value={city} onChange={e => setCity(e.target.value)} />
+        <input value={city} onChange={e => { mark('city'); setCity(e.target.value) }} />
       </div>
       )}
 

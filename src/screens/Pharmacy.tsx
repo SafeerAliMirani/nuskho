@@ -108,26 +108,54 @@ export default function Pharmacy({ visits, onChange }: {
     }
   }
 
+  /**
+   * TICKING OFF WRITES THE WHOLE LINE LIST BACK, SO IT HAS TO START FROM THE
+   * LIVE ONE.
+   *
+   * This counter holds a copy of the visit from whenever the screen last
+   * refreshed. The doctor can amend a prescription after it is printed — that
+   * is a feature, and the amendment is counted on the slip. Rebuilding the
+   * array from this screen's copy and putting it back therefore undoes any
+   * amendment made since, silently, at the moment a box is handed over.
+   *
+   * So the write re-reads inside a transaction and maps over the LIVE lines.
+   * If the prescription changed shape underneath, the tick is refused rather
+   * than applied to a line that is no longer the one that was tapped: the
+   * medicine at that position may now be a different medicine.
+   */
   async function setGiven(v: Visit, i: number, given: number | undefined) {
     await guard('That was not ticked off', async () => {
-      const lines = v.lines.map((l, k) => {
-        if (k !== i) return l
-        const { given: _g, ...rest } = l
-        return given === undefined ? rest : { ...rest, given }
-      })
-      const all = lines.every(lineDone)
-      await db.visits.update(v.id, {
-        lines,
-        dispensedAt: all ? (v.dispensedAt ?? Date.now()) : undefined,
+      await db.transaction('rw', db.visits, async () => {
+        const live = await db.visits.get(v.id)
+        if (!live) return
+        if (live.lines.length !== v.lines.length || live.lines[i]?.drugId !== v.lines[i]?.drugId)
+          throw new Error('This slip was changed by the doctor a moment ago. Open it again.')
+        const lines = live.lines.map((l, k) => {
+          if (k !== i) return l
+          const { given: _g, ...rest } = l
+          return given === undefined ? rest : { ...rest, given }
+        })
+        const all = lines.every(lineDone)
+        await db.visits.update(v.id, {
+          lines,
+          dispensedAt: all ? (live.dispensedAt ?? Date.now()) : undefined,
+        })
       })
       onChange()
     })
   }
 
+  /** The same, for the whole slip at once. Here a changed prescription is not
+   *  a refusal: handing everything over covers whatever is on the live slip,
+   *  including a line the doctor added since this screen last looked. */
   async function giveAll(v: Visit) {
     await guard('The slip was not marked handed over', async () => {
-      const lines = v.lines.map(l => lineDone(l) ? l : { ...l, given: course(l).n })
-      await db.visits.update(v.id, { lines, dispensedAt: Date.now() })
+      await db.transaction('rw', db.visits, async () => {
+        const live = await db.visits.get(v.id)
+        if (!live) return
+        const lines = live.lines.map(l => lineDone(l) ? l : { ...l, given: course(l).n })
+        await db.visits.update(v.id, { lines, dispensedAt: Date.now() })
+      })
       onChange()
     })
   }

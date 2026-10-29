@@ -95,7 +95,14 @@ export function CareLine({ alert, pregnant, sex, onAlert, onPregnant, disabled }
       <input className="cl-in" value={draft} maxLength={120} disabled={disabled}
              placeholder="allergies or conditions, in your own words (prints) — الرجي يا ٻي بيماري، پنهنجن لفظن ۾ (پرچي تي ڇپبي)"
              onChange={e => { typed.current = Date.now(); setDraft(e.target.value) }}
-             onBlur={() => { pending = null; void write.current() }} />
+             /* KEEP THE PROMISE. This used to read `pending = null; void
+                write.current()`, which threw away the one thing the print path
+                waits for. Tapping PRINT blurs this box first, so flushCare()
+                found nothing pending, resolved at once, and the slip could be
+                built while the allergy was still in flight — the same race the
+                header of this file was written about. Registering the running
+                promise means flushCare awaits THIS write. */
+             onBlur={() => { const p = write.current(); pending = () => p; void p }} />
       {mayBePregnant && (
         <button type="button" className={'chip cl-pg' + (pregnant ? ' on' : '')} disabled={disabled}
                 aria-pressed={!!pregnant}

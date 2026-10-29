@@ -23,8 +23,13 @@ export const cleanPhone = (v: unknown): string =>
  * that looks like a right one.
  */
 export const cleanAge = (v: unknown): string => {
-  const d = String(v ?? '').replace(/\D/g, '').slice(0, 3)
-  return d && +d <= 120 ? String(+d) : ''
+  const d = String(v ?? '').replace(/\D/g, '')
+  // The comment above is the rule; `.slice(0, 3)` used to break it. "1205"
+  // clipped to "120" is a wrong age that looks like a right one, and it passed
+  // the range check because 120 is a legal age. Too many digits is a typo, and
+  // a typo becomes nothing at all. (Found by the 29 Oct read of the code.)
+  if (!d || d.length > 3) return ''
+  return +d <= 120 ? String(+d) : ''
 }
 
 /** A city or village: trimmed, at most 40 characters. */

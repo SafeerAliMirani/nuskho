@@ -52,6 +52,23 @@ describe('one rule for a patient\'s fields at every door', () => {
     expect(cleanAge('045')).toBe('45')
     expect(cleanAge('7 years')).toBe('7')
   })
+
+  /**
+   * The test above passed for two months while the rule was broken, because
+   * every number in it happens to start with three digits over 120. The
+   * clipping it was written to catch survived underneath it: "1205" became
+   * "120", a legal age, and printed. These are the typos that actually get
+   * made at a counter — a finger that stays on a key, a year typed into the
+   * age box.
+   */
+  it('refuses a long number whose first three digits ARE a legal age', () => {
+    expect(cleanAge('1205')).toBe('')     // used to be '120'
+    expect(cleanAge('1150')).toBe('')     // used to be '115'
+    expect(cleanAge('1234')).toBe('')
+    expect(cleanAge('2026')).toBe('')     // a year typed into the age box
+    expect(cleanAge('07')).toBe('7')      // still fine: a real age, padded
+    expect(cleanAge('0')).toBe('0')       // a newborn is an age, not a blank
+  })
   it('keeps a phone to digits, plus and space', () => {
     expect(cleanPhone('0300-123 4567')).toBe('0300123 4567')
     expect(cleanPhone('+92 300 1234567 ext 9')).toBe('+92 300 1234567')

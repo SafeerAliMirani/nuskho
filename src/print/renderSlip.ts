@@ -82,6 +82,28 @@ const siteIcon = (r: Route): ((w: string, h: string) => string) | null =>
   r === 'eye' ? EYE : r === 'ear' ? EAR : r === 'nose' ? NOSE : null
 
 /** One dose cell: the pictogram, then the number under it. */
+/**
+ * THE NUMBER IN THE DOSE CELL, AND WHY IT IS NEVER ROUNDED.
+ *
+ * This read `Math.round(n)`, so a dose of 1.5 printed as 2. Nothing could
+ * produce a 1.5 — the dose control is a closed cycle, 0, 1, 2, ½ and back —
+ * so no slip has ever been wrong because of it. It is here because "one and a
+ * half tablets" is an ordinary prescription, and the day a 1½ step is added to
+ * that cycle the paper would quietly say 2 and nobody would be told.
+ *
+ * A dose is the doctor's decision about a particular patient. Rounding it is
+ * not a display choice, it is a different prescription. So the number prints
+ * exactly as it was set, and only the PICTURES are approximate: they are a
+ * count a non-reader can match against a strip, and half a tablet has no
+ * picture of its own above one.
+ */
+export const doseText = (n: number): string => {
+  if (n === 0.5) return '½'
+  if (Number.isInteger(n)) return String(n)
+  const whole = Math.floor(n)
+  return n - whole === 0.5 ? `${whole}½` : String(n)
+}
+
 function doseCell(m: RxSnap, n: number, sz: string): string {
   if (!n) return '<td class="tcell off">&mdash;</td>'
 
@@ -131,7 +153,7 @@ function doseCell(m: RxSnap, n: number, sz: string): string {
    * reason, so only the syrup repeats its picture.
    */
   if (m.form === 'syr' || m.form === 'drop' || m.form === 'inhaler') {
-    const many = n === 0.5 ? '½' : String(Math.round(n))
+    const many = doseText(n)
     const reps = m.form === 'syr' ? Math.min(Math.max(Math.round(n), 1), 3) : 1
     const pics = Array.from({ length: reps }, () => (ic ? ic(sz, sz) : '')).join('')
     const word = doseUnitSd(m)
@@ -144,7 +166,7 @@ function doseCell(m: RxSnap, n: number, sz: string): string {
   if (n === 0.5)
     return `<td class="tcell"><div class="dz">${HALF(sz, sz)}<div class="dose">½</div></div></td>`
   const pics = Array.from({ length: Math.min(Math.round(n), 3) }, () => (ic ? ic(sz, sz) : '')).join('')
-  return `<td class="tcell"><div class="dz">${pics}<div class="dose">${Math.round(n)}</div></div></td>`
+  return `<td class="tcell"><div class="dz">${pics}<div class="dose">${doseText(n)}</div></div></td>`
 }
 
 /**
