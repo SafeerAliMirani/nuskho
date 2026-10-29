@@ -320,10 +320,18 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
      held here by a DIFFERENT id is skipped, and reported. */
   const numHeld = new Map((await db.patients.toArray()).map(p => [p.num, p.id]))
   let clashes = 0
+  /* A PATIENT WHO IS NOT RESTORED HAS NO VISITS TO RESTORE.
+     The visit loop below wrote every visit in the file, including the visits
+     of a patient skipped for a number clash. They landed pointing at a
+     patientId that does not exist here: unreachable from any search or card
+     number, counted in the report as restored, and sitting in day and token
+     lists as prescriptions with nobody behind them. The report said
+     "visits restored: 3" and the desk had no way to know. */
+  const ownerless = new Set<string>()
   for (const p of f.patients ?? []) {
     if (await db.patients.get(p.id)) { rep.skipped++; continue }
     const holder = numHeld.get(p.num)
-    if (holder && holder !== p.id) { rep.skipped++; clashes++; continue }
+    if (holder && holder !== p.id) { rep.skipped++; clashes++; ownerless.add(p.id); continue }
     await db.patients.put(p)
     numHeld.set(p.num, p.id)
     rep.patients++
@@ -335,6 +343,7 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
   const top = Math.max(0, ...(f.patients ?? []).map(p => p.num || 0))
   if (top) bumpHighWaterPastRestore(top)
   for (const v of f.visits ?? []) {
+    if (ownerless.has(v.patientId)) { rep.skipped++; continue }
     if (await db.visits.get(v.id)) { rep.skipped++; continue }
     await db.visits.put(v)
     rep.visits++

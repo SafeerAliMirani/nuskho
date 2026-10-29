@@ -126,7 +126,20 @@ function BulkSindhi({ live, onDone }: { live: Drug[]; onDone: () => Promise<void
           {allOn ? 'untick all' : 'tick all ' + waiting.length}
         </button>
         <span style={{ flex: 1 }} />
-        <button className="btn" disabled={!chosen.length || busy} onClick={approve}>
+        {/* THE ONE PLACE THE SINDHI GATE IS ONLY AS GOOD AS A PERSON LOOKING.
+            Every row shows its Sindhi beside the English, which is the gate
+            working. But "tick all" plus this button is two taps, and after
+            them a hundred names nobody read are printing on prescriptions. So
+            the confirmation says the number out loud. It is not a lock, and it
+            is not meant to be: the person who means it says yes and gets on
+            with his evening. It is there so that approving unread Sindhi has
+            to be a decision rather than a reflex. */}
+        <button className="btn" disabled={!chosen.length || busy} onClick={() => {
+          if (chosen.length > 1 && !confirm(
+            `Approve the Sindhi on ${chosen.length} medicines?\n\n`
+            + 'Each one will print on prescriptions from now on. Only approve the names you have read.')) return
+          void approve()
+        }}>
           {busy ? 'Approving…' : 'Approve the ' + chosen.length + ' ticked'}
         </button>
       </div>

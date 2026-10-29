@@ -693,7 +693,7 @@ function renderSheet(d: SlipData, lines: RxLine[], compact: boolean,
      decides at the last moment, where both facts are in one place. */
   const pregnantNow = visit.pregnant === true && d.patientSex !== 'M'
   const care = (alertText || pregnantNow) ? `<div class="care">
-    ${pregnantNow ? '<b class="care-pg">PREGNANT</b>' : ''}
+    ${pregnantNow ? '<b class="care-pg">PREGNANT <span class="sd">(حمل)</span></b>' : ''}
     ${alertText ? `<span class="care-t">${esc(alertText)}</span>` : ''}
   </div>` : ''
 

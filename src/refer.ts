@@ -143,6 +143,15 @@ export async function sendOn(visitId: string, p: SendOn): Promise<SendResult> {
     })
   }
 
+  /* ONE REFERRAL AT A TIME.
+     Sending again without undoing the first overwrote sentOn and left the
+     first room's token standing in its queue, with its fee still due. That
+     doctor opens a referred patient and sees an empty card, because incoming()
+     matches on toVisitId and the record no longer points at him. The desk,
+     meanwhile, shows two room fees for one patient. Undo is one tap and it
+     cleans both up, so the honest answer is to ask for it. */
+  if (v.sentOn) return { ok: false, why: 'He is already sent on. Undo that first, then send him again.' }
+
   const sentOn: SentOn = {
     toDoctorId: to?.id, toPlace: to ? undefined : place,
     note, at: Date.now(), toVisitId,
@@ -171,6 +180,15 @@ export async function sendOn(visitId: string, p: SendOn): Promise<SendResult> {
 export async function unsend(visitId: string): Promise<SendResult> {
   const v = await db.visits.get(visitId)
   if (!v?.sentOn) return { ok: false, why: 'Nothing to undo.' }
+  /* WHAT IS ON THE PAPER CANNOT BE TAKEN BACK.
+     This checked the receiving room and nothing else, so a referral that had
+     already gone out on a printed slip could be undone while the patient was
+     walking down the corridor: his paper says Room 4, the token in Room 4 is
+     deleted, and the record no longer says what he was told. A printed slip is
+     the one thing in this app that never changes; undoing something it says is
+     the same fault as editing it. */
+  if (v.printedAt)
+    return { ok: false, why: 'That is already printed on his slip. Sending him somewhere else now would leave him holding paper for a room that is not expecting him.' }
   const other = v.sentOn.toVisitId ? await db.visits.get(v.sentOn.toVisitId) : undefined
   if (other && (other.lines.length > 0 || other.printedAt || other.status !== 'waiting'))
     return { ok: false, why: 'That room has already started. Ask them.' }

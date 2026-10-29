@@ -292,10 +292,17 @@ export function canBecome(from: VisitStatus, to: VisitStatus): boolean {
 /** End a visit without a prescription. The token stops waiting; nothing is
  *  deleted. A visit that already printed is refused: see canBecome. */
 export async function closeVisit(id: string, status: VisitStatus, note?: string): Promise<boolean> {
-  const v = await db.visits.get(id)
-  if (!v || !canBecome(v.status, status)) return false
-  await db.visits.update(id, { status, closedAt: Date.now(), closeNote: note?.trim() || undefined })
-  return true
+  /* READ AND WRITE TOGETHER, or 'done' is not final after all. The status was
+     read, judged by canBecome, and written in three separate steps. A print
+     landing in between stamped 'done' and was then overwritten: the patient
+     walks out holding a slip and the evening's count says he left without one.
+     canBecome is the rule; a transaction is what makes it true. */
+  return db.transaction('rw', db.visits, async () => {
+    const v = await db.visits.get(id)
+    if (!v || !canBecome(v.status, status)) return false
+    await db.visits.update(id, { status, closedAt: Date.now(), closeNote: note?.trim() || undefined })
+    return true
+  })
 }
 
 export async function setFee(id: string, fee: Fee | undefined) {
@@ -306,26 +313,44 @@ export async function setFee(id: string, fee: Fee | undefined) {
  *  ever taken: a collected fee produces a refund the counter owes back; a fee
  *  still due simply becomes a smaller debt. Computing a "refund" of money that
  *  was never collected made the drawer count itself short. */
-export async function grantDiscount(id: string, newAmount: number, note?: string) {
-  const v = await db.visits.get(id)
-  if (!v?.fee) return
-  const want = Math.max(0, newAmount)
-  if (v.fee.state === 'due') {
+export async function grantDiscount(id: string, newAmount: number, note?: string): Promise<boolean> {
+  /* THE DRAWER IS COUNTED AGAINST THIS, so it reads and writes in one
+     transaction. Outside one, a payment the counter recorded between the read
+     and the write was turned back into a debt: the money is in the drawer, the
+     visit says it is owed, and the day's figures are short by the whole fee.
+     The money being real is what makes this worth a transaction rather than a
+     cleverer merge.
+
+     AND ONCE MONEY HAS BEEN HANDED BACK, THIS STOPS. The paid branch
+     recomputed the refund from the original amount and cleared refundedAt, so
+     a second reduction made money already returned owed all over again: 300
+     reduced to 250 after 200 was handed back asked the counter for 250 more. A
+     visit records one refund and whether it was paid out, with nowhere to
+     record a partial one, so the honest answer is to refuse rather than invent
+     a number the drawer will be judged against. */
+  return db.transaction('rw', db.visits, async () => {
+    const v = await db.visits.get(id)
+    if (!v?.fee) return false
+    if (v.fee.refundedAt) return false
+    const want = Math.max(0, newAmount)
+    if (v.fee.state === 'due') {
     // nothing was collected, so nothing can be owed back: the debt shrinks
     await db.visits.update(id, {
       fee: { ...v.fee, amount: want, refund: undefined, refundedAt: undefined,
              refundNote: note?.trim() || undefined,
              state: want === 0 ? 'waived' : 'due' },
-    })
-    return
-  }
-  if (v.fee.amount === 0) return   // free from the start: nothing to reduce
-  const back = Math.max(0, v.fee.amount - want)
-  await db.visits.update(id, {
+      })
+      return true
+    }
+    if (v.fee.amount === 0) return false   // free from the start: nothing to reduce
+    const back = Math.max(0, v.fee.amount - want)
+    await db.visits.update(id, {
     // cancelling a full waive puts the state back to paid: the money was
     // collected and is being kept, so calling it waived was a lie in figures
-    fee: { ...v.fee, refund: back || undefined, refundNote: note?.trim() || undefined,
-           refundedAt: undefined, state: back === v.fee.amount ? 'waived' : 'paid' },
+      fee: { ...v.fee, refund: back || undefined, refundNote: note?.trim() || undefined,
+             refundedAt: undefined, state: back === v.fee.amount ? 'waived' : 'paid' },
+    })
+    return true
   })
 }
 

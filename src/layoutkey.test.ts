@@ -66,6 +66,23 @@ describe('the care band decides at the last moment, where both facts are togethe
     expect(renderSlip(data({ visit: preg }))).toContain('PREGNANT')          // sex not recorded
     expect(renderSlip(data({ visit: preg, patientSex: 'M' }))).not.toContain('PREGNANT')
   })
+  /**
+   * A1 of the Gemini audit, and the only string from it that reaches paper.
+   * Approved by Safeer on 29 October, so it prints bilingually: the English
+   * for the chemist and whoever reads it in the corridor, the Sindhi for the
+   * family holding the sheet. The English stays first and stays in the
+   * heaviest type on the page; the Sindhi is beside it, not instead of it.
+   */
+  it('prints PREGNANT with its approved Sindhi beside it', () => {
+    const out = renderSlip(data({ visit: visit({ pregnant: true }), patientSex: 'F' }))
+    expect(out).toContain('PREGNANT')
+    expect(out).toContain('حمل')
+    // and never the Sindhi alone, on the one band a man in a hurry reads first
+    expect(out).toMatch(/PREGNANT[^<]*<span class="sd">\(حمل\)<\/span>/)
+  })
+  it('keeps the Sindhi off a man\'s slip too, since the whole band is withheld', () => {
+    expect(renderSlip(data({ visit: visit({ pregnant: true }), patientSex: 'M' }))).not.toContain('حمل')
+  })
   it('still prints the allergy for a man', () => {
     const out = renderSlip(data({ visit: visit({ pregnant: true }), patientSex: 'M', patientAlert: 'penicillin' }))
     expect(out).toContain('penicillin')
