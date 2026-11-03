@@ -79,6 +79,12 @@ export default function Tour({ role, screen = 'queue', onClose }: {
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
+      /* NOT WHILE HE IS TYPING. These are window keys, so Arrow stepped the
+         tour and smooth-scrolled the page away from the box under the cursor,
+         and Escape — the key everyone presses to get out of a field — called
+         done(), which writes the tour off as seen for good. */
+      const t = e.target as HTMLElement | null
+      if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return
       if (e.key === 'Escape') done()
       if (e.key === 'ArrowRight') setI(n => Math.min(n + 1, steps.length - 1))
       if (e.key === 'ArrowLeft') setI(n => Math.max(n - 1, 0))

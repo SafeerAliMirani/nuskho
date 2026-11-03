@@ -62,7 +62,20 @@ function Clinic() {
   const [, bump] = useState(0)
   const [menu, setMenu] = useState(false)
 
-  const refresh = async () => setToday(await todaysVisits())
+  /* `today` starts empty and is empty again a moment later if the clinic is
+     empty, so the queue could not tell "nothing yet" from "not read yet" and
+     showed its empty illustration during every first load. On a laptop with a
+     few thousand patients that is half a second of a screen that looks like a
+     fault. One flag, set after the first read ever returns. */
+  const [queueRead, setQueueRead] = useState(false)
+  const refresh = async () => {
+    // finally, not after: a read that REJECTS (no disk room, another Nuskho
+    // window holding the records, a browser refusing IndexedDB — see fail.ts)
+    // would otherwise leave three grey rows shimmering for ever, asserting
+    // "loading" about something that will never load, in the spot where the
+    // error note would have been noticed.
+    try { setToday(await todaysVisits()) } finally { setQueueRead(true) }
+  }
   // announce this window so the bell can honestly say whether anyone hears it
   useEffect(() => startPresence(), [])
 
@@ -275,7 +288,7 @@ function Clinic() {
                 <div className="scrim" onClick={() => setMenu(false)} />
                 <div className="menu">
                   {can('figures') && (
-                    <button onClick={() => { setMenu(false); setMerge(false); setSetup(false); setVisitId(null); setStats(true) }}>
+                    <button onClick={() => { setMenu(false); setAbout(false); setPharm(false); setOps(false); setMerge(false); setSetup(false); setVisitId(null); setStats(true) }}>
                       <IcChart size={16} /> My figures <small>patients, fees, month card</small>
                     </button>
                   )}
@@ -284,12 +297,12 @@ function Clinic() {
                       true for him only when he is the owner (roles.ts), so this
                       never appears for an employed doctor. */}
                   {can('ops') && can('queue') && (
-                    <button onClick={() => { setMenu(false); setMerge(false); setSetup(false); setStats(false); setVisitId(null); setOps(true) }}>
+                    <button onClick={() => { setMenu(false); setAbout(false); setPharm(false); setMerge(false); setSetup(false); setStats(false); setVisitId(null); setOps(true) }}>
                       <IcChart size={16} /> The building <small>money by room, the day, the machines</small>
                     </button>
                   )}
                   {can('dispense') && can('queue') && (
-                    <button onClick={() => { setMenu(false); setMerge(false); setSetup(false); setStats(false); setVisitId(null); setPharm(true) }}>
+                    <button onClick={() => { setMenu(false); setAbout(false); setOps(false); setMerge(false); setSetup(false); setStats(false); setVisitId(null); setPharm(true) }}>
                       <IcQueue size={16} /> Pharmacy desk <small>printed slips, mark medicines given</small>
                     </button>
                   )}
@@ -297,13 +310,13 @@ function Clinic() {
                       admin: the people who close the day and read the
                       register, and nobody at the door in a hurry. */}
                   {mayMerge && (
-                    <button onClick={() => { setMenu(false); setSetup(false); setStats(false); setVisitId(null); setMerge(true) }}>
+                    <button onClick={() => { setMenu(false); setAbout(false); setPharm(false); setOps(false); setSetup(false); setStats(false); setVisitId(null); setMerge(true) }}>
                       <IcUser size={16} /> Same person twice <small>fold a duplicate record into the first</small>
                       <small className="sd">هڪ ئي مريض ٻه ڀيرا · نقل رڪارڊ پهرئين ۾ ملايو</small>
                     </button>
                   )}
                   {maySetup &&
-                  <button onClick={() => { setMenu(false); setMerge(false); setStats(false); setSetup(true) }}>
+                  <button onClick={() => { setMenu(false); setAbout(false); setPharm(false); setOps(false); setMerge(false); setStats(false); setSetup(true) }}>
                     <IcCog size={16} /> Setup <small>paper, medicines, PINs</small>
                   </button>}
                   {role() === 'admin' && (
@@ -312,7 +325,7 @@ function Clinic() {
                     }}><IcCog size={16} /> Run setup again <small>the whole first-run sequence</small></button>
                   )}
                   {role() === 'admin' && adminIsSet() ? (
-                    <button onClick={() => { setMenu(false); lockAdmin(); bump(n => n + 1) }}>
+                    <button onClick={() => { setMenu(false); setAbout(false); setPharm(false); setStats(false); setSetup(false); setMerge(false); setOps(false); lockAdmin(); bump(n => n + 1) }}>
                       <IcUser size={16} /> Sign out of admin <small>back to clinic access</small>
                     </button>
                   ) : role() !== 'admin' && (
@@ -329,7 +342,7 @@ function Clinic() {
                       manual. It sits one tap away, for ever, in the same
                       menu the role is chosen from. */}
                   {tourFor(role(), showing).length > 0 && (
-                    <button onClick={() => { setMenu(false); setTour(true) }}>
+                    <button onClick={() => { setMenu(false); setAbout(false); setPharm(false); setStats(false); setSetup(false); setMerge(false); setOps(false); setTour(true) }}>
                       <IcBook size={16} /> How this works <small>a short tour of your own screen</small>
                     </button>
                   )}
@@ -345,7 +358,7 @@ function Clinic() {
                       he leaves. */}
                   <ThemeRow />
 
-                  <button onClick={() => { setMenu(false); signOut(); setStats(false); setSetup(false); setVisitId(null); setLocked(true) }}>
+                  <button onClick={() => { setMenu(false); setAbout(false); setPharm(false); setMerge(false); setOps(false); signOut(); setStats(false); setSetup(false); setVisitId(null); setLocked(true) }}>
                     <IcLock size={16} /> Sign out <small>hand this computer to someone else</small>
                   </button>
                 </div>
@@ -393,7 +406,7 @@ function Clinic() {
         // The Nuskho role has no business on the day's list — it is names and
         // who came in. It lands in Setup, which is the only reason it exists.
         : can('queue')
-        ? <Intake visits={today} onOpen={setVisitId} onChange={refresh} />
+        ? <Intake visits={today} read={queueRead} onOpen={setVisitId} onChange={refresh} />
         : can('dispense')
         ? <PharmWrap visits={today} onChange={refresh} onBack={() => {}} showBack={false} />
         : can('ops')

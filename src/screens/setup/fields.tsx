@@ -41,7 +41,14 @@ export function IdentityFields({ v, on }: { v: Profile; on: (p: Partial<Profile>
                       // MERGE, never replace. He may already have curated a list,
                       // and changing the label on his signboard must not delete it.
                       const seed = seedDiagnoses(sp.id)
-                      const keep = (v.dx ?? []).filter(d => !seed.includes(d))
+                      // FROM THE LIVE PROFILE, not from `v`. `v` is the draft
+                      // this form took when Setup opened, and the Diagnoses tab
+                      // writes to disk directly. Merging into the mount-time
+                      // copy and committing it put back the list as it was an
+                      // hour ago, deleting everything he had added since —
+                      // the precise revert useDraftProfile was written to stop.
+                      const mine = profile().dx ?? v.dx ?? []
+                      const keep = mine.filter(d => !seed.includes(d))
                       on({ specialty: sp.id, dx: [...seed, ...keep] })
                     }}>
               {sp.name} <small className="sd">{sp.sd}</small>

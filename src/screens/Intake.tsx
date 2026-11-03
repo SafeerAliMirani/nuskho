@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readQrPayload } from '../print/qr'
-import { ArtWaiting, IcScan, IcUser, IcMoney, IcQueue } from '../ui/art'
+import { ArtWaiting, RowGhost, IcScan, IcUser, IcMoney, IcQueue } from '../ui/art'
 import { cleanName, cleanPhone, cleanAge, cleanCity } from '../fields'
 import { NEAR } from '../data/places'
 import { printedCount, type PatientPatch } from '../patient'
@@ -89,8 +89,12 @@ function scanned(v: string): string {
   return v.replace(/[^0-9]/g, '').slice(0, 5)
 }
 
-export default function Intake({ visits, onOpen, onChange }: {
+export default function Intake({ visits, read = true, onOpen, onChange }: {
   visits: Visit[]
+  /** false until the first read of the day's visits has come back. An empty
+   *  queue and an unread one look identical otherwise, and the difference is
+   *  the difference between "nobody is here" and "this screen is broken". */
+  read?: boolean
   onOpen: (id: string) => void
   onChange: () => void
 }) {
@@ -706,7 +710,8 @@ export default function Intake({ visits, onOpen, onChange }: {
           {takesFee && sum.unrecorded > 0 && <span className="soft">{sum.unrecorded} with no fee recorded</span>}
         </div>
       )}
-      {!visits.length && (
+      {!visits.length && !read && <RowGhost rows={3} />}
+      {!visits.length && read && (
         <div className="blank">
           <ArtWaiting />
           <b>Nobody waiting yet</b>

@@ -116,6 +116,16 @@ function clockNow(now: number): number {
     const last = Number(localStorage.getItem(SEEN) || 0)
     if (!last) { localStorage.setItem(SEEN, String(now)); return now }
     if (now - last > IMPLAUSIBLE) return last   // not believed, and not recorded
+    /* AND THE OTHER DIRECTION, WHICH WAS THE DANGEROUS ONE.
+       The guard above only disbelieved a clock that had jumped FORWARD. A
+       laptop whose battery dies and comes up reading 2038 wrote that moment
+       into SEEN; once the clock was corrected, `now - last` was negative, the
+       mark was believed, and Math.max kept the clinic permanently in the
+       future. Every licence deadline is then years past, the app stops, and
+       no unlock code can reach it: candidateDays only walks forward 760 days
+       from today. A mark that far ahead of a plausible now is a broken clock,
+       not a memory, and it is thrown away rather than kept for ever. */
+    if (last - now > IMPLAUSIBLE) { localStorage.setItem(SEEN, String(now)); return now }
     const at = Math.max(now, last)
     localStorage.setItem(SEEN, String(at))
     return at

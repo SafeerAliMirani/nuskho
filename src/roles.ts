@@ -406,6 +406,12 @@ export async function checkRolePin(r: Role, pin: string): Promise<boolean> {
     const raw = localStorage.getItem(pinKey(r))
     if (!raw) return true
     const { salt, h } = JSON.parse(raw)
+    /* PARSEABLE IS NOT THE SAME AS READABLE. '{}', '[]' and '5' all parse,
+       and then `digest(pin, undefined) === undefined` is simply false for
+       every PIN anybody types: the catch never fires, and the role is locked
+       out for good — the exact failure the sentence above this function says
+       must never happen. A lock that cannot be read is a lock that opens. */
+    if (typeof salt !== 'string' || typeof h !== 'string') return true
     return (await digest(pin, salt)) === h
   } catch { return true }
 }

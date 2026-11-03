@@ -2436,3 +2436,90 @@ h2 svg{width:26px;height:26px;padding:5px;border-radius:8px;background:var(--g-1
 .hbar .fill{background:var(--ch-a);border-radius:4px 4px 0 0}
 .hbar .lost{background:var(--ch-b);border-radius:0 0 2px 2px}
 .swatch{background:var(--ch-b)}
+
+/* =============================================================================
+   BATCH 40 — MORE MOTION, AND THE RULE IT KEEPS TO
+   =============================================================================
+   Everything here sits inside prefers-reduced-motion:no-preference, like the
+   block above it, so a machine that has asked for quiet gets a still app with
+   nothing missing. Three further rules, learned from the first motion pass:
+
+     NOTHING ON THE PRINT PATH MOVES. slip.css is not touched by any of this.
+     Paper does not animate, and the preview of paper should not either.
+
+     NOTHING WAITS ON AN ANIMATION. Every state below is readable at frame one;
+     the motion is what draws the eye to it, never what reveals it.
+
+     MOTION IS FOR SAFETY OR FOR FEEDBACK. A thing the doctor must not miss, or
+     a thing that has just happened and needs saying. Not for charm.
+   ========================================================================== */
+@media (prefers-reduced-motion:no-preference){
+
+  /* ---- the tick that draws itself, after something worked ---------------- */
+  @keyframes nk-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+  .tickdraw path{stroke-dasharray:1;stroke-dashoffset:0;animation:nk-draw 320ms var(--ease) both}
+
+  /* ---- THE CARE BAND, WHICH IS THE ONE THING HE MUST NOT MISS ------------
+     An allergy typed at the desk arrives on the doctor's screen in the middle
+     of a consultation, in a band that was already on screen and empty. Nothing
+     announced it. It glows once, strongly enough to catch the eye and briefly
+     enough that it is gone before it can annoy anybody. Safety, not charm. */
+  @keyframes nk-careglow{
+    0%{box-shadow:0 0 0 0 var(--w-solid)}
+    35%{box-shadow:0 0 0 7px color-mix(in srgb, var(--w-solid) 22%, transparent)}
+    100%{box-shadow:0 0 0 0 transparent}
+  }
+  .careline.on{animation:nk-careglow 1.1s var(--ease) 1}
+
+  /* ---- a row standing in for one that has not loaded --------------------
+     Only the shimmer is here. The SHAPE of these rows is plain layout and
+     lives outside every motion query, below: a browser that matches neither
+     preference would otherwise render three invisible divs, which is exactly
+     the blank screen they exist to prevent. */
+  @keyframes nk-shim{from{background-position:-180% 0}to{background-position:180% 0}}
+  .ghost{animation:nk-fade var(--mid) var(--ease) both}
+  .ghost span{background:linear-gradient(90deg,var(--line) 25%,var(--bg) 45%,var(--line) 65%);
+    background-size:220% 100%;animation:nk-shim 1.25s linear infinite}
+
+  /* ---- the printer, where the app is waiting on paper -------------------- */
+  @keyframes nk-apsheet{
+    0%{transform:translateY(10px);opacity:0}
+    25%{opacity:1}
+    75%{transform:translateY(-2px);opacity:1}
+    100%{transform:translateY(-10px);opacity:0}
+  }
+  @keyframes nk-apled{0%,100%{opacity:.25}50%{opacity:1}}
+    /* THREE PASSES, THEN STILL. The pharmacy counter is empty for most of an
+     evening and this drawing sits on it the whole time; an endless animation
+     there is a tired laptop repainting for nobody. Three sheets say "waiting
+     for paper", and then it is a picture of a printer, which is also true. */
+  .artprint.live .ap-sheet{animation:nk-apsheet 2.4s var(--ease) 3}
+  .artprint.live .ap-led{animation:nk-apled 1.6s var(--ease) infinite}
+
+  /* The figures numbers count up in CountUp.tsx, and that is ALL they do. A
+     nk-rise on .mh b was added here in the same batch; with `both` it holds
+     the element at opacity 0 through its delay, so the headline figure was
+     invisible for the first stretch of the very count meant to draw the eye
+     to it. Two animations on one element, fighting. */
+}
+
+/* The ghost rows' shape, outside every motion query, so they are there whatever
+   the device prefers — and in one place, so the next edit cannot desync two
+   copies. With motion off they simply do not shimmer. */
+/* read by a screen reader, drawn for nobody */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+
+/* a line the doctor can act on, above the button rather than in a dialog on it */
+.hint.warnhint{color:var(--w-solid);font-weight:600}
+
+.ghosts{display:grid;gap:var(--s2)}
+.ghost{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);
+  border:1px solid var(--line);border-radius:var(--r3);background:var(--card)}
+.ghost span{height:12px;border-radius:6px;background:var(--line)}
+.ghost .g-tok{width:34px;height:34px;border-radius:var(--r2);flex:none}
+.ghost .g-name{flex:1;max-width:260px}
+.ghost .g-tag{width:62px;margin-left:auto}
+
+/* and the glow uses the warning token, not a hand-copied hex that was a shade
+   out in light mode and stayed yellow in the dark theme */

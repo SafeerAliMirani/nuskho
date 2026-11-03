@@ -55,6 +55,14 @@ export function parseCode(code: string): number | null {
   const c = code.replace(/\D/g, '')
   if (c.length < 5) return null           // 4-digit body + check is the smallest
   const b = c.slice(0, -1)
+  /* AND A BODY MAY NOT HAVE A LEADING ZERO ONCE IT IS LONGER THAN FOUR.
+     Luhn cannot see a leading zero, so widening the code to any length let an
+     inserted digit pass as a longer, legitimate number: patient 452's printed
+     04523, typed with the 0 held down, is 045203 — body 04520, check 3, which
+     Luhn accepts, and the desk opens patient 4520 instead. The slip's own
+     number is always padded to exactly five, so a real six-digit code never
+     starts with a zero and nothing already in a drawer is refused by this. */
+  if (b.length > 4 && b[0] === '0') return null
   if (luhn(b) !== Number(c[c.length - 1])) return null
   return Number(b)
 }

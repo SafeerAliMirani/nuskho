@@ -90,6 +90,13 @@ export function CareLine({ alert, pregnant, sex, onAlert, onPregnant, disabled }
   const mayBePregnant = sex !== 'M'
 
   return (
+    /* THIS FOLLOWS THE COMMITTED VALUE, NOT THE DRAFT, AND THAT IS DELIBERATE.
+       It was briefly changed to follow the draft so the band would light up as
+       the doctor typed. That broke the one case the glow exists for: an allergy
+       typed at the DESK, arriving mid-consultation on a screen where the band
+       was already lit by his own half-typed word, changing no class and so
+       announcing nothing. It also pulsed under his own cursor on every first
+       keystroke, which is the charm this app does not do. */
     <div className={'careline' + (alert || pregnant ? ' on' : '')}>
       <span className="cl-i"><IcWarn size={16} /></span>
       <input className="cl-in" value={draft} maxLength={120} disabled={disabled}

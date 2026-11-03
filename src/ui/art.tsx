@@ -223,14 +223,20 @@ export const ArtEmpty = ({ className }: { className?: string }) => (
 
 /** For the test print step: a printer with a sheet coming out of it. */
 export const ArtPrinter = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 200 140" className={className} fill="none" aria-hidden>
+  /* The class hooks below are for app.css, which animates the emerging sheet
+     and the ready light where this is used as a waiting state (batch 40). It
+     is still the same drawing, and with motion turned off it is still correct:
+     a printer with a sheet in it. */
+  <svg viewBox="0 0 200 140" className={('artprint ' + (className ?? '')).trim()} fill="none" aria-hidden>
     <rect x="58" y="14" width="84" height="34" rx="4" stroke="currentColor" strokeOpacity=".3" strokeWidth="2.4" />
     <path d="M74 28h44M74 38h28" stroke="currentColor" strokeOpacity=".22" strokeWidth="3" strokeLinecap="round" />
     <rect x="40" y="48" width="120" height="42" rx="8" fill="currentColor" fillOpacity=".07"
           stroke="currentColor" strokeOpacity=".45" strokeWidth="2.6" />
-    <circle cx="142" cy="60" r="3.6" fill="currentColor" opacity=".55" />
-    <rect x="62" y="86" width="76" height="34" rx="4" fill="var(--card)" stroke="currentColor" strokeWidth="2.6" />
-    <path d="M76 98h48M76 108h32" stroke="currentColor" strokeOpacity=".35" strokeWidth="3" strokeLinecap="round" />
+    <circle cx="142" cy="60" r="3.6" fill="currentColor" opacity=".55" className="ap-led" />
+    <g className="ap-sheet">
+      <rect x="62" y="86" width="76" height="34" rx="4" fill="var(--card)" stroke="currentColor" strokeWidth="2.6" />
+      <path d="M76 98h48M76 108h32" stroke="currentColor" strokeOpacity=".35" strokeWidth="3" strokeLinecap="round" />
+    </g>
   </svg>
 )
 
@@ -566,3 +572,53 @@ export const Avatar = ({ name, size = 34, className }: { name: string; size?: nu
     </span>
   )
 }
+
+/* ============================================================================
+   BATCH 40: three pieces of drawing added for the pilot.
+
+   The rule they obey is the same one the rest of this file obeys. A picture
+   here is for somebody who cannot read the words beside it, or it is feedback
+   for somebody who has just done something and needs to know it worked. It is
+   never decoration for its own sake, and nothing in the app waits on it.
+   ========================================================================= */
+
+/**
+ * A tick that draws itself, for the moment after something worked.
+ *
+ * The print button has said "Printing…" with a sheet animating out of it since
+ * batch 21, and then it simply went back to saying PRINT. A doctor who looked
+ * away at the wrong moment had no way to tell a finished print from one that
+ * never started, and the honest answer — look at the printer — is not available
+ * when the printer is in the next room. This is the second and a half that says
+ * it went.
+ */
+export const Tick = ({ size = 20 }: { size?: number }) => (
+  <svg className="tickdraw" viewBox="0 0 24 24" width={size} height={size} fill="none"
+       stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+       aria-hidden="true">
+    <path d="M5 12.5 10 17.5 19 7" pathLength={1} />
+  </svg>
+)
+
+/**
+ * A SHAPE TO FILL A ROW THAT HAS NOT ARRIVED YET.
+ *
+ * The queue reads from the database on every change, and on a tired clinic
+ * laptop with two thousand patients that is not instant. A blank page for half
+ * a second looks broken; three grey rows look like a list about to appear,
+ * which is exactly what it is. Nothing here is interactive, and it never
+ * replaces a real row — it only stands in before the first one lands.
+ */
+export const RowGhost = ({ rows = 3 }: { rows?: number }) => (
+  <div className="ghosts" aria-busy="true">
+    {/* aria-hidden on the whole block left a screen reader with nothing at all
+        while the queue loaded: not these, and not the empty-state text either,
+        because that is held back until the read lands. */}
+    <span className="sr-only">Reading the day&rsquo;s patients</span>
+    {Array.from({ length: rows }, (_, i) => (
+      <div className="ghost" key={i} style={{ animationDelay: `${i * 90}ms` }} aria-hidden="true">
+        <span className="g-tok" /><span className="g-name" /><span className="g-tag" />
+      </div>
+    ))}
+  </div>
+)

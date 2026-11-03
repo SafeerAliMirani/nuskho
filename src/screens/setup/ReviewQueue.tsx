@@ -160,6 +160,8 @@ function BulkSindhi({ live, onDone }: { live: Drug[]; onDone: () => Promise<void
 export default function ReviewQueue() {
   const [all, setAll] = useState<Drug[]>([])
   const [edit, setEdit] = useState<Drug | null>(null)
+  // the spoon size WHILE IT IS BEING TYPED; see the note on the box itself
+  const [ml, setMl] = useState('')
   const [out, setOut] = useState('')
   /** Why the last Save did not happen. Nothing here is urgent, but a correction
    *  that was never written is one we will make again next visit. */
@@ -312,10 +314,21 @@ export default function ReviewQueue() {
           {/* Only a syrup, and only because the chemist picks a bottle by it. */}
           {edit.form === 'syr' && (
             <div className="fld"><label>One spoon is how many ml?</label>
-              <input inputMode="numeric" value={String(edit.mlPerDose ?? 5)}
-                     onChange={e => {
-                       const v = e.target.value.replace(/[^0-9.]/g, '').slice(0, 5)
-                       setEdit({ ...edit, mlPerDose: v === '' ? undefined : +v })
+              {/* A DECIMAL POINT HAS TO SURVIVE BEING TYPED.
+                  This was a controlled number: `+"2."` is 2, so the box
+                  redrew as "2", the dot vanished under the finger, and the
+                  next keystroke made 25. A 2.5 ml paediatric cap could not be
+                  typed at all, and 25 reaches paper — course.ts multiplies it
+                  into the bottle size on the slip, so 75 ml became 750. The
+                  field holds text while it is being typed and becomes a number
+                  when the finger leaves it. */}
+              <input inputMode="decimal" value={ml} placeholder="5"
+                     onChange={e => setMl(e.target.value.replace(/[^0-9.]/g, '').slice(0, 5))}
+                     onBlur={() => {
+                       const n = parseFloat(ml)
+                       const ok = Number.isFinite(n) && n > 0 ? n : undefined
+                       setEdit({ ...edit, mlPerDose: ok })
+                       setMl(ok === undefined ? '' : String(ok))
                      }} />
               <span className="unit">Almost always 5, the cap that comes with the
                 bottle. It never changes the dose printed on the slip. It only
@@ -331,7 +344,7 @@ export default function ReviewQueue() {
           </label>
           {err && <div className="saidno"><Note tone="stop" title="That did not go through">{err}</Note></div>}
           <div className="wiznav">
-            <button className="btn ghost" onClick={() => { setEdit(null); setErr('') }}>Cancel</button>
+            <button className="btn ghost" onClick={() => { setEdit(null); setMl(''); setErr('') }}>Cancel</button>
             <button className="btn wide" onClick={saveEdit}>Save</button>
           </div>
         </div>
@@ -347,7 +360,7 @@ export default function ReviewQueue() {
               <span>{d.generic || <i>no generic</i>}</span>
               <span className="sd">{d.sdReviewed === true ? d.sd : <i className="unv">{d.sd} — unchecked</i>}</span>
               {near.length > 0 && <span className="warnpill">like {near[0].brand} {near[0].strength}</span>}
-              <button className="lnk" onClick={() => { setEdit(d); setErr('') }}>edit</button>
+              <button className="lnk" onClick={() => { setEdit(d); setMl(d.mlPerDose ? String(d.mlPerDose) : ''); setErr('') }}>edit</button>
               <button className="lnk" onClick={() => promote(d)}>promote</button>
               <button className="lnk" onClick={() => archiveDrug(d.id).then(load)}>retire</button>
             </div>

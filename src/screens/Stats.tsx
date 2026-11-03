@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import CountUp from '../ui/CountUp'
 import { IcClock, IcCalendar, IcHeart, IcMoney, ArtNoFigures } from '../ui/art'
 import { chargesFee } from '../profile'
 import { Note } from '../ui/Note'
@@ -59,7 +60,7 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
           <div className="mheroes">
             <div className="mh">
               <small>People served <i className="sd">ماڻهو</i></small>
-              <b>{s.month.toLocaleString('en-GB')}</b>
+              <b><CountUp to={s.month} /></b>
               <span>in {s.monthLabel} · {s.today} today</span>
               {/* the shape of the month behind the number it belongs to: the
                   stat-tile-with-trend pattern, not a second chart */}
@@ -67,12 +68,12 @@ export default function StatsScreen({ onBack }: { onBack: () => void }) {
             </div>
             <div className="mh">
               <small>People who came back</small>
-              <b>{s.returningN.toLocaleString('en-GB')}</b>
+              <b><CountUp to={s.returningN} /></b>
               <span>{s.returningPct}% of the month · {s.loyalN} on a third visit or more</span>
             </div>
             <div className="mh alt">
               <small>Evenings worked</small>
-              <b>{s.evenings}</b>
+              <b><CountUp to={s.evenings} /></b>
               <span>{s.lifetime.toLocaleString('en-GB')} people in all{s.since
                 ? `, since ${new Date(s.since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}` : ''}</span>
             </div>

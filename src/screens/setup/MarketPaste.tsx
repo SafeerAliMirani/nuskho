@@ -95,7 +95,14 @@ export default function MarketPaste() {
       id: 'mkt_' + uid(),
       brand: r.brand, strength: r.strength, generic: r.generic,
       sd: r.sd || toSindhi(r.brand), sdReviewed: false,
-      form: r.form === 'other' ? 'tab' : r.form,
+      // 'other' is a real Form and it prints NOTHING for the unit and the
+      // meal scene (FORM_WORD.other and DOSE_WORD.other are deliberately
+      // blank in data/forms.ts) — which is the honest answer for a product
+      // the parser could not place. Coercing it to 'tab' threw that refusal
+      // away: the dose cell fell back to گوري and the slip drew a plate and a
+      // pill, so a cream the reviewer had been shown as "something else" went
+      // home called a tablet.
+      form: r.form,
       unitSd: doseSdFor(r.form), route: defaultRoute(r.form),
       verified: false, pending: true, addedAt: Date.now(),
     })))

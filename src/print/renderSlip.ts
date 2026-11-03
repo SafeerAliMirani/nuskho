@@ -539,7 +539,14 @@ export interface SlipData {
 /** groups[i] = how many medicines are on sheet i. Sheets are NOT equal:
  *  a continuation sheet carries one thin bar, the last sheet carries the
  *  legend, tests, advice and the handwriting area. */
-export type SheetPlan = { groups: number[]; compact: boolean }
+export type SheetPlan = {
+  groups: number[]
+  compact: boolean
+  /** The fitter could not make this fit, and printed it anyway. `.page` is
+   *  overflow:hidden, so whatever ran past the bottom is not on the paper.
+   *  Set by planSheets; the doctor's screen asks before printing it. */
+  cramped?: boolean
+}
 
 export const FALLBACK_PLAN = (n: number): SheetPlan => {
   if (n <= 5) return { groups: [Math.max(1, n)], compact: false }

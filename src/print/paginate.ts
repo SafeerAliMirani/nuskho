@@ -217,7 +217,16 @@ async function computePlan(d: SlipData): Promise<SheetPlan> {
       if (allFit(d, even, compact, n)) groups = even
     }
   }
-  return { groups, compact }
+  /* AND SAY SO WHEN IT STILL DOES NOT FIT.
+     `pack` falls back to `|| 1` when even one medicine will not go on a sheet,
+     which happens on a last sheet carrying a long tests list, a long advice
+     block, the legend and the handwriting strip. The slip was then printed
+     overfull, and since `.page` is overflow:hidden the bottom simply was not
+     on the paper: the tests the lab is meant to run, or the advice, gone, with
+     the screen and the preview both showing them.
+     The only notice was a console.warn, which nobody in a clinic will ever
+     see. A console warning is not a warning. */
+  return { groups, compact, cramped: !allFit(d, groups, compact, n) }
 }
 
 /** Spread n medicines over s sheets, heavier at the front — the last sheet also

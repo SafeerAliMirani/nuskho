@@ -23,7 +23,7 @@ import { whoFor, printedCount } from '../patient'
 import { dxList, dxPatch, toggleDx, hasDx, dxText, dxSd } from '../dx'
 import { FixPatient } from '../ui/FixPatient'
 import { role, can, ROLE_NAME } from '../roles'
-import { warmPlan } from '../print/paginate'
+import { warmPlan, planSheets } from '../print/paginate'
 import { notePrinted, printerLikelyCold } from '../safety'
 import { whyItFailed } from '../fail'
 import { sameMolecule } from '../data/who'
@@ -212,6 +212,26 @@ export default function Compose({ visitId, onDone, onBack }: {
     const t = setInterval(again, 6000)
     return () => { window.removeEventListener('nuskho:refresh', again); clearInterval(t) }
   }, [visitId])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* THE SLIP THAT WILL NOT FIT ON THE PAPER.
+     The fitter does its best and then prints what it has, and `.page` is
+     overflow:hidden, so the bottom of the last sheet is simply not on the
+     sheet that comes out — the tests and the advice live down there.
+     This was first written as a confirm() on the print tap. Twice wrong: a
+     suppressed or silently dismissed dialog returns false, so PRINT would do
+     NOTHING AT ALL with no error and no paper (see Pharmacy.tsx on why this
+     app does not use prompt()); and it told the doctor at the one moment he
+     cannot act on it. It is a line above the button now, beside the cold
+     printer hint, which he can read and then shorten the advice. */
+  const [tooLong, setTooLong] = useState(false)
+  useEffect(() => {
+    let live = true
+    if (!visit?.lines.length) { setTooLong(false); return }
+    planSheets(slipData()).then(pl => { if (live) setTooLong(!!pl.cramped) })
+      .catch(() => { if (live) setTooLong(false) })
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visit, pt])
 
   if (!visit || !pt) return <div className="pane">…</div>
   const locked = !!visit.printedAt
@@ -1178,10 +1198,22 @@ export default function Compose({ visitId, onDone, onBack }: {
               seconds to wake it. Press once.
             </p>
           )}
+          {tooLong && (
+            <p className="hint warnhint">
+              This prescription is longer than the paper. The bottom of the last sheet
+              will not print — usually the tests and the advice. Shorten them, or take a
+              medicine off, and it fits.
+            </p>
+          )}
           <button className={`btn wide ${badIdx >= 0 || namelessIdx >= 0 ? 'warn' : ''}`} onClick={print}
                   disabled={busy || visit.lines.length === 0}>
             {!busy && badIdx < 0 && namelessIdx < 0 && <IcPrint size={20} />}
             {busy && <span className="sheetout" aria-hidden><i /></span>}
+            {/* The "it went" tick is NOT here. It was, for an hour, and it could
+                never be seen: this screen closes about sixteen milliseconds
+                after the print, so the state existed for one frame and then
+                unmounted. The feedback lives on the toast instead, which is
+                raised in the same breath and outlives this screen. */}
             {busy ? 'Printing…'
               : namelessIdx >= 0 ? `Line ${namelessIdx + 1} has no medicine name. Remove it and add it again`
               : badIdx >= 0 ? `${drugs[visit.lines[badIdx].drugId]?.brand} has no dose. Tap to fix`

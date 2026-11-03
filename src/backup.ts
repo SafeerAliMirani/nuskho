@@ -305,6 +305,14 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
   const have = new Set((await db.drugs.toArray())
     .map(d => `${d.brand} ${d.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '')))
   for (const d of f.drugs ?? []) {
+    /* HIS OWN ROW WINS, AND IT IS CHECKED BY ID FIRST.
+       The name key alone could not see it: a file holding X as "AUGMENTIN
+       375" restored onto a machine where X has since been corrected to 625
+       missed the key — the local row is filed under the corrected name — and
+       `put` rewrote his correction back to 375, silently, on a medicine that
+       then prints. "Adds, never replaces" is the rule at the top of this
+       function; this is what makes it true. */
+    if (await db.drugs.get(d.id)) { rep.skipped++; continue }
     const k = `${d.brand} ${d.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '')
     if (have.has(k)) { rep.skipped++; continue }
     have.add(k)
@@ -319,6 +327,17 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
      and the number is what a returning patient hands over. A number already
      held here by a DIFFERENT id is skipped, and reported. */
   const numHeld = new Map((await db.patients.toArray()).map(p => [p.num, p.id]))
+  /* THE COUNTER IS JUMPED FIRST, BEFORE A SINGLE ROW GOES IN.
+     It used to be bumped after the loop. The loop awaits once per patient, so
+     on a year of records it runs for seconds — and a walk-in registered at the
+     desk during those seconds took the next number from a counter that had not
+     moved yet, while the file was still to insert that same number. Two people
+     then hold one card, and `findByCode` returns whichever Dexie reaches
+     first: one patient's history, allergies and all, opened under another
+     person's number. A gap in the numbering costs nothing; this costs the
+     worst thing in the app. */
+  const top = Math.max(0, ...(f.patients ?? []).map(p => p.num || 0))
+  if (top) bumpHighWaterPastRestore(top)
   let clashes = 0
   /* A PATIENT WHO IS NOT RESTORED HAS NO VISITS TO RESTORE.
      The visit loop below wrote every visit in the file, including the visits
@@ -330,18 +349,16 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
   const ownerless = new Set<string>()
   for (const p of f.patients ?? []) {
     if (await db.patients.get(p.id)) { rep.skipped++; continue }
+    // the snapshot was taken before the first await, so it is already old;
+    // the live table is what decides whether this number is spoken for
     const holder = numHeld.get(p.num)
+      ?? (await db.patients.where('num').equals(p.num).first())?.id
     if (holder && holder !== p.id) { rep.skipped++; clashes++; ownerless.add(p.id); continue }
     await db.patients.put(p)
     numHeld.set(p.num, p.id)
     rep.patients++
   }
   rep.numberClashes = clashes
-  // Numbers issued since this file was made may already be on paper in someone's
-  // hand. Jump the counter clear of everything restored rather than risk a
-  // collision; a gap in the numbering costs nothing.
-  const top = Math.max(0, ...(f.patients ?? []).map(p => p.num || 0))
-  if (top) bumpHighWaterPastRestore(top)
   for (const v of f.visits ?? []) {
     if (ownerless.has(v.patientId)) { rep.skipped++; continue }
     if (await db.visits.get(v.id)) { rep.skipped++; continue }

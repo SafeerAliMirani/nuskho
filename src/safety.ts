@@ -134,7 +134,14 @@ const DAY = 86400000
  */
 export async function snapshotDaily(): Promise<boolean> {
   try {
-    const last = +(localStorage.getItem(SNAP_KEY) ?? 0)
+    let last = +(localStorage.getItem(SNAP_KEY) ?? 0)
+    /* A MARK IN THE FUTURE STOPS THIS FOR EVER, QUIETLY. The difference is
+       negative every day after a clock has been wrong once, so the snapshot
+       never runs again — and because nothing throws, no failure is recorded
+       and About goes on reporting "Snapshot ok" over a backup that stopped
+       months ago. The same fault as the licence clock, in the one place the
+       clinic has no other copy of its records. */
+    if (last > Date.now()) { localStorage.setItem(SNAP_KEY, '0'); last = 0 }
     if (Date.now() - last < DAY) return false
     const blob = JSON.stringify(await makeBackup('full'))
     await db.table('snapshots').put({ at: Date.now(), blob })

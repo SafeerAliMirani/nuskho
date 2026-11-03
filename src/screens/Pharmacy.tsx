@@ -192,7 +192,10 @@ export default function Pharmacy({ visits, onChange }: {
           empty state has, and it says which of the three silences this is. */}
       {shown.length === 0 && (
         <div className="blank">
-          {printed.length === 0 && !needle ? <ArtPrinter /> : <ArtSlip />}
+          {/* `live` runs the sheet and the ready light: the counter is waiting on a
+              machine, not on a person, and a still drawing of a printer on an
+              empty screen reads as a screen that failed to load. */}
+          {printed.length === 0 && !needle ? <ArtPrinter className="live" /> : <ArtSlip />}
           <b>
             {!wholeDay && !needle ? 'Waiting for a slip'
               : printed.length === 0 ? 'Nothing printed yet'
