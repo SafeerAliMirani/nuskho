@@ -229,3 +229,23 @@ group('the Sindhi read-back is a noun phrase, not a translated verb phrase', () 
     expect(describeSd(pt({ age: '34' }), { age: '34' })).toBe('')
   })
 })
+
+/**
+ * THE FREEZE COVERS THE SEX AS WELL.
+ *
+ * The printed-visit test above checks the name, the age, the allergy and the
+ * number, and never the sex — so `patientSex: pt.sex`, read live, passed. The
+ * sex is what raises the PREGNANT band (see layoutkey.test.ts), so an unfrozen
+ * one means a reprint can gain or lose that band relative to the paper already
+ * in the patient's hand. (Found 10 Nov.)
+ */
+group('a printed slip keeps the sex it was printed with', () => {
+  it('does not follow a correction made afterwards', () => {
+    const before = { id: 'p1', num: 18, name: 'Wazir', age: '34', sex: 'M' as const, createdAt: 1 }
+    const frozen = whoFor(before)
+    expect(frozen.sex).toBe('M')
+    const after = correct(before, { sex: 'F' }, 'Counter')!.next
+    expect(after.sex).toBe('F')          // the record moves on
+    expect(frozen.sex).toBe('M')         // the paper does not
+  })
+})

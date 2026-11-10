@@ -1,16 +1,24 @@
 import { describe, it, expect } from 'vitest'
 import { renderSlip, type SlipData } from './print/renderSlip'
+import { layoutKey } from './print/paginate'
 import type { Visit, RxLine } from './types'
 
 /**
  * THE FITTER'S CACHE KEY MUST NOTICE EVERY FIELD THE PRINTER DRAWS.
  *
- * layoutKey is not exported (it is an implementation detail of the fitter and
- * nothing else may call it), so this pins the property that matters instead:
- * a field that changes the rendered sheet must also change the key. The test
- * renders two slips that differ only in that field, and asserts the OUTPUT
- * differs — which is the same thing the key exists to detect. If somebody adds
- * a printed field and forgets the key, they will still have to come here.
+ * AND THIS FILE SPENT MONTHS NOT CHECKING THAT. Its header used to say
+ * layoutKey was unexported and that comparing rendered output was "the same
+ * thing the key exists to detect". Both were wrong. layoutKey IS exported —
+ * dx.test.ts already imported it — and renderSlip does not import the fitter
+ * at all, so nothing here could observe the key. `layoutKey` could have been
+ * `return JSON.stringify([])` and every test below would still have passed,
+ * while the cache handed a stale sheet plan to a slip that had grown a line:
+ * `.page` is overflow:hidden, so the bottom of it simply would not be on the
+ * paper. The file named after the key never called it. (Found 10 Nov.)
+ *
+ * `differs` now requires BOTH: the field must change the rendered sheet AND
+ * the key. A printed field left out of the key fails here, which is what the
+ * header always claimed.
  */
 const line = (p: Partial<RxLine> = {}): RxLine => ({
   drugId: 'd1', dose: { m: 1, d: 0, n: 0 }, meal: 'after', days: 5,
@@ -26,7 +34,8 @@ const data = (p: Partial<SlipData> = {}): SlipData => ({
   drugs: {}, rxId: 'ABC123', ...p,
 })
 
-const differs = (a: SlipData, b: SlipData) => renderSlip(a) !== renderSlip(b)
+const differs = (a: SlipData, b: SlipData) =>
+  renderSlip(a) !== renderSlip(b) && layoutKey(a) !== layoutKey(b)
 
 describe('every field the slip draws changes the slip', () => {
   it('the doctor\'s note under a medicine', () => {

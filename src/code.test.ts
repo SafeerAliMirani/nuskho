@@ -62,3 +62,49 @@ describe('the printed patient code', () => {
     }
   })
 })
+
+/**
+ * THE CHECK DIGIT HAS TO BE THE THING THAT REFUSES.
+ *
+ * Everything above passed with `luhn()` replaced by `return 0`. The tests
+ * asserted that a mistyped code does not open patient 1234 — which is true for
+ * free, since a changed body is a different number — and never that it opens
+ * NOBODY. And no test pinned a literal code, so a change to the check digit
+ * would quietly invalidate every slip already in a drawer while the suite
+ * stayed green: the desk types the number off the card, finds no one, and
+ * registers the patient again as new. (Found 10 Nov.)
+ */
+describe('the code printed on a slip, pinned to literals', () => {
+  it('is exactly what it has always been', () => {
+    // literal on both sides: nothing here may be computed by the code under test
+    expect(patientCode(42)).toBe('00422')
+    expect(patientCode(452)).toBe('04523')
+    expect(patientCode(1234)).toBe('12344')
+  })
+
+  it('reads those same codes back', () => {
+    expect(parseCode('00422')).toBe(42)
+    expect(parseCode('04523')).toBe(452)
+    expect(parseCode('12344')).toBe(1234)
+  })
+
+  it('REFUSES a mistyped digit rather than opening anybody', () => {
+    const good = patientCode(1234)
+    for (let i = 0; i < good.length; i++) {
+      for (let d = 0; d <= 9; d++) {
+        const typo = good.slice(0, i) + d + good.slice(i + 1)
+        if (typo === good) continue
+        expect(parseCode(typo), typo).toBeNull()
+      }
+    }
+  })
+
+  it('refuses an inserted digit that would otherwise be a longer patient', () => {
+    // the finger that stayed on the 0 key: 04523 becomes 045203, whose body
+    // 04520 passes Luhn and used to open patient 4520
+    expect(parseCode('045203')).toBeNull()
+    expect(parseCode('0' + patientCode(10000))).toBeNull()
+    // and a genuine five-digit patient is still read
+    expect(parseCode(patientCode(10000))).toBe(10000)
+  })
+})

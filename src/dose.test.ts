@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { doseText } from './print/renderSlip'
+import { doseText , renderSlip } from './print/renderSlip'
 
 /**
  * A DOSE IS NEVER ROUNDED ON PAPER.
@@ -36,5 +36,40 @@ describe('the number in the dose cell', () => {
       expect(printed).not.toBe(String(Math.round(n)) === printed && !Number.isInteger(n) ? printed : '\u0000')
       if (!Number.isInteger(n)) expect(printed).not.toBe(String(Math.round(n)))
     }
+  })
+})
+
+/**
+ * AND THE CELL, NOT ONLY THE HELPER.
+ *
+ * The tests above pin doseText, which is right but not enough: the slip could
+ * stop calling it. Putting `Math.round(n)` back into the dose cell in
+ * renderSlip leaves every assertion above green and prints 2 where the doctor
+ * set one and a half. The invariant is about paper, so one test has to look at
+ * paper. (Found 10 Nov, by asking what mutation each test survives.)
+ */
+describe('what the dose cell actually prints', () => {
+  const snap = { brand: 'PANADOL', strength: '500 mg', generic: 'Paracetamol',
+                 sd: '', sdReviewed: false, unitSd: '', form: 'tab' as const }
+  const slip = (n: number): string => renderSlip({
+    visit: { id: 'v1', patientId: 'p1', token: 1, status: 'waiting', createdAt: Date.now(),
+             lines: [{ drugId: 'd1', dose: { m: n, d: 0, n: 0 }, meal: 'after', days: 5, snap }],
+             tests: [], advice: [] },
+    patientName: 'Wazir Ali', patientCode: '00185', drugs: {}, rxId: 'ABC123',
+  })
+
+  it('prints a half dose as the glyph', () => {
+    expect(slip(0.5)).toContain('½')
+  })
+
+  it('never rounds one and a half up to two on the paper', () => {
+    const out = slip(1.5)
+    expect(out).toContain('1½')
+    // the number as printed, not merely somewhere on the sheet
+    expect(out).not.toMatch(/<div class="dose">\s*2\s*<\/div>/)
+  })
+
+  it('still prints a whole dose plainly', () => {
+    expect(slip(2)).toMatch(/<div class="dose">\s*2\s*<\/div>/)
   })
 })
