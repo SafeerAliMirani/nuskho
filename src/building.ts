@@ -6,7 +6,7 @@ import {
 } from './db'
 import { formulary } from './data/formulary'
 import { dictionary } from './data/dictionary'
-import { linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp, vitalsBlocker } from './rx'
+import { linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp, vitalsBlocker , docFor} from './rx'
 import { whoFor, correct, refusal, cleanPatch, printedCount, type PatientPatch } from './patient'
 import { dxList, dxText, dxPatch } from './dx'
 import { checkRolePin, can, ROLE_NAME, type Role } from './roles'
@@ -1128,7 +1128,7 @@ async function applyIntent(
     const lines = freezeLines(v.lines, dmap)
     // the patient is frozen with them: the desk may correct a spelling
     // tomorrow, and the paper this phone is about to print may not change
-    const stamp = printedStamp(lines, whoFor(pt))
+    const stamp = printedStamp(lines, whoFor(pt), docFor(v))
     await db.visits.update(vid, stamp)
     signal({ kind: 'printed', token: v.token })
     return { ok: true, slip: slipDataFor({ ...v, ...stamp }, pt, dmap) }

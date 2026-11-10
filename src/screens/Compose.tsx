@@ -27,7 +27,7 @@ import { warmPlan, planSheets } from '../print/paginate'
 import { notePrinted, printerLikelyCold } from '../safety'
 import { whyItFailed } from '../fail'
 import { sameMolecule } from '../data/who'
-import { lineIsEmpty, linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp, vitalsBlocker, snapFor } from '../rx'
+import { lineIsEmpty, linesReady, freezeLines, slipDataFor, drugFromShelf, slipDoctorMissing, printedStamp, vitalsBlocker, snapFor , docFor} from '../rx'
 import { courseCheck } from '../course'
 import { isChild } from '../data/vitals'
 import type { Visit, Patient, RxLine, Drug, RxSet } from '../types'
@@ -590,7 +590,7 @@ export default function Compose({ visitId, onDone, onBack }: {
       // can drag a stale copy of them over what the desk did meanwhile
       // and WHO it was printed for, frozen in the same breath as the medicines:
       // the desk may correct a spelling tomorrow, and this paper may not change
-      const stamp = printedStamp(undefined, now ? whoFor(now) : undefined)
+      const stamp = printedStamp(undefined, now ? whoFor(now) : undefined, docFor(cur.current!))
       await db.visits.update(visitId, stamp)
       cur.current = { ...cur.current!, ...stamp }
       setVisit(cur.current)

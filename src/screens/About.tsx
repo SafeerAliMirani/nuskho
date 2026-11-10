@@ -100,7 +100,13 @@ export default function About({ onBack }: { onBack: () => void }) {
       'WHAT WENT WRONG',
       what.trim() || '(not described)',
       '',
-      'No patient name, number, medicine, diagnosis or fee is in this report.',
+      // It can only speak for what IT collected. The box above is free text,
+      // and a desk that types "Rukhsana Bibi 1042, slip came out in English"
+      // was being told by the next line that there was no patient name in the
+      // report it is about to paste into WhatsApp.
+      'Nothing above was taken from the clinic\'s records: no patient, medicine,',
+      'diagnosis or fee is read into this report.',
+      'Check WHAT WENT WRONG for any name or number you typed before you send it.',
     ]
     setReport(lines.join('\n'))
     setCopied(false)

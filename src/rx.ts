@@ -21,7 +21,7 @@
  * Nothing in this file touches the database. Everything is handed in, so it
  * can serve the solo screen, the wire path, and a unit test identically.
  */
-import type { Visit, Patient, Drug, RxLine, RxSnap, WhoSnap } from './types'
+import type { Visit, Patient, Drug, RxLine, RxSnap, WhoSnap, DocSnap } from './types'
 import type { SlipData } from './print/renderSlip'
 import type { DictEntry } from './data/dictionary'
 import { doseSdFor, defaultRoute } from './data/forms'
@@ -137,6 +137,19 @@ export function vitalsBlocker(v: Visit): string | null {
  * fill. Both prescribing paths ask this before they freeze anything. A visit
  * in a building names its room's doctor; a solo visit names the profile.
  */
+/**
+ * The heading as a sheet will carry it, built in one place so the desk and the
+ * phone cannot freeze it differently. Undefined for a solo clinic, where the
+ * profile is the heading and is not per-visit.
+ */
+export function docFor(v: Visit): DocSnap | undefined {
+  const room = doctorById(v.doctorId)
+  return room ? {
+    nameEn: room.nameEn, nameSd: room.nameSd,
+    degreesEn: room.degreesEn ?? '', degreesSd: room.degreesSd ?? '', reg: room.reg ?? '',
+  } : undefined
+}
+
 export function slipDoctorMissing(v: Visit): string | null {
   const room = doctorById(v.doctorId)
   if (room) return room.nameEn.trim() ? null : 'This room’s doctor has no name yet. Set it in Setup, Staff.'
@@ -150,8 +163,12 @@ export function slipDoctorMissing(v: Visit): string | null {
  * ended in a prescription, not in a cancellation, and the day's figures must
  * not carry both.
  */
-export const printedStamp = (lines?: RxLine[], who?: WhoSnap) => ({
+export const printedStamp = (lines?: RxLine[], who?: WhoSnap, doc?: DocSnap) => ({
   ...(lines ? { lines } : {}),
+  // AND WHOSE NAME HEADED IT. Same reason, same breath: the heading used to be
+  // read live from the doctors table on every assembly, so renaming a room's
+  // doctor rewrote the attribution on slips printed weeks before.
+  ...(doc ? { doc } : {}),
   // WHO IT WAS PRINTED FOR, frozen in the same write as the medicines.
   // Identity became correctable (patient.ts), and the moment it did, a slip
   // that reads its name from the live record stopped being a record of what
@@ -171,7 +188,8 @@ export const printedStamp = (lines?: RxLine[], who?: WhoSnap) => ({
  * anything up.
  */
 export function slipDataFor(v: Visit, pt: Patient, drugs: Record<string, Drug>): SlipData {
-  const room = doctorById(v.doctorId)
+  // the frozen heading wins once there is one: see DocSnap in types.ts
+  const room = v.doc ?? doctorById(v.doctorId)
   /* WHAT THE PAPER SAYS, WHICH AFTER PRINTING IS NOT THE LIVE RECORD.
      A visit that has been printed carries its own copy of the patient, so a
      spelling corrected in October cannot change what this app says it printed

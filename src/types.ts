@@ -281,6 +281,23 @@ export interface WhoSnap {
   alert?: string
 }
 
+/**
+ * WHOSE NAME HEADS A PRINTED SLIP. Frozen with the patient and the medicines,
+ * and for the same reason: `doctorById` is a live lookup, so renaming room 2's
+ * doctor or correcting his registration number rewrote who every slip he had
+ * already printed says prescribed it. A prescription is a legal document about
+ * who prescribed; that name is the one field on it least allowed to drift.
+ */
+export interface DocSnap {
+  nameEn: string
+  nameSd: string
+  /** blank rather than absent: this is what the sheet printed, and a sheet
+   *  prints an empty line, not an undefined one */
+  degreesEn: string
+  degreesSd: string
+  reg: string
+}
+
 export interface Visit {
   id: string
   patientId: string
@@ -358,6 +375,8 @@ export interface Visit {
    * app has always done.
    */
   who?: WhoSnap
+  /** the doctor's block as the sheet printed it; see DocSnap */
+  doc?: DocSnap
   printedAt?: number     // set on every successful print — this is the audit trail
   /** when the visit stopped being open, whatever the outcome */
   closedAt?: number

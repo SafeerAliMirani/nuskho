@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { printedStamp } from './rx'
 import { renderSlip, type SlipData } from './print/renderSlip'
 import { destinationEn, destinationSd } from './refer'
 import type { Visit } from './types'
@@ -693,5 +694,28 @@ describe('a line that has already been frozen onto the paper', () => {
     const compose = await fs.readFile(new URL('./screens/Compose.tsx', import.meta.url), 'utf8')
     expect(compose).toContain('freezeLines(')
     expect(compose).not.toContain('snap: {')
+  })
+})
+
+/**
+ * THE HEADING IS FROZEN WITH THE REST (batch 41).
+ *
+ * The patient and the medicines were frozen at print time; the doctor's name
+ * was read live on every assembly, so renaming a room's doctor — or correcting
+ * his registration number, which is the likelier edit — rewrote who every slip
+ * he had already printed said prescribed it. A prescription is a document
+ * about who prescribed.
+ */
+describe('whose name a printed slip keeps', () => {
+  it('freezes the heading when it prints, and prefers it afterwards', () => {
+    const doc = { nameEn: 'Dr A. Soomro', nameSd: 'ڊاڪٽر اي سومرو', degreesEn: 'MBBS', degreesSd: '', reg: 'PMC-1' }
+    const st = printedStamp(undefined, undefined, doc)
+    expect(st.doc).toEqual(doc)
+    expect(st.printedAt).toBeGreaterThan(0)
+  })
+
+  it('carries no heading when there is nothing to freeze, so a solo clinic still prints its profile', () => {
+    expect('doc' in printedStamp()).toBe(false)
+    expect('doc' in printedStamp(undefined, undefined, undefined)).toBe(false)
   })
 })

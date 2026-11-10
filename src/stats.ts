@@ -260,13 +260,26 @@ export async function computeStats(forDoctor?: string): Promise<Stats> {
          disease in those places, and never joined to one. --- */
   const place = new Map<string, number>()
   const placeSeen = new Set<string>()
+  let placeRecorded = 0
   for (const v of monthSeen) {
     const c = canonPlace(pById.get(v.patientId)?.city)
     if (!c) continue
+    placeRecorded++
     placeSeen.add(c)
     place.set(c, (place.get(c) ?? 0) + 1)
   }
   const places = bars(place, monthSeen.length, 'Other places')
+  /* NOT RECORDED IS ITS OWN BAR, as it is for the diagnoses above. The rule at
+     the top of this file is that it is never quietly dropped — and it was,
+     here: every visit counted in the denominator, every visit with no village
+     silently absent from the bars, so the chart summed to three quarters with
+     nothing on the page to explain the rest. */
+  if (monthSeen.length - placeRecorded > 0) {
+    places.push({
+      label: 'Not recorded', n: monthSeen.length - placeRecorded,
+      pct: monthSeen.length ? Math.round(((monthSeen.length - placeRecorded) / monthSeen.length) * 100) : 0,
+    })
+  }
 
   /* --- medicines by GENERIC name. Brand-level prescribing data is exactly what
          pharmaceutical companies buy; it does not exist in this app. --- */
