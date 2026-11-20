@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { Patient } from './types'
 import { phoneKey, household, sameHousehold, tell } from './household'
 import { planMerge, mergeRefusal, joinAlerts, suggestKeep } from './merge'
+import { db, findByCode, patientCode } from './db'
 
 const pt = (over: Partial<Patient> = {}): Patient => ({
   id: 'p' + Math.random().toString(36).slice(2, 8), num: 1, name: 'Wazir Ali', createdAt: 1, ...over,
@@ -165,5 +166,89 @@ describe('what a merge must not quietly take away', () => {
     expect(joinAlerts(undefined, 'sulpha')).toBe('sulpha')
     const plan = planMerge(keep, { ...gone, alert: undefined }, 'Admin', at)!
     expect(plan.keep.alert).toBe('penicillin')
+  })
+})
+
+/**
+ * THE SLIP IN THE DRAWER STILL OPENS THE RIGHT PERSON. (Found 10 Nov.)
+ *
+ * The tests above pin that a merge leaves a signpost. Nothing pinned that the
+ * desk FOLLOWS it, and that is the half the patient meets: he hands over a
+ * slip printed before the merge, the desk types its number, and either his
+ * whole history opens or a record with no visits in it does. The second is
+ * worse than "not found", because an empty history looks like a new patient
+ * and the doctor prescribes without the allergy written on the other record.
+ *
+ * WHAT THIS IS AND IS NOT, SAID PLAINLY.
+ *
+ * `findByCode` reads IndexedDB and there is no IndexedDB in this test run. So
+ * the two reads it makes, `where('num').equals(n).first()` and `get(id)`, are
+ * answered from a list held here. Everything between them is the real code:
+ * the real `planMerge` writes the two records, the real `patientCode` prints
+ * the number, the real `findByCode` parses it and walks the chain. Take the
+ * walk out of findByCode, or `mergedInto` out of planMerge, and these fail.
+ *
+ * What is NOT covered is the writing. `mergePatients` in db.ts puts the plan
+ * into the tables inside a transaction and re-points the visits, and nothing
+ * here runs it: delete `db.patients.put(plan.gone)` there and these still
+ * pass, because the signpost on this shelf was put there by the test. That
+ * needs a real database under the test (fake-indexeddb), which this project
+ * does not have yet.
+ */
+describe('a slip printed before a merge still opens the person it now means', () => {
+  /** stand in for the patients table: the two reads findByCode makes, no more */
+  const shelf = (rows: Patient[]) => {
+    vi.spyOn(db.patients, 'where').mockImplementation(((index: string) => ({
+      equals: (v: unknown) => ({
+        first: async () => rows.find(p => (p as unknown as Record<string, unknown>)[index] === v),
+      }),
+    })) as never)
+    vi.spyOn(db.patients, 'get').mockImplementation((async (id: string) => rows.find(p => p.id === id)) as never)
+  }
+  afterEach(() => { vi.restoreAllMocks() })
+
+  const a = pt({ id: 'a', num: 10, name: 'Wazir Ali', createdAt: 100, alert: 'penicillin' })
+  const b = pt({ id: 'b', num: 88, name: 'Wazeer Ali', createdAt: 900 })
+  const c = pt({ id: 'c', num: 5, name: 'Wazir Ali Soomro', createdAt: 50 })
+
+  it('opens each record under its own number while they are still two people', () => {
+    // The control. If the shelf answered "a" to everything, every test below
+    // would pass and prove nothing.
+    shelf([a, b])
+    return Promise.all([findByCode(patientCode(88)), findByCode(patientCode(10))]).then(([x, y]) => {
+      expect(x?.id).toBe('b')
+      expect(y?.id).toBe('a')
+    })
+  })
+
+  it('opens the survivor from the number of the record that was folded away', async () => {
+    const plan = planMerge(a, b, 'Clinic admin', 5000)!
+    shelf([plan.keep, plan.gone])
+    const opened = await findByCode(patientCode(88))      // the old slip
+    expect(opened?.id).toBe('a')
+    expect(opened?.mergedInto).toBeUndefined()             // a person, not a signpost
+    expect(opened?.alert).toBe('penicillin')               // and his allergy came with him
+    // the survivor's own slips are untouched by any of this
+    expect((await findByCode(patientCode(10)))?.id).toBe('a')
+  })
+
+  it('follows two merges in a row, because the survivor of one can be folded in the next', async () => {
+    // b went into a in March; in June a is found to be a duplicate of c.
+    // The slip that says 88 is now two steps from the person. One hop, an
+    // `if` where the loop is, lands on a: a signpost with no history.
+    const first = planMerge(a, b, 'Clinic admin', 5000)!
+    const second = planMerge(c, first.keep, 'Clinic admin', 9000)!
+    expect(second.gone.mergedInto).toBe('c')
+    shelf([second.keep, second.gone, first.gone])
+    expect((await findByCode(patientCode(88)))?.id).toBe('c')
+    expect((await findByCode(patientCode(10)))?.id).toBe('c')
+    expect((await findByCode(patientCode(5)))?.id).toBe('c')
+  })
+
+  it('opens nobody for a number that was mistyped or never issued', async () => {
+    const plan = planMerge(a, b, 'Clinic admin', 5000)!
+    shelf([plan.keep, plan.gone])
+    expect(await findByCode('not a code')).toBeUndefined()
+    expect(await findByCode(patientCode(4321))).toBeUndefined()
   })
 })

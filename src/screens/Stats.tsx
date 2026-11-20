@@ -374,12 +374,12 @@ function CardView({ s, onClose }: { s: Stats; onClose: () => void }) {
         <button className="btn ghost" onClick={() => { ensurePrintStyles(); printCard(d) }}>Print it</button>
         <button className="lnk" onClick={onClose}>close</button>
       </div>
-      {d.topDiagnoses.length === 0 && (
-        <p className="hint">
-          No condition has been treated 25 times this month, so none is named on the card.
-          Below that, a "case" in a town this size is a person.
-        </p>
-      )}
+      <p className="hint">
+        The card carries no conditions. It is made to go on a wall and onto
+        WhatsApp, the labels are your own words, and a count cannot tell a broad
+        category from one a patient would not want shown. What it does carry is
+        how many people you served, how many came back, and where they came from.
+      </p>
     </div>
   )
 }

@@ -230,7 +230,12 @@ export type RestoreReport = {
 export function readBackup(text: string): SetupFile {
   const f = JSON.parse(text)
   if (f?.magic !== MAGIC) throw new Error('That is not a Nuskho setup file.')
-  if (typeof f.version !== 'number' || f.version > VERSION)
+  // a missing or non-numeric version is a damaged file, not a newer one, and
+  // being told to upgrade when the file is simply broken sends the clinic
+  // looking for an update that does not exist
+  if (typeof f.version !== 'number')
+    throw new Error('That file is damaged: it does not say which version of Nuskho made it. Nothing was changed.')
+  if (f.version > VERSION)
     throw new Error('That file was made by a newer version of Nuskho.')
   /**
    * THE SHAPE IS CHECKED BEFORE ANYTHING IS WRITTEN.
@@ -252,7 +257,10 @@ export function readBackup(text: string): SetupFile {
   }
   for (const p of f.patients ?? []) {
     if (!isObj(p) || typeof p.id !== 'string' || typeof p.name !== 'string'
-        || typeof p.num !== 'number' || !Number.isFinite(p.num) || p.num <= 0) throw bad('a patient has no id, name or number')
+        || typeof p.num !== 'number' || !Number.isFinite(p.num) || p.num <= 0
+        // a fractional number is not a card anybody can hand over, and it
+        // would go on to feed the counter
+        || !Number.isInteger(p.num)) throw bad('a patient has no id, name or number')
   }
   for (const v of f.visits ?? []) {
     if (!isObj(v) || typeof v.id !== 'string' || typeof v.patientId !== 'string'
@@ -302,8 +310,17 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
     restoreDoctorsBlob(f.doctors)
   }
 
-  const have = new Set((await db.drugs.toArray())
-    .map(d => `${d.brand} ${d.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '')))
+  /* AND WHEN A MEDICINE IS SKIPPED, WHAT POINTED AT IT HAS TO BE RE-AIMED.
+     The dedupe keeps the local row and drops the file's — correct — but the
+     file's sets and visits still name the file's drugId, which now exists
+     nowhere. Compose.tsx filters a saved set by `drugs[l.drugId]`, silently,
+     so the doctor taps a set he has used for a year and gets two medicines out
+     of three with nothing on screen to say why. `remap` carries the file's id
+     to the id this machine kept, and every restored line is re-aimed through
+     it below. */
+  const remap = new Map<string, string>()
+  const have = new Map((await db.drugs.toArray())
+    .map(d => [`${d.brand} ${d.strength}`.toLowerCase().replace(/[^a-z0-9]/g, ''), d.id] as const))
   for (const d of f.drugs ?? []) {
     /* HIS OWN ROW WINS, AND IT IS CHECKED BY ID FIRST.
        The name key alone could not see it: a file holding X as "AUGMENTIN
@@ -314,8 +331,9 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
        function; this is what makes it true. */
     if (await db.drugs.get(d.id)) { rep.skipped++; continue }
     const k = `${d.brand} ${d.strength}`.toLowerCase().replace(/[^a-z0-9]/g, '')
-    if (have.has(k)) { rep.skipped++; continue }
-    have.add(k)
+    const kept = have.get(k)
+    if (kept) { rep.skipped++; if (kept !== d.id) remap.set(d.id, kept); continue }
+    have.set(k, d.id)
     await db.drugs.put(d)
     rep.drugs++
   }
@@ -359,15 +377,21 @@ export async function restore(f: SetupFile, takeIdentity = false): Promise<Resto
     rep.patients++
   }
   rep.numberClashes = clashes
+  /** A line that named a medicine this machine kept under its own id. A frozen
+   *  line keeps its snap either way, so the paper it already printed is not
+   *  touched; this only decides what the picker and the sets can still find. */
+  const reaim = <T extends { drugId: string }>(l: T): T =>
+    remap.has(l.drugId) ? { ...l, drugId: remap.get(l.drugId)! } : l
+
   for (const v of f.visits ?? []) {
     if (ownerless.has(v.patientId)) { rep.skipped++; continue }
     if (await db.visits.get(v.id)) { rep.skipped++; continue }
-    await db.visits.put(v)
+    await db.visits.put(remap.size ? { ...v, lines: v.lines.map(reaim) } : v)
     rep.visits++
   }
   for (const st of f.sets ?? []) {
     if (await db.sets.get(st.id)) { rep.skipped++; continue }
-    await db.sets.put(st)
+    await db.sets.put(remap.size ? { ...st, lines: st.lines.map(reaim) } : st)
   }
 
   // Tokens from TODAY's restored visits may already be on thermal receipts in

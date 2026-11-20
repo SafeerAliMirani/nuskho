@@ -404,8 +404,11 @@ export async function daySummary(visits: Visit[]) {
        figure. A clinic that cannot tell the two apart cannot tell whether the
        strip machine pays for itself. Owed until the compounder marks it taken,
        because money nobody collected must never look collected. */
+    /* Taken: the frozen amount, falling back to today's price list only for
+       visits paid before this field existed. Money already in the drawer is not
+       re-priced by an edit to the list hours later. */
     testsTaken: firsts.filter(v => v.testsPaidAt)
-                      .reduce((a, v) => a + chargeTotal(chargesFor(v.vitals, INSTANT)), 0),
+                      .reduce((a, v) => a + (v.testsPaidAmount ?? chargeTotal(chargesFor(v.vitals, INSTANT))), 0),
     testsOwed: firsts.filter(v => !v.testsPaidAt)
                      .reduce((a, v) => a + chargeTotal(chargesFor(v.vitals, INSTANT)), 0),
     testsOwedCount: firsts.filter(v => !v.testsPaidAt && chargesFor(v.vitals, INSTANT).length).length,
@@ -414,7 +417,15 @@ export async function daySummary(visits: Visit[]) {
 
 /** The compounder took the money for the tests, outside the room, after. */
 export async function markTestsPaid(visitId: string): Promise<void> {
-  await db.visits.update(visitId, { testsPaidAt: Date.now() })
+  // the amount is frozen with the moment: see testsPaidAmount in types.ts
+  await db.transaction('rw', db.visits, async () => {
+    const live = await db.visits.get(visitId)
+    if (!live) return
+    await db.visits.update(visitId, {
+      testsPaidAt: Date.now(),
+      testsPaidAmount: chargeTotal(chargesFor(live.vitals, INSTANT)),
+    })
+  })
 }
 
 

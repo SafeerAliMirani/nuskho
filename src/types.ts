@@ -339,6 +339,15 @@ export interface Visit {
    */
   testsPaidAt?: number
   /**
+   * WHAT WAS ACTUALLY TAKEN, frozen at the moment it was taken.
+   *
+   * The figures used to price every test live, from the current list, so
+   * changing a price at eight in the evening changed what the day said had
+   * been collected at six. The drawer is counted against that number. This is
+   * the amount that changed hands, and it does not move afterwards.
+   */
+  testsPaidAmount?: number
+  /**
    * Pregnant, as recorded in this room today.
    *
    * On the VISIT and not on the patient, because it is true for a while and

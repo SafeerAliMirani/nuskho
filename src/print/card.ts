@@ -41,7 +41,7 @@ export type CardData = {
   returningPct: number
   returningN: number
   placeCount: number
-  /** only broad, non-stigmatising categories, and only when large enough */
+  /** always empty: see cardData. Kept so an older saved card still types. */
   topDiagnoses: { label: string; n: number }[]
   sinceLabel?: string
   credit: boolean
@@ -62,10 +62,22 @@ export function cardData(s: Stats, who?: { nameEn: string; nameSd: string; degre
     returningPct: s.returningPct,
     returningN: s.returningN,
     placeCount: s.placeCount,
-    // 25 is the floor: below it a "case" in a town this size is a person
-    topDiagnoses: s.diagnoses
-      .filter(d => d.label !== 'Not recorded' && !d.label.startsWith('Other') && d.n >= 25)
-      .slice(0, 3).map(d => ({ label: d.label, n: d.n })),
+    /* NOT THE DIAGNOSES, AND THE COUNT WAS NEVER THE PROTECTION.
+       The field above calls itself "only broad, non-stigmatising categories",
+       and the filter underneath it only ever checked a count of 25. The labels
+       are the DOCTOR'S OWN FREE TEXT — his Setup list, in his words — so in the
+       right clinic "TB", a psychiatric label, or anything else a patient would
+       not want on a wall clears 25 easily. This card is made to be printed for
+       the clinic wall and sent on WhatsApp, and the header of this file calls
+       it structurally incapable of embarrassing anybody. A number cannot tell
+       a broad category from a stigmatising one, and no whitelist can be written
+       over free text.
+       So the card carries no diagnoses. The patients served, the ones who came
+       back, the towns they travelled from and the evenings worked are the
+       claim it was always really making. If this is ever wanted back, it needs
+       the doctor to tick the three labels on the preview before the file is
+       made, not a threshold. (20 Nov) */
+    topDiagnoses: [],
     sinceLabel: s.since
       ? new Date(s.since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
       : undefined,

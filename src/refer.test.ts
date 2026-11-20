@@ -111,6 +111,7 @@ import { FORM_WORD, DOSE_WORD, ROUTE_WORD, TIME_WORD, pendingWords, wordOk,
          routesFor, routeMatters, defaultRoute, sideMatters } from './data/forms'
 import { sameMolecule } from './data/who'
 import type { RxLine, RxSnap, Form, Route, Drug } from './types'
+import { snapFor, freezeLines } from './rx'
 
 const line = (form: Form, over: Partial<RxLine> = {}, route?: Route): RxLine => ({
   drugId: 'x', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5,
@@ -694,6 +695,83 @@ describe('a line that has already been frozen onto the paper', () => {
     const compose = await fs.readFile(new URL('./screens/Compose.tsx', import.meta.url), 'utf8')
     expect(compose).toContain('freezeLines(')
     expect(compose).not.toContain('snap: {')
+  })
+
+  /**
+   * AND THE VALUES, WHICH THE TEST ABOVE NEVER LOOKED AT. (Found 10 Nov.)
+   *
+   * It compares the NAMES of the keys in two literals. `brand: g?.strength`
+   * has the right names. So does `sdReviewed: g?.sdReviewed !== false`, and
+   * that one is the dangerous one: a medicine whose Sindhi nobody has read has
+   * no `sdReviewed` at all, `undefined !== false` is true, and the line
+   * freezes as reviewed. From then on the machine's guess at the brand in
+   * Sindhi prints under the English name on every slip, and the snap is never
+   * rebuilt, so correcting the medicine list afterwards does not take it back.
+   *
+   * Every field below carries a value no other field carries, so two fields
+   * swapped is a failure and not a coincidence.
+   */
+  const whole: Drug = {
+    id: 'd1', brand: 'CALPOL', strength: '120 mg/5 ml', generic: 'Paracetamol',
+    sd: 'ڪالپول', sdReviewed: true, unitSd: 'چمچو', form: 'syr', route: 'mouth', mlPerDose: 2.5,
+  }
+
+  it('freezes each field with its own value, not merely under its own name', () => {
+    expect(snapFor(whole)).toEqual({
+      brand: 'CALPOL', strength: '120 mg/5 ml', generic: 'Paracetamol',
+      sd: 'ڪالپول', sdReviewed: true, unitSd: 'چمچو', form: 'syr', route: 'mouth', mlPerDose: 2.5,
+    })
+  })
+
+  it('freezes a Sindhi name as reviewed only when a person has said so', () => {
+    expect(snapFor({ ...whole, sdReviewed: true }).sdReviewed).toBe(true)
+    expect(snapFor({ ...whole, sdReviewed: false }).sdReviewed).toBe(false)
+    // THE CASE THE MUTATION TURNS. A medicine typed mid-consultation, or one
+    // from before the gate existed, has no flag at all. Absent is not a yes.
+    const { sdReviewed: _never, ...unread } = whole
+    expect(snapFor(unread).sdReviewed).toBe(false)
+    // A restored file is not typed by TypeScript. Neither of these is a person
+    // saying yes, and `!!x` in place of `=== true` would take both as one.
+    expect(snapFor({ ...whole, sdReviewed: 'yes' as unknown as boolean }).sdReviewed).toBe(false)
+    expect(snapFor({ ...whole, sdReviewed: 1 as unknown as boolean }).sdReviewed).toBe(false)
+  })
+
+  it('freezes a line whose medicine has gone as blanks, and never as reviewed', () => {
+    // route and mlPerDose stay absent on purpose: printed() fills those two
+    // from the medicine list when the snap has none, and an invented default
+    // here would stop it.
+    expect(snapFor(undefined)).toEqual({
+      brand: '', strength: '', generic: '', sd: '', sdReviewed: false, unitSd: '', form: 'tab',
+    })
+    expect(snapFor(undefined).route).toBeUndefined()
+    expect(snapFor(undefined).mlPerDose).toBeUndefined()
+  })
+
+  it('keeps an unread Sindhi brand off the paper once the line is frozen', () => {
+    // The same claim asked of the printer, because the paper is what the
+    // patient holds. The reviewed slip is printed first so that the refusal
+    // below can fail: if the word never printed at all, "not on the slip"
+    // would be true of everything.
+    const lines: RxLine[] = [{ drugId: 'd1', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5 }]
+    const paper = (d: Drug) => renderSlip(slip({ visit: visit({ lines: freezeLines(lines, { d1: d }) }), drugs: {} }))
+    const { sdReviewed: _never, ...unread } = whole
+
+    expect(paper(whole)).toContain('ڪالپول')
+    expect(paper(unread)).not.toContain('ڪالپول')
+    expect(paper({ ...whole, sdReviewed: false })).not.toContain('ڪالپول')
+    // the English name is what the chemist reads, and it prints either way
+    expect(paper(unread)).toContain('CALPOL')
+  })
+
+  it('leaves a line already frozen exactly as it was, whatever the list says now', () => {
+    // freezeLines must not re-freeze. A slip printed in March with an unread
+    // Sindhi name does not acquire one in June because somebody reviewed it.
+    const once = freezeLines([{ drugId: 'd1', dose: { m: 1, d: 0, n: 1 }, meal: 'after', days: 5 }],
+      { d1: { ...whole, sdReviewed: false } })
+    const again = freezeLines(once, { d1: { ...whole, brand: 'RENAMED', sdReviewed: true } })
+    expect(again[0].snap).toEqual(once[0].snap)
+    expect(again[0].snap!.sdReviewed).toBe(false)
+    expect(again[0].snap!.brand).toBe('CALPOL')
   })
 })
 
